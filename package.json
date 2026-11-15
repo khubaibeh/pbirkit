@@ -1,0 +1,34 @@
+{
+	"name": "pbirkit",
+	"private": true,
+	"description": "[EXPERIMENTAL] Tool(s) for interacting with power bi reports.",
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"prepare": "vp config",
+		"build": "pnpm -r build",
+		"check": "vp check",
+		"lint": "vp lint",
+		"lint:fix": "vp lint --fix",
+		"format": "vp fmt",
+		"format:check": "vp fmt --check",
+		"typecheck": "pnpm -r typecheck"
+	},
+	"devDependencies": {
+		"@types/node": "catalog:",
+		"@typescript/native-preview": "catalog:",
+		"vite-plus": "catalog:"
+	},
+	"devEngines": {
+		"packageManager": {
+			"name": "pnpm",
+			"version": "12.21.0",
+			"onFail": "download"
+		},
+		"runtime": {
+			"name": "node",
+			"version": "26.13.1",
+			"onFail": "download"
+		}
+	}
+}

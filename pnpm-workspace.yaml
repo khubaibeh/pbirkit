@@ -1,0 +1,26 @@
+packages:
+  - packages/*
+
+catalog:
+  "@effect/platform-node": 4.1.4
+  "@types/node": 26.6.6
+  "@typescript/native-preview": 7.0.0-dev.20260707.2
+  ajv: 8.20.0
+  effect: 4.1.4
+  jsonc-parser: 3.3.1
+  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
+  vite-plus: 1.6.0
+
+allowBuilds:
+  msgpackr-extract: true
+
+minimumReleaseAge: 4320 # 3 days
+minimumReleaseAgeStrict: true
+
+overrides:
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
