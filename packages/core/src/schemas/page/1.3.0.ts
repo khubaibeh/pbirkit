@@ -1,6 +1,7 @@
 import { Literal, Literals, Struct, optionalKey } from "effect/Schema";
 
 import { FilterConfig } from "#schemas/filter-configuration/1.0.0.ts";
+import { SchemaUrl } from "#schemas/schema-url.ts";
 
 import { AutoPageGenerationConfig, BindingParameter, PageBinding, PageFormattingObjects } from "./1.2.0.ts";
 import { PageFields, PageVisuals } from "./shared.ts";
@@ -11,9 +12,7 @@ export { AutoPageGenerationConfig, BindingParameter, FilterConfig, PageBinding, 
 export const PageType = Literals(["Drillthrough", "Tooltip"]);
 
 export const Page = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/1.3.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.page["1.3.0"]),
 	...PageFields,
 	filterConfig: optionalKey(FilterConfig),
 	pageBinding: optionalKey(PageBinding),

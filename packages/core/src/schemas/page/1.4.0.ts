@@ -3,6 +3,7 @@ import { Literal, Struct, optionalKey } from "effect/Schema";
 import { formattingObjects } from "#schemas/common/formatting.ts";
 import { FilterConfig } from "#schemas/filter-configuration/1.1.0.ts";
 import { Selector } from "#schemas/formatting-object-definitions/1.3.0.ts";
+import { SchemaUrl } from "#schemas/schema-url.ts";
 
 import { AutoPageGenerationConfig, BindingParameter, PageBinding } from "./1.2.0.ts";
 import { PageType } from "./1.3.0.ts";
@@ -16,9 +17,7 @@ export const PageFormattingObjects = formattingObjects(Selector, PageFormattingP
 export type PageFormattingObjects = typeof PageFormattingObjects.Type;
 
 export const Page = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/1.4.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.page["1.4.0"]),
 	...PageFields,
 	filterConfig: optionalKey(FilterConfig),
 	pageBinding: optionalKey(PageBinding),

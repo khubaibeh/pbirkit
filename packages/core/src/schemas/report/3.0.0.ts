@@ -1,5 +1,7 @@
 import { Literal, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 import { ExplorationSettings } from "./1.0.0.ts";
 import { FilterConfig, ReportFormattingObjects } from "./2.1.0.ts";
 import { ReportFields, ThemeResourcePackageType } from "./shared.ts";
@@ -31,9 +33,7 @@ export const ThemeCollection = Struct({
 export type ThemeCollection = typeof ThemeCollection.Type;
 
 export const Report = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/3.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.report["3.0.0"]),
 	filterConfig: optionalKey(FilterConfig),
 	objects: optionalKey(ReportFormattingObjects),
 	...ReportFields,

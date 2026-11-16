@@ -3,6 +3,7 @@ import { Array, Literal, String, Struct, optionalKey } from "effect/Schema";
 import { formattingObjects } from "#schemas/common/formatting.ts";
 import { FilterType, filterConfiguration } from "#schemas/filter-configuration/shared.ts";
 import { Selector } from "#schemas/formatting-object-definitions/1.1.0.ts";
+import { SchemaUrl } from "#schemas/schema-url.ts";
 import { FilterDefinition, QueryExpressionContainer } from "#schemas/semantic-query/1.1.0.ts";
 
 import {
@@ -48,9 +49,7 @@ export const AutoPageGenerationConfig = autoPageGenerationConfig(QueryExpression
 export type AutoPageGenerationConfig = typeof AutoPageGenerationConfig.Type;
 
 export const Page = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/1.1.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.page["1.1.0"]),
 	...PageFields,
 	filterConfig: optionalKey(FilterConfig),
 	pageBinding: optionalKey(PageBinding),

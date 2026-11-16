@@ -1,5 +1,7 @@
 import { Boolean, Literal, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 import { ThemeCollection, ThemeMetadata, ThemeVersion } from "./3.0.0.ts";
 import { FieldParameterReportSettings } from "./3.1.0.ts";
 import { FilterConfig, ReportFormattingObjects } from "./3.2.0.ts";
@@ -26,9 +28,7 @@ export const ExplorationSettings = Struct({
 export type ExplorationSettings = typeof ExplorationSettings.Type;
 
 export const Report = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/3.3.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.report["3.3.0"]),
 	filterConfig: optionalKey(FilterConfig),
 	objects: optionalKey(ReportFormattingObjects),
 	...ReportFields,

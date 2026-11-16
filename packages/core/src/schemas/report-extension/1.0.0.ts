@@ -1,5 +1,7 @@
 import { Array, Boolean, Literal, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 export const PrimitiveTypeName = Literals([
 	"Binary",
 	"Boolean",
@@ -71,9 +73,7 @@ export const ReportExtensionEntity = Struct({
 export type ReportExtensionEntity = typeof ReportExtensionEntity.Type;
 
 export const ReportExtension = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/reportExtension/1.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.reportExtension["1.0.0"]),
 	name: String,
 	entities: optionalKey(Array(ReportExtensionEntity)),
 });

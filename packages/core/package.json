@@ -19,6 +19,7 @@
 		"./page/*": "./src/schemas/page/*.ts",
 		"./report": "./src/schemas/report/index.ts",
 		"./report-extension/*": "./src/schemas/report-extension/*.ts",
+		"./schema-url": "./src/schemas/schema-url.ts",
 		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
 		"./visual/*": "./src/schemas/visual/*.ts"
 	},

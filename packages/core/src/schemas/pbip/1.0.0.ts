@@ -1,5 +1,7 @@
 import { Array, Boolean, Literal, NullOr, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 export const ReportArtifact = Struct({
 	report: Struct({ path: String }),
 });
@@ -13,9 +15,7 @@ export const PbipSettings = Struct({
 export type PbipSettings = typeof PbipSettings.Type;
 
 export const Pbip = Struct({
-	$schema: optionalKey(
-		Literal("https://developer.microsoft.com/json-schemas/fabric/pbip/pbipProperties/1.0.0/schema.json"),
-	),
+	$schema: optionalKey(Literal(SchemaUrl.pbip["1.0.0"])),
 	version: String,
 	artifacts: Array(ReportArtifact),
 	settings: optionalKey(NullOr(PbipSettings)),

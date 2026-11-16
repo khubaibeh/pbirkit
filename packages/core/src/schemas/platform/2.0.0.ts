@@ -1,5 +1,7 @@
 import { Literal, Struct } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 import { PlatformConfig, PlatformMetadataFields } from "./shared.ts";
 
 export * from "./shared.ts";
@@ -9,9 +11,7 @@ export const PlatformMetadata = Struct(PlatformMetadataFields);
 export type PlatformMetadata = typeof PlatformMetadata.Type;
 
 export const Platform = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.platform["2.0.0"]),
 	metadata: PlatformMetadata,
 	config: PlatformConfig,
 });

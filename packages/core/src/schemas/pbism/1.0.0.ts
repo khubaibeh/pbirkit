@@ -1,5 +1,7 @@
 import { Boolean, Literal, Literals, NullOr, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 export const PbismSettings = Struct({
 	qnaEnabled: optionalKey(NullOr(Boolean)),
 	qnaLsdlSharingPermissions: optionalKey(Literals([0, 1])),
@@ -8,11 +10,7 @@ export const PbismSettings = Struct({
 export type PbismSettings = typeof PbismSettings.Type;
 
 export const Pbism = Struct({
-	$schema: optionalKey(
-		Literal(
-			"https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/definitionProperties/1.0.0/schema.json",
-		),
-	),
+	$schema: optionalKey(Literal(SchemaUrl.pbism["1.0.0"])),
 	version: String,
 	settings: optionalKey(NullOr(PbismSettings)),
 });

@@ -3,6 +3,7 @@ import { Literal, Literals, Struct, Union, optionalKey } from "effect/Schema";
 import type { WithoutSchema } from "#schemas/common/define.ts";
 import { FilterTypeValues, filterConfiguration } from "#schemas/filter-configuration/shared.ts";
 import { DataViewObjectDefinitions, Selector } from "#schemas/formatting-object-definitions/1.0.0.ts";
+import { SchemaUrl } from "#schemas/schema-url.ts";
 import { FilterDefinition, QueryExpressionContainer } from "#schemas/semantic-query/1.0.0.ts";
 import { VisualLink } from "#schemas/visual-configuration/1.5.0.ts";
 import {
@@ -50,9 +51,7 @@ export const { FilterConfig } = filterConfiguration({
 export type FilterConfig = typeof FilterConfig.Type;
 
 const fields = {
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.visual["1.0.0"]),
 	...VisualContainerFields,
 	position: VisualContainerPosition,
 	filterConfig: optionalKey(FilterConfig),
@@ -67,6 +66,6 @@ export const Visual = Union([
 export type Visual = typeof Visual.Type;
 
 export const defineVisual = (visual: WithoutSchema<Visual>): Visual => ({
-	...visual,
 	$schema: fields.$schema.literal,
+	...visual,
 });

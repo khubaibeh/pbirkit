@@ -1,5 +1,7 @@
 import { Literal, NullOr, String, Struct, optionalKey } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 import { ByPath } from "./shared.ts";
 
 export * from "./shared.ts";
@@ -18,11 +20,7 @@ export const DatasetReference = Struct({
 export type DatasetReference = typeof DatasetReference.Type;
 
 export const Pbir = Struct({
-	$schema: optionalKey(
-		Literal(
-			"https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
-		),
-	),
+	$schema: optionalKey(Literal(SchemaUrl.pbir["2.0.0"])),
 	version: String,
 	datasetReference: DatasetReference,
 });

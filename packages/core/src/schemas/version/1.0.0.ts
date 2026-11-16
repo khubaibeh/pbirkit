@@ -1,9 +1,9 @@
 import { Literal, String, Struct } from "effect/Schema";
 
+import { SchemaUrl } from "#schemas/schema-url.ts";
+
 export const VersionMetadata = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/versionMetadata/1.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.version["1.0.0"]),
 	version: String,
 });
 

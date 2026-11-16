@@ -3,6 +3,7 @@ import { Literal, Literals, String, Struct, optionalKey } from "effect/Schema";
 import { formattingObjects } from "#schemas/common/formatting.ts";
 import { FilterTypeValues, filterConfiguration } from "#schemas/filter-configuration/shared.ts";
 import { Selector } from "#schemas/formatting-object-definitions/1.0.0.ts";
+import { SchemaUrl } from "#schemas/schema-url.ts";
 import { FilterDefinition, QueryExpressionContainer } from "#schemas/semantic-query/1.0.0.ts";
 
 import {
@@ -49,9 +50,7 @@ export type ExplorationSettings = typeof ExplorationSettings.Type;
 export const LayoutOptimization = Literals(["None", "PhonePortrait"]);
 
 export const Report = Struct({
-	$schema: Literal(
-		"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/1.0.0/schema.json",
-	),
+	$schema: Literal(SchemaUrl.report["1.0.0"]),
 	filterConfig: optionalKey(FilterConfig),
 	objects: optionalKey(ReportFormattingObjects),
 	...ReportFields,
