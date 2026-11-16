@@ -1,0 +1,20 @@
+{
+	"name": "@pbirkit/cli",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Command line tools for pbirkit.",
+	"license": "MIT",
+	"bin": {
+		"pbirkit": "./src/main.ts"
+	},
+	"type": "module",
+	"scripts": {
+		"pbirkit": "node src/main.ts",
+		"typecheck": "tsgo --noEmit"
+	},
+	"dependencies": {
+		"@effect/platform-node": "catalog:",
+		"@pbirkit/core": "workspace:*",
+		"effect": "catalog:"
+	}
+}

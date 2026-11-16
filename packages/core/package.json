@@ -12,6 +12,7 @@
 		"#schemas/*": "./src/schemas/*/index.ts"
 	},
 	"exports": {
+		"./build": "./src/build.ts",
 		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",
 		"./custom-visual": "./src/custom-visual.ts",
