@@ -12,7 +12,10 @@
 		"#schemas/*": "./src/schemas/*/index.ts"
 	},
 	"exports": {
+		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",
+		"./custom-visual": "./src/custom-visual.ts",
+		"./expr": "./src/expr/index.ts",
 		"./filter-configuration/*": "./src/schemas/filter-configuration/*.ts",
 		"./formatting-object-definitions/*": "./src/schemas/formatting-object-definitions/*.ts",
 		"./model": "./src/schemas/model/index.ts",

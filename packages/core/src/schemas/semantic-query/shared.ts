@@ -243,7 +243,7 @@ type QueryExpressionKindTypes<E, D extends Constraint> = KindTypes<
 	>
 >;
 
-type QueryExpressionKindName = keyof ReturnType<typeof queryExpressionKinds<Top, Top, Top>>;
+export type QueryExpressionKindName = keyof ReturnType<typeof queryExpressionKinds<Top, Top, Top>>;
 
 export interface QueryExpressionRecursion {
 	readonly expression: unknown;
