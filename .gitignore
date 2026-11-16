@@ -2,3 +2,7 @@ node_modules
 .local
 dist
 playground
+
+
+README.md
+TRACKER.md

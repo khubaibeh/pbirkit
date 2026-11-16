@@ -45,6 +45,8 @@ export default defineConfig({
 			"max-classes-per-file": "off",
 			"no-underscore-dangle": "off",
 			"max-lines": "off",
+			"import/max-dependencies": "off",
+			"no-redeclare": "off",
 			"max-lines-per-function": ["warn", { max: 150 }],
 			"typescript/prefer-readonly-parameter-types": "off",
 			"vite-plus/prefer-vite-plus-imports": "error",
