@@ -19,6 +19,10 @@ import { Visual as VisualV2_6 } from "./2.6.0.ts";
 import { Visual as VisualV2_7 } from "./2.7.0.ts";
 import { Visual as VisualV2_8 } from "./2.8.0.ts";
 import { Visual as VisualV2_9 } from "./2.9.0.ts";
+import { Visual as VisualV2_10 } from "./2.10.0.ts";
+import { Visual as VisualV2_11 } from "./2.11.0.ts";
+import { Visual as VisualV2_12 } from "./2.12.0.ts";
+import { Visual as VisualV2_13 } from "./2.13.0.ts";
 
 export const AnyVisual = Union([
 	VisualV1_0,
@@ -40,6 +44,10 @@ export const AnyVisual = Union([
 	VisualV2_7,
 	VisualV2_8,
 	VisualV2_9,
+	VisualV2_10,
+	VisualV2_11,
+	VisualV2_12,
+	VisualV2_13,
 ]);
 
 export type AnyVisual = typeof AnyVisual.Type;
