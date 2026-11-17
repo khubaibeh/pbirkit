@@ -1,6 +1,7 @@
 import { Array, String, Struct, optionalKey } from "effect/Schema";
 import { omit } from "effect/Struct";
 
+import { BookmarksItem } from "#schemas/bookmarks-metadata";
 import { Model } from "#schemas/model";
 import { AnyPage } from "#schemas/page";
 import { PagesMetadataItem } from "#schemas/pages";
@@ -19,6 +20,7 @@ export const ReportItem = Struct({
 	version: VersionMetadata,
 	pagesMetadata: PagesMetadataItem,
 	pages: Array(AnyPage),
+	bookmarks: optionalKey(BookmarksItem),
 	extensions: optionalKey(ReportExtension),
 });
 

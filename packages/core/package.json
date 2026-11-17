@@ -12,6 +12,8 @@
 		"#schemas/*": "./src/schemas/*/index.ts"
 	},
 	"exports": {
+		"./bookmark/*": "./src/schemas/bookmark/*.ts",
+		"./bookmarks-metadata": "./src/schemas/bookmarks-metadata/index.ts",
 		"./build": "./src/build.ts",
 		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",

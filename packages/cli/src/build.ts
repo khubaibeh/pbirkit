@@ -12,7 +12,9 @@ class BuildError extends Error {}
 
 const fail = (message: string) => Effect.fail(new BuildError(`[ERROR] build: ${message}`));
 
-const OWNED: ReadonlySet<string> = new Set(["page.json", "visual.json"]);
+const OWNED: ReadonlySet<string> = new Set(["page.json", "visual.json", "bookmarks.json"]);
+
+const owned = (file: string): boolean => OWNED.has(file) || file.endsWith(".bookmark.json");
 
 const parents = (path: Path.Path, file: string, root: string): ReadonlyArray<string> => {
 	const folder = path.dirname(file);
@@ -33,8 +35,9 @@ const loadConfig = (file: string) =>
 			),
 		);
 		if (!is(Config)(input)) return yield* fail(`${file} is not a valid config`);
-		const issues = checkConfig(input);
-		if (issues.length > 0) return yield* Effect.fail(new BuildError(issues.join("\n")));
+		const { errors, warnings } = checkConfig(input);
+		if (warnings.length > 0) yield* Console.error(warnings.join("\n"));
+		if (errors.length > 0) return yield* Effect.fail(new BuildError(errors.join("\n")));
 		return input;
 	});
 
@@ -67,14 +70,14 @@ export const build = Command.make(
 				yield* fs.writeFileString(target, content);
 				written.add(target);
 			}
-			const pages = path.join(out, `${config.name}.Report`, "definition", "pages");
-			const stale = (yield* fs.exists(pages))
-				? (yield* fs.readDirectory(pages, { recursive: true }))
-						.map((entry) => path.join(pages, entry))
-						.filter((entry) => OWNED.has(path.basename(entry)) && !written.has(entry))
+			const definition = path.join(out, `${config.name}.Report`, "definition");
+			const stale = (yield* fs.exists(definition))
+				? (yield* fs.readDirectory(definition, { recursive: true }))
+						.map((entry) => path.join(definition, entry))
+						.filter((entry) => owned(path.basename(entry)) && !written.has(entry))
 				: [];
 			for (const entry of stale) yield* fs.remove(entry);
-			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, pages)))].toSorted(
+			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, definition)))].toSorted(
 				(a, b) => b.length - a.length,
 			);
 			for (const folder of folders) {

@@ -74,11 +74,36 @@ const pbip = (config: Config, reportPath: string) => {
 	return { $schema, version, artifacts: [{ report: { path: reportPath } }], ...rest };
 };
 
+type Bookmarks = NonNullable<Config["report"]["bookmarks"]>;
+
+const bookmarkFiles = (folder: string, bookmarks: Bookmarks): ReadonlyArray<readonly [string, unknown]> => {
+	const { items, ...metadata } = bookmarks;
+	const all = items.flatMap((item) => ("children" in item ? item.children : [item]));
+	return [
+		[
+			`${folder}/bookmarks.json`,
+			{
+				...metadata,
+				items: items.map((item) =>
+					"children" in item
+						? {
+								name: item.name,
+								displayName: item.displayName,
+								children: item.children.map((child) => child.name),
+							}
+						: { name: item.name },
+				),
+			},
+		],
+		...all.map((bookmark) => [`${folder}/${bookmark.name}.bookmark.json`, bookmark] as const),
+	];
+};
+
 export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	const report = `${config.name}.Report`;
 	const model = withoutDot(config.model.path);
 	const definition = `${report}/definition`;
-	const { extensions, pagesMetadata } = config.report;
+	const { bookmarks, extensions, pagesMetadata } = config.report;
 	const { $schema, ...pagesRest } = pagesMetadata;
 	const files: Array<readonly [string, unknown]> = [
 		[`${config.name}.pbip`, pbip(config, report)],
@@ -93,6 +118,7 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 			`${definition}/pages/pages.json`,
 			{ $schema, pageOrder: config.report.pages.map((page) => page.name), ...pagesRest },
 		],
+		...(bookmarks === undefined ? [] : bookmarkFiles(`${definition}/bookmarks`, bookmarks)),
 		...(extensions === undefined ? [] : [[`${definition}/reportExtensions.json`, extensions] as const]),
 		[
 			`${model}/.platform`,
