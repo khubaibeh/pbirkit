@@ -24,6 +24,7 @@ export const ReportItem = Struct({
 	pages: Array(AnyPage),
 	bookmarks: optionalKey(BookmarksItem),
 	resources: optionalKey(Array(Resource)),
+	fonts: optionalKey(Array(String)),
 	extensions: optionalKey(ReportExtension),
 });
 

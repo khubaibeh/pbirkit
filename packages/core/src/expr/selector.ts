@@ -1,6 +1,6 @@
 import type { Expression } from "./expression.ts";
-import { props } from "./formatting.ts";
-import type { Properties, PropertyOf } from "./formatting.ts";
+import type { FormattingInput, FormattingValue, Properties, PropertyOf } from "./formatting.ts";
+import { toProperties } from "./properties.ts";
 import { queryRefOf } from "./query.ts";
 
 export type Target = string | Expression;
@@ -31,19 +31,17 @@ export type FieldEntries<K extends string, P extends ReadonlyArray<readonly [Tar
 		: never;
 };
 
-export type FieldPropertyEntries<
-	P extends ReadonlyArray<readonly [Target, Readonly<Record<string, unknown>>]>,
-> = {
+export type FieldPropertyEntries<P extends ReadonlyArray<readonly [Target, FormattingInput]>> = {
 	readonly [I in keyof P]: P[I] extends readonly [Target, infer V]
 		? { readonly properties: Properties<V>; readonly selector: FieldSelector }
 		: never;
 };
 
-export function perField<const K extends string, const P extends ReadonlyArray<readonly [Target, unknown]>>(
-	key: K,
-	pairs: P,
-): FieldEntries<K, P>;
-export function perField<const P extends ReadonlyArray<readonly [Target, Readonly<Record<string, unknown>>]>>(
+export function perField<
+	const K extends string,
+	const P extends ReadonlyArray<readonly [Target, FormattingValue<K>]>,
+>(key: K, pairs: P): FieldEntries<K, P>;
+export function perField<const P extends ReadonlyArray<readonly [Target, FormattingInput]>>(
 	pairs: P,
 ): FieldPropertyEntries<P>;
 export function perField(
@@ -52,7 +50,7 @@ export function perField(
 ): unknown {
 	const pairs = typeof first === "string" ? (second ?? []) : first;
 	return pairs.map(([target, value]) => ({
-		properties: props(typeof first === "string" ? { [first]: value } : isRecord(value) ? value : {}),
+		properties: toProperties(typeof first === "string" ? { [first]: value } : isRecord(value) ? value : {}),
 		selector: forField(target),
 	}));
 }

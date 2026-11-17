@@ -1,6 +1,22 @@
-import { Array, Literals, Number, Record, String, Struct, Union, Unknown, optionalKey } from "effect/Schema";
+import {
+	Array,
+	Literals,
+	Record,
+	String,
+	Struct,
+	StructWithRest,
+	TemplateLiteral,
+	Union,
+	Unknown,
+	isPattern,
+	optionalKey,
+} from "effect/Schema";
 
-export const ThemeColor = String;
+import { FontFace, FontSize } from "#core/font.ts";
+
+export const ThemeColor = TemplateLiteral(["#", String]).check(isPattern(/^#[0-9a-fA-F]{6}$/u));
+
+export type ThemeColor = typeof ThemeColor.Type;
 
 export const BaseThemeName = Literals([
 	"CY17SU10",
@@ -48,8 +64,8 @@ export const BaseThemeName = Literals([
 ]);
 
 export const TextClass = Struct({
-	fontFace: optionalKey(String),
-	fontSize: optionalKey(Number),
+	fontFace: optionalKey(FontFace),
+	fontSize: optionalKey(FontSize),
 	fontWeight: optionalKey(String),
 	color: optionalKey(ThemeColor),
 });
@@ -75,7 +91,21 @@ export const TextClasses = Struct({
 
 export const ThemeIcon = Struct({ url: String, description: optionalKey(String) });
 
-export const VisualStyles = Record(String, Record(String, Record(String, Array(Record(String, Unknown)))));
+export const VisualStyleProperties = StructWithRest(
+	Struct({
+		fontFamily: optionalKey(FontFace),
+		fontSize: optionalKey(FontSize),
+		textSize: optionalKey(FontSize),
+	}),
+	[
+		Record(TemplateLiteral([String, "FontFamily"]), FontFace),
+		Record(TemplateLiteral([String, "FontSize"]), FontSize),
+		Record(TemplateLiteral([String, "TextSize"]), FontSize),
+		Record(String, Unknown),
+	],
+);
+
+export const VisualStyles = Record(String, Record(String, Record(String, Array(VisualStyleProperties))));
 
 export type VisualStyles = typeof VisualStyles.Type;
 

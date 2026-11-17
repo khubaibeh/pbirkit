@@ -2,6 +2,15 @@ import type { VisualContainerGroupState } from "#schemas/bookmark/shared.ts";
 
 import type { Config } from "./config.ts";
 import { at as valueAt } from "./expr/query.ts";
+import {
+	MAX_FONT_SIZE,
+	MIN_FONT_SIZE,
+	isBuiltinFont,
+	isFamilyName,
+	isFontKey,
+	isFontSize,
+	isFontSizeKey,
+} from "./font.ts";
 import { packageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
 
@@ -240,6 +249,71 @@ const checkResources = (config: Config) => {
 	return { errors, warnings: themes.concat(links) };
 };
 
+const fontFaces = (value: unknown): ReadonlyArray<string> =>
+	typeof value === "object" && value !== null
+		? Object.entries(value).flatMap(([key, child]) =>
+				(isFontKey(key) ? strings([typeof child === "string" ? child : textLiteral(child)]) : []).concat(
+					fontFaces(child),
+				),
+			)
+		: [];
+
+const sizeOf = (value: unknown): ReadonlyArray<unknown> => {
+	if (typeof value === "number") return [value];
+	if (typeof value === "string") return [/^\d+pt$/u.test(value) ? Number(value.slice(0, -2)) : value];
+	const literal = valueAt(valueAt(valueAt(value, "expr"), "Literal"), "Value");
+	if (typeof literal !== "string") return [];
+	return [/^-?\d+(?:\.\d+)?[DL]$/u.test(literal) ? Number(literal.slice(0, -1)) : literal];
+};
+
+const fontSizes = (value: unknown): ReadonlyArray<unknown> =>
+	typeof value === "object" && value !== null
+		? Object.entries(value).flatMap(([key, child]) =>
+				(isFontSizeKey(key) ? sizeOf(child) : []).concat(fontSizes(child)),
+			)
+		: [];
+
+const checkFonts = (config: Config): ReadonlyArray<string> => {
+	const registered = new Set(config.report.fonts ?? []);
+	const sources: ReadonlyArray<readonly [string, unknown]> = [
+		["report", config.report.definition],
+		...config.report.pages.flatMap((page) => {
+			const { visuals, ...rest } = page;
+			return [
+				[`page "${page.name}"`, rest] as const,
+				...visuals.map((visual) => [`page "${page.name}" visual "${visual.name}"`, visual] as const),
+			];
+		}),
+		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item] as const),
+		...(config.report.resources ?? []).flatMap((resource) =>
+			resource.kind === "baseTheme" || resource.kind === "customTheme"
+				? [[resourceLabel(resource), resource.theme] as const]
+				: [],
+		),
+	];
+	const families = [...registered]
+		.filter((family) => !isFamilyName(family))
+		.map((family) => `report.fonts: "${family}" must be one font family name, without commas or quotes`);
+	return families.concat(
+		sources.flatMap(([where, value]) =>
+			[...new Set(fontFaces(value))]
+				.filter((face) => !isBuiltinFont(face) && !registered.has(face))
+				.map(
+					(face) =>
+						`${where}: font "${face}" is not a Power BI font, add it to report.fonts and to the font Register`,
+				)
+				.concat(
+					[...new Set(fontSizes(value))]
+						.filter((size) => !isFontSize(size))
+						.map(
+							(size) =>
+								`${where}: font size ${JSON.stringify(size)} must be a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
+						),
+				),
+		),
+	);
+};
+
 export const checkConfig = (config: Config): ConfigIssues => {
 	const { pages, pagesMetadata } = config.report;
 	const pageNames = pages.map((page) => page.name);
@@ -262,6 +336,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	const resourceIssues = checkResources(config);
 	const errors = [
 		...resourceIssues.errors,
+		...checkFonts(config),
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),
 		...duplicates(bindings).map((name) => `report: pageBinding name "${name}" is used more than once`),
 		...Object.entries(pageRefs).flatMap(([key, name]) =>
