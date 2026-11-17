@@ -69,17 +69,10 @@ const platform = (
 	return { $schema, metadata: { type, displayName, ...metadata }, config: { version, logicalId } };
 };
 
-const pbip = (config: Config, reportPath: string): Record<string, unknown> =>
-	Object.fromEntries(
-		Object.entries(config.pbip).flatMap(([key, value]): ReadonlyArray<readonly [string, unknown]> =>
-			key === "version"
-				? [
-						[key, value],
-						["artifacts", [{ report: { path: reportPath } }]],
-					]
-				: [[key, value]],
-		),
-	);
+const pbip = (config: Config, reportPath: string) => {
+	const { $schema, version, ...rest } = config.pbip;
+	return { $schema, version, artifacts: [{ report: { path: reportPath } }], ...rest };
+};
 
 export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	const report = `${config.name}.Report`;
@@ -98,7 +91,7 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 		[`${definition}/version.json`, config.report.version],
 		[
 			`${definition}/pages/pages.json`,
-			{ $schema, pageOrder: config.pages.map((page) => page.name), ...pagesRest },
+			{ $schema, pageOrder: config.report.pages.map((page) => page.name), ...pagesRest },
 		],
 		...(extensions === undefined ? [] : [[`${definition}/reportExtensions.json`, extensions] as const]),
 		[
@@ -110,7 +103,7 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 			? []
 			: [[`${model}/modelReference.json`, config.model.modelReference] as const]),
 	];
-	for (const page of config.pages) {
+	for (const page of config.report.pages) {
 		const { visuals, ...rest } = page;
 		const folder = `${definition}/pages/${page.name}`;
 		files.push([`${folder}/page.json`, rest]);

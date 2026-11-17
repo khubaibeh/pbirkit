@@ -18,6 +18,7 @@ export const ReportItem = Struct({
 	definition: AnyReport,
 	version: VersionMetadata,
 	pagesMetadata: PagesMetadataItem,
+	pages: Array(AnyPage),
 	extensions: optionalKey(ReportExtension),
 });
 
@@ -28,7 +29,6 @@ export const Config = Struct({
 	pbip: Pbip.mapFields(omit(["artifacts"])),
 	report: ReportItem,
 	model: Model,
-	pages: Array(AnyPage),
 });
 
 export type Config = typeof Config.Type;

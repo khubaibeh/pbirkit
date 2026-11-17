@@ -25,5 +25,3 @@ export const AnyReport = Union([
 ]);
 
 export type AnyReport = typeof AnyReport.Type;
-
-export const defineReport = (report: AnyReport): AnyReport => report;

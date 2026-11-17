@@ -7,10 +7,16 @@ export const literal = <const V extends string>(Value: V): LiteralExpression<V> 
 export const text = (value: string): LiteralExpression<`'${string}'`> =>
 	literal(`'${value.replaceAll("'", "''")}'`);
 
-export const double = (value: number): LiteralExpression<`${number}D`> => literal(`${value}D`);
+export const double = (value: number): LiteralExpression<`${number}D`> => {
+	if (!Number.isFinite(value)) throw new TypeError(`[ERROR] double: ${value} is not a finite number`);
+	return literal(`${value}D`);
+};
 
-export const long = (value: number | bigint): LiteralExpression<`${number | bigint}L`> =>
-	literal(`${value}L`);
+export const long = (value: number | bigint): LiteralExpression<`${number | bigint}L`> => {
+	if (typeof value === "number" && !Number.isSafeInteger(value))
+		throw new TypeError(`[ERROR] long: ${value} is not a safe integer`);
+	return literal(`${value}L`);
+};
 
 export const bool = <const V extends boolean>(value: V): LiteralExpression<`${V}`> => literal(`${value}`);
 

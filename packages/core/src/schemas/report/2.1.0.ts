@@ -27,3 +27,8 @@ export const Report = Struct({
 });
 
 export type Report = typeof Report.Type;
+
+export const defineReport = (report: Omit<Report, "$schema">): Report => ({
+	$schema: Report.fields.$schema.literal,
+	...report,
+});

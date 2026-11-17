@@ -3,7 +3,14 @@ import type { Config } from "./config.ts";
 const NAME = /^[\p{L}\p{Mn}\p{Nd}\p{Pc}-]+$/u;
 const MAX_NAME = 50;
 
-type Page = Config["pages"][number];
+const insideProject = (path: string): boolean =>
+	path
+		.replace(/^\.\//u, "")
+		.replace(/\/$/u, "")
+		.split("/")
+		.every((part) => part !== "" && part !== "." && part !== ".." && !/[\\:]/u.test(part));
+
+type Page = Config["report"]["pages"][number];
 type Visual = Page["visuals"][number];
 
 const nameIssue = (where: string, name: string): ReadonlyArray<string> => [
@@ -53,17 +60,28 @@ const checkPage = (page: Page): ReadonlyArray<string> => {
 };
 
 export const checkConfig = (config: Config): ReadonlyArray<string> => {
-	const pageNames = config.pages.map((page) => page.name);
-	const bindings = config.pages.flatMap((page) =>
+	const pageNames = config.report.pages.map((page) => page.name);
+	const bindings = config.report.pages.flatMap((page) =>
 		"pageBinding" in page && page.pageBinding !== undefined ? [page.pageBinding.name] : [],
 	);
-	const active = config.report.pagesMetadata.activePageName;
+	const { pagesMetadata } = config.report;
+	const pageRefs = {
+		activePageName: pagesMetadata.activePageName,
+		landingPageName: "landingPageName" in pagesMetadata ? pagesMetadata.landingPageName : undefined,
+	};
 	return [
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),
 		...duplicates(bindings).map((name) => `report: pageBinding name "${name}" is used more than once`),
-		...(active === undefined || pageNames.includes(active)
+		...Object.entries(pageRefs).flatMap(([key, name]) =>
+			name === undefined || pageNames.includes(name)
+				? []
+				: [`report: ${key} "${name}" is not a page in this report`],
+		),
+		...(insideProject(config.model.path)
 			? []
-			: [`report: activePageName "${active}" is not a page in this report`]),
-		...config.pages.flatMap(checkPage),
+			: [
+					`model: path "${config.model.path}" must be a relative path inside the project, with "/" as the separator`,
+				]),
+		...config.report.pages.flatMap(checkPage),
 	].map((issue) => `[ERROR] check: ${issue}`);
 };

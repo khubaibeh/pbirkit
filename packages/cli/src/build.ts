@@ -12,6 +12,13 @@ class BuildError extends Error {}
 
 const fail = (message: string) => Effect.fail(new BuildError(`[ERROR] build: ${message}`));
 
+const OWNED: ReadonlySet<string> = new Set(["page.json", "visual.json"]);
+
+const parents = (path: Path.Path, file: string, root: string): ReadonlyArray<string> => {
+	const folder = path.dirname(file);
+	return folder === root || !folder.startsWith(root) ? [] : [folder, ...parents(path, folder, root)];
+};
+
 const loadConfig = (file: string) =>
 	Effect.gen(function* () {
 		const module: unknown = yield* Effect.tryPromise({
@@ -53,16 +60,29 @@ export const build = Command.make(
 			const out = path.resolve(path.dirname(file), outFlag);
 			const config = yield* loadConfig(file);
 			const files = buildFiles(config);
-			yield* fs.remove(path.join(out, `${config.name}.Report`, "definition", "pages"), {
-				recursive: true,
-				force: true,
-			});
+			const written = new Set<string>();
 			for (const { path: relative, content } of files) {
 				const target = path.join(out, relative);
 				yield* fs.makeDirectory(path.dirname(target), { recursive: true });
 				yield* fs.writeFileString(target, content);
+				written.add(target);
 			}
-			yield* Console.log(`build: wrote ${files.length} files to ${out}`);
+			const pages = path.join(out, `${config.name}.Report`, "definition", "pages");
+			const stale = (yield* fs.exists(pages))
+				? (yield* fs.readDirectory(pages, { recursive: true }))
+						.map((entry) => path.join(pages, entry))
+						.filter((entry) => OWNED.has(path.basename(entry)) && !written.has(entry))
+				: [];
+			for (const entry of stale) yield* fs.remove(entry);
+			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, pages)))].toSorted(
+				(a, b) => b.length - a.length,
+			);
+			for (const folder of folders) {
+				if ((yield* fs.readDirectory(folder)).length === 0) yield* fs.remove(folder, { recursive: true });
+			}
+			yield* Console.log(
+				`build: wrote ${files.length} files to ${out}${stale.length > 0 ? `, removed ${stale.length} stale files` : ""}`,
+			);
 		}).pipe(
 			Effect.catchIf(
 				(error) => error instanceof BuildError,
