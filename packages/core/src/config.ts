@@ -12,6 +12,8 @@ import { AnyReport } from "#schemas/report";
 import { ReportExtension } from "#schemas/report-extension/1.0.0.ts";
 import { VersionMetadata } from "#schemas/version/1.0.0.ts";
 
+import { Resource } from "./resource.ts";
+
 export const ReportItem = Struct({
 	logicalId: String,
 	platform: PlatformItem,
@@ -21,6 +23,7 @@ export const ReportItem = Struct({
 	pagesMetadata: PagesMetadataItem,
 	pages: Array(AnyPage),
 	bookmarks: optionalKey(BookmarksItem),
+	resources: optionalKey(Array(Resource)),
 	extensions: optionalKey(ReportExtension),
 });
 

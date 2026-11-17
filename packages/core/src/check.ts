@@ -2,6 +2,8 @@ import type { VisualContainerGroupState } from "#schemas/bookmark/shared.ts";
 
 import type { Config } from "./config.ts";
 import { at as valueAt } from "./expr/query.ts";
+import { packageItem } from "./resource.ts";
+import type { Resource } from "./resource.ts";
 
 const NAME = /^[\p{L}\p{Mn}\p{Nd}\p{Pc}-]+$/u;
 const MAX_NAME = 50;
@@ -128,6 +130,71 @@ const checkBookmark = (bookmark: Bookmark, visualsByPage: VisualsByPage): Readon
 	];
 };
 
+const nested = (value: unknown, key: string): ReadonlyArray<unknown> => {
+	if (typeof value !== "object" || value === null) return [];
+	const own = key in value ? [Reflect.get(value, key)] : [];
+	return own.concat(Object.values(value).flatMap((child) => nested(child, key)));
+};
+
+const pathIssue = (where: string, name: string): ReadonlyArray<string> =>
+	name === "" || name === "." || name === ".." || /[\\/:*?"<>|]/u.test(name)
+		? [`${where}: name "${name}" must be a plain file name`]
+		: [];
+
+const resourceLabel = (resource: Resource): string =>
+	resource.kind === "customVisual"
+		? `custom visual "${resource.guid}"`
+		: `${resource.kind} "${resource.name}"`;
+
+const checkResources = (config: Config) => {
+	const { definition, resources } = config.report;
+	if (resources === undefined) return { errors: [], warnings: [] };
+	const items = resources.map((resource) => packageItem(resource));
+	const errors = [
+		...("resourcePackages" in definition && definition.resourcePackages !== undefined
+			? ["report: remove definition.resourcePackages, the build writes it from report.resources"]
+			: []),
+		...duplicates(items.map(({ package: name, item }) => `${name}/${item.name}`)).map(
+			(name) => `report: resource "${name}" is listed more than once`,
+		),
+		...resources.flatMap((resource) =>
+			resource.kind === "customVisual"
+				? pathIssue(resourceLabel(resource), resource.guid).concat(
+						resource.pbiviz !== undefined && resource.pbiviz.visual.guid !== resource.guid
+							? [`${resourceLabel(resource)}: pbiviz guid "${resource.pbiviz.visual.guid}" does not match`]
+							: [],
+					)
+				: pathIssue(resourceLabel(resource), resource.name),
+		),
+	];
+	const { baseTheme, customTheme } = definition.themeCollection;
+	const themes = (
+		[
+			["baseTheme", baseTheme],
+			["customTheme", customTheme],
+		] as const
+	).flatMap(([kind, theme]) =>
+		theme === undefined ||
+		resources.some((resource) => resource.kind === kind && resource.name === theme.name)
+			? []
+			: [`report: themeCollection ${kind} "${theme.name}" is not a ${kind} in report.resources`],
+	);
+	const links = config.report.pages.flatMap((page) =>
+		page.visuals.flatMap((visual) =>
+			nested(visual, "ResourcePackageItem").flatMap((ref) => {
+				const packageName = valueAt(ref, "PackageName");
+				const itemName = valueAt(ref, "ItemName");
+				return items.some(({ package: name, item }) => name === packageName && item.name === itemName)
+					? []
+					: [
+							`page "${page.name}" visual "${visual.name}": resource "${String(packageName)}/${String(itemName)}" is not in report.resources`,
+						];
+			}),
+		),
+	);
+	return { errors, warnings: themes.concat(links) };
+};
+
 export const checkConfig = (config: Config): ConfigIssues => {
 	const { pages, pagesMetadata } = config.report;
 	const pageNames = pages.map((page) => page.name);
@@ -147,7 +214,9 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	const visualsByPage: VisualsByPage = new Map(
 		pages.map((page) => [page.name, new Map(page.visuals.map((visual) => [visual.name, visual]))]),
 	);
+	const resourceIssues = checkResources(config);
 	const errors = [
+		...resourceIssues.errors,
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),
 		...duplicates(bindings).map((name) => `report: pageBinding name "${name}" is used more than once`),
 		...Object.entries(pageRefs).flatMap(([key, name]) =>
@@ -168,6 +237,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 		...groups.flatMap((group) => nameIssue(`bookmark group "${group.name}"`, group.name)),
 	];
 	const warnings = [
+		...resourceIssues.warnings,
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
 		...pages.flatMap((page) =>
 			page.visuals.flatMap((visual) =>

@@ -1,4 +1,4 @@
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Console, Effect, FileSystem, Path } from "effect";
 import { Command, Flag } from "effect/cli";
@@ -64,20 +64,48 @@ export const build = Command.make(
 			const config = yield* loadConfig(file);
 			const files = buildFiles(config);
 			const written = new Set<string>();
-			for (const { path: relative, content } of files) {
-				const target = path.join(out, relative);
+			for (const item of files) {
+				const target = path.join(out, item.path);
 				yield* fs.makeDirectory(path.dirname(target), { recursive: true });
-				yield* fs.writeFileString(target, content);
+				if ("content" in item) yield* fs.writeFileString(target, item.content);
+				else
+					yield* fs
+						.copyFile(fileURLToPath(item.source), target)
+						.pipe(
+							Effect.mapError(
+								(cause) =>
+									new BuildError(
+										`[ERROR] build: cannot copy ${item.source.href} to ${item.path}: ${cause.message}`,
+									),
+							),
+						);
 				written.add(target);
 			}
-			const definition = path.join(out, `${config.name}.Report`, "definition");
-			const stale = (yield* fs.exists(definition))
-				? (yield* fs.readDirectory(definition, { recursive: true }))
-						.map((entry) => path.join(definition, entry))
-						.filter((entry) => owned(path.basename(entry)) && !written.has(entry))
-				: [];
+			const report = path.join(out, `${config.name}.Report`);
+			const scopes = [
+				{ root: path.join(report, "definition"), isOwned: owned },
+				...(config.report.resources === undefined
+					? []
+					: ["StaticResources", "CustomVisuals"].map((folder) => ({
+							root: path.join(report, folder),
+							isOwned: () => true,
+						}))),
+			];
+			const stale: Array<string> = [];
+			for (const { root, isOwned } of scopes) {
+				if (!(yield* fs.exists(root))) continue;
+				for (const entry of yield* fs.readDirectory(root, { recursive: true })) {
+					const target = path.join(root, entry);
+					if (
+						isOwned(path.basename(target)) &&
+						!written.has(target) &&
+						(yield* fs.stat(target)).type === "File"
+					)
+						stale.push(target);
+				}
+			}
 			for (const entry of stale) yield* fs.remove(entry);
-			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, definition)))].toSorted(
+			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, report)))].toSorted(
 				(a, b) => b.length - a.length,
 			);
 			for (const folder of folders) {

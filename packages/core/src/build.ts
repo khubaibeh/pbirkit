@@ -1,9 +1,11 @@
 import type { Config } from "./config.ts";
+import type { Pbiviz } from "./custom-visual.ts";
+import { packageItem } from "./resource.ts";
+import type { PackageItem, Resource } from "./resource.ts";
 
-export interface BuildFile {
-	readonly path: string;
-	readonly content: string;
-}
+export type BuildFile =
+	| { readonly path: string; readonly content: string }
+	| { readonly path: string; readonly source: URL };
 
 const INDENT = "  ";
 
@@ -99,11 +101,71 @@ const bookmarkFiles = (folder: string, bookmarks: Bookmarks): ReadonlyArray<read
 	];
 };
 
+const resourcePackages = (resources: ReadonlyArray<Resource>) => {
+	const packages = new Map<
+		string,
+		{ name: string; type: PackageItem["type"]; items: Array<PackageItem["item"]> }
+	>();
+	for (const resource of resources) {
+		const { package: name, type, item } = packageItem(resource);
+		const entry = packages.get(name) ?? { name, type, items: [] };
+		entry.items.push(item);
+		packages.set(name, entry);
+	}
+	return [...packages.values()];
+};
+
+const AFTER_PACKAGES: ReadonlySet<string> = new Set([
+	"organizationCustomVisuals",
+	"annotations",
+	"dataSourceVariables",
+	"settings",
+	"slowDataSourceSettings",
+]);
+
+const reportDefinition = (config: Config) => {
+	const { definition, resources } = config.report;
+	if (resources === undefined) return definition;
+	const entries = Object.entries(definition);
+	const at = entries.findIndex(([key]) => AFTER_PACKAGES.has(key));
+	return Object.fromEntries(
+		entries.toSpliced(at === -1 ? entries.length : at, 0, ["resourcePackages", resourcePackages(resources)]),
+	);
+};
+
+const visualPackage = (guid: string, pbiviz: Pbiviz) => {
+	const { name, displayName, version, description, supportUrl, gitHubUrl, visualClassName } = pbiviz.visual;
+	return {
+		version,
+		author: pbiviz.author,
+		resources: [{ resourceId: "rId0", sourceType: 5, file: `resources/${guid}.pbiviz.json` }],
+		visual: { guid, name, displayName, version, description, supportUrl, gitHubUrl, visualClassName },
+		metadata: { pbivizjson: { resourceId: "rId0" } },
+	};
+};
+
+const resourceFiles = (report: string, resource: Resource): ReadonlyArray<BuildFile> => {
+	if (resource.kind === "customVisual") {
+		const folder = `${report}/CustomVisuals/${resource.guid}`;
+		return resource.pbiviz === undefined
+			? []
+			: [
+					{ path: `${folder}/package.json`, content: toJson(visualPackage(resource.guid, resource.pbiviz)) },
+					{ path: `${folder}/resources/${resource.guid}.pbiviz.json`, content: toJson(resource.pbiviz) },
+				];
+	}
+	const { package: name, item } = packageItem(resource);
+	const path = `${report}/StaticResources/${name}/${item.path}`;
+	return [
+		resource.kind === "image" ? { path, source: resource.file } : { path, content: toJson(resource.theme) },
+	];
+};
+
 export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	const report = `${config.name}.Report`;
 	const model = withoutDot(config.model.path);
 	const definition = `${report}/definition`;
-	const { bookmarks, extensions, pagesMetadata } = config.report;
+	const { bookmarks, extensions, pagesMetadata, resources = [] } = config.report;
 	const { $schema, ...pagesRest } = pagesMetadata;
 	const files: Array<readonly [string, unknown]> = [
 		[`${config.name}.pbip`, pbip(config, report)],
@@ -112,7 +174,7 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 			`${report}/definition.pbir`,
 			{ ...config.report.pbir, datasetReference: { byPath: { path: `../${model}` } } },
 		],
-		[`${definition}/report.json`, config.report.definition],
+		[`${definition}/report.json`, reportDefinition(config)],
 		[`${definition}/version.json`, config.report.version],
 		[
 			`${definition}/pages/pages.json`,
@@ -135,5 +197,7 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 		files.push([`${folder}/page.json`, rest]);
 		for (const visual of visuals) files.push([`${folder}/visuals/${visual.name}/visual.json`, visual]);
 	}
-	return files.map(([path, value]) => ({ path, content: toJson(value) }));
+	return files
+		.map(([path, value]): BuildFile => ({ path, content: toJson(value) }))
+		.concat(resources.flatMap((resource) => resourceFiles(report, resource)));
 };

@@ -24,10 +24,12 @@
 		"./model": "./src/schemas/model/index.ts",
 		"./page/*": "./src/schemas/page/*.ts",
 		"./report": "./src/schemas/report/index.ts",
-		"./report/*": "./src/schemas/report/*.ts",
 		"./report-extension/*": "./src/schemas/report-extension/*.ts",
+		"./report/*": "./src/schemas/report/*.ts",
+		"./resource": "./src/resource.ts",
 		"./schema-url": "./src/schemas/schema-url.ts",
 		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
+		"./theme": "./src/schemas/theme/index.ts",
 		"./visual/*": "./src/schemas/visual/*.ts"
 	},
 	"scripts": {
