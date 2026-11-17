@@ -12,7 +12,8 @@
 		"lint:fix": "vp lint --fix",
 		"format": "vp fmt",
 		"format:check": "vp fmt --check",
-		"typecheck": "pnpm -r typecheck"
+		"typecheck": "pnpm -r typecheck",
+		"test": "vp test run"
 	},
 	"devDependencies": {
 		"@types/node": "catalog:",

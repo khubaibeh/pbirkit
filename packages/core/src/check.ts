@@ -101,6 +101,40 @@ const visualLinks = (visual: Visual) => {
 const groupNames = (groups: GroupStates = {}): ReadonlyArray<string> =>
 	Object.entries(groups).flatMap(([name, state]) => [name].concat(groupNames(state.children)));
 
+const strings = (value: unknown): ReadonlyArray<string> =>
+	Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+const list = (value: unknown): ReadonlyArray<unknown> => (Array.isArray(value) ? value : []);
+
+const treeDepth = (node: unknown): number =>
+	list(valueAt(node, "children")).reduce<number>((depth, child) => Math.max(depth, 1 + treeDepth(child)), 0);
+
+const fieldRefs = (visual: Visual, role: string): ReadonlyArray<string> =>
+	list(
+		valueAt(valueAt(valueAt(valueAt(valueAt(visual, "visual"), "query"), "queryState"), role), "projections"),
+	).flatMap((projection) => strings([valueAt(projection, "queryRef")]));
+
+const expansionIssues = (where: string, visual: Visual, states: unknown): ReadonlyArray<string> =>
+	list(states).flatMap((state, index) => {
+		const at = `${where} expansionStates[${index}]`;
+		const fields = strings(valueAt(state, "roles")).flatMap((role) => fieldRefs(visual, role));
+		const levels = list(valueAt(state, "levels"));
+		const refs = levels.flatMap((level) => strings(valueAt(level, "queryRefs")));
+		const positions = refs.map((ref) => fields.indexOf(ref)).filter((position) => position !== -1);
+		const depth = treeDepth(valueAt(state, "root"));
+		return refs
+			.filter((ref) => !fields.includes(ref))
+			.map((ref) => `${at}: level "${ref}" is not a field of visual "${visual.name}"`)
+			.concat(
+				positions.some((position, step) => step > 0 && position < (positions[step - 1] ?? 0))
+					? [`${at}: levels are not in the same order as the fields of visual "${visual.name}"`]
+					: [],
+				depth > levels.length
+					? [`${at}: the tree is ${depth} levels deep, but the state lists only ${levels.length} levels`]
+					: [],
+			);
+	});
+
 const checkBookmark = (bookmark: Bookmark, visualsByPage: VisualsByPage): ReadonlyArray<string> => {
 	const where = `bookmark "${bookmark.name}"`;
 	const { activeSection } = bookmark.explorationState;
@@ -118,7 +152,18 @@ const checkBookmark = (bookmark: Bookmark, visualsByPage: VisualsByPage): Readon
 			const missing = Object.keys(state.visualContainers)
 				.filter((name) => !visuals.has(name))
 				.map((name) => `${where} section "${section}": visual "${name}" is not a visual on this page`);
+			const expansions = Object.entries(state.visualContainers).flatMap(([name, container]) => {
+				const visual = visuals.get(name);
+				return visual === undefined
+					? []
+					: expansionIssues(
+							`${where} section "${section}" visual "${name}"`,
+							visual,
+							valueAt(valueAt(container, "singleVisual"), "expansionStates"),
+						);
+			});
 			return missing.concat(
+				expansions,
 				groupNames(state.visualContainerGroups)
 					.filter((name) => {
 						const visual = visuals.get(name);
@@ -239,6 +284,15 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	const warnings = [
 		...resourceIssues.warnings,
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
+		...pages.flatMap((page) =>
+			page.visuals.flatMap((visual) =>
+				expansionIssues(
+					`page "${page.name}" visual "${visual.name}"`,
+					visual,
+					valueAt(valueAt(visual, "visual"), "expansionStates"),
+				),
+			),
+		),
 		...pages.flatMap((page) =>
 			page.visuals.flatMap((visual) =>
 				visualLinks(visual)

@@ -1,5 +1,6 @@
 export * from "./bookmark.ts";
 export * from "./condition.ts";
+export * from "./expansion.ts";
 export * from "./expression.ts";
 export * from "./field.ts";
 export * from "./filter.ts";
