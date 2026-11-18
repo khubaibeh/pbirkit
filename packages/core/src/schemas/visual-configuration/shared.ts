@@ -1,6 +1,7 @@
 import { Array, Boolean, Record, String, Struct, optionalKey } from "effect/Schema";
 import type { Codec, Constraint } from "effect/Schema";
 
+import { VisualType } from "#core/visual-type.ts";
 import { formattingObjects } from "#schemas/common/formatting.ts";
 
 import { expansionState } from "./expansion.ts";
@@ -20,7 +21,7 @@ export const VisualSyncGroup = Struct({
 export type VisualSyncGroup = typeof VisualSyncGroup.Type;
 
 export const VisualConfigurationFields = {
-	visualType: String,
+	visualType: VisualType,
 	autoSelectVisualType: optionalKey(Boolean),
 	syncGroup: optionalKey(VisualSyncGroup),
 	drillFilterOtherVisuals: optionalKey(Boolean),

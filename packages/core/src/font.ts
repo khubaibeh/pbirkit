@@ -1,5 +1,7 @@
 import { declare } from "effect/Schema";
 
+import type { Register } from "./register.ts";
+
 export const FONT_FACES = [
 	"Arial",
 	"Arial Black",
@@ -35,8 +37,6 @@ export const FONT_FACES = [
 ] as const;
 
 export type BuiltinFontFace = (typeof FONT_FACES)[number];
-
-export interface Register {}
 
 export type FamilyName<F extends string> = F extends "" | ` ${string}` | `${string} `
 	? never

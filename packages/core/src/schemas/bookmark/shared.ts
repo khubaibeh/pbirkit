@@ -14,6 +14,8 @@ import {
 } from "effect/Schema";
 import type { Codec, Constraint } from "effect/Schema";
 
+import { VisualType } from "#core/visual-type.ts";
+
 export interface DecomposedTree<E> {
 	readonly left?: DecomposedTree<E>;
 	readonly right?: DecomposedTree<E>;
@@ -174,7 +176,7 @@ export const bookmarkDefinitions = <
 	});
 
 	const SingleVisualConfigState = Struct({
-		visualType: optionalKey(String),
+		visualType: optionalKey(VisualType),
 		autoSelectVisualType: optionalKey(Boolean),
 		targetType: optionalKey(String),
 		targetAutoSelectVisualType: optionalKey(Boolean),

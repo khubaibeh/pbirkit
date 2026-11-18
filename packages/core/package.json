@@ -27,10 +27,12 @@
 		"./report": "./src/schemas/report/index.ts",
 		"./report-extension/*": "./src/schemas/report-extension/*.ts",
 		"./report/*": "./src/schemas/report/*.ts",
+		"./register": "./src/register.ts",
 		"./resource": "./src/resource.ts",
 		"./schema-url": "./src/schemas/schema-url.ts",
 		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
 		"./theme": "./src/schemas/theme/index.ts",
+		"./visual-type": "./src/visual-type.ts",
 		"./visual/*": "./src/schemas/visual/*.ts"
 	},
 	"scripts": {

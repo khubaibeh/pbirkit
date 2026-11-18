@@ -13,6 +13,7 @@ import {
 } from "./font.ts";
 import { packageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
+import { isBuiltinVisual } from "./visual-type.ts";
 
 const NAME = /^[\p{L}\p{Mn}\p{Nd}\p{Pc}-]+$/u;
 const MAX_NAME = 50;
@@ -200,6 +201,35 @@ const resourceLabel = (resource: Resource): string =>
 		? `custom visual "${resource.guid}"`
 		: `${resource.kind} "${resource.name}"`;
 
+const customVisualTypes = (config: Config): ReadonlySet<string> => {
+	const { definition, resources } = config.report;
+	const listed = "publicCustomVisuals" in definition ? (definition.publicCustomVisuals ?? []) : [];
+	const organization =
+		"organizationCustomVisuals" in definition ? (definition.organizationCustomVisuals ?? []) : [];
+
+	return new Set([
+		...listed,
+		...organization.map((visual) => visual.name),
+		...(resources ?? []).flatMap((resource) => (resource.kind === "customVisual" ? [resource.guid] : [])),
+	]);
+};
+
+const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
+	const custom = customVisualTypes(config);
+
+	return config.report.pages.flatMap((page) =>
+		page.visuals.flatMap((visual) => {
+			const type = "visual" in visual ? visual.visual?.visualType : undefined;
+
+			return type === undefined || isBuiltinVisual(type) || custom.has(type)
+				? []
+				: [
+						`page "${page.name}" visual "${visual.name}": visualType "${type}" is not a Power BI visual or a custom visual listed in the report`,
+					];
+		}),
+	);
+};
+
 const sourceIssues = (config: Config): ReadonlyArray<string> => {
 	const { model } = config;
 	const sources: ReadonlyArray<readonly [string, URL | undefined]> = [
@@ -316,7 +346,7 @@ const checkFonts = (config: Config): ReadonlyArray<string> => {
 				.filter((face) => !isBuiltinFont(face) && !registered.has(face))
 				.map(
 					(face) =>
-						`${where}: font "${face}" is not a Power BI font, add it to report.fonts and to the font Register`,
+						`${where}: font "${face}" is not a Power BI font, add it to report.fonts and to the Register`,
 				)
 				.concat(
 					[...new Set(fontSizes(value))]
@@ -389,6 +419,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	];
 	const warnings = [
 		...resourceIssues.warnings,
+		...visualTypeIssues(config),
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
 		...pages.flatMap((page) =>
 			page.visuals.flatMap((visual) =>
