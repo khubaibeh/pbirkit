@@ -5,7 +5,8 @@ import type { PackageItem, Resource } from "./resource.ts";
 
 export type BuildFile =
 	| { readonly path: string; readonly content: string }
-	| { readonly path: string; readonly source: URL };
+	| { readonly path: string; readonly source: URL }
+	| { readonly path: string; readonly sourceFolder: URL };
 
 const INDENT = "  ";
 
@@ -65,7 +66,7 @@ const platform = (
 	type: string,
 	displayName: string,
 	logicalId: string,
-	item: Config["model"]["platform"],
+	item: Config["report"]["platform"],
 ) => {
 	const { $schema, version, ...metadata } = item;
 	return { $schema, metadata: { type, displayName, ...metadata }, config: { version, logicalId } };
@@ -161,19 +162,59 @@ const resourceFiles = (report: string, resource: Resource): ReadonlyArray<BuildF
 	];
 };
 
+type Model = NonNullable<Config["model"]>;
+
+const modelFiles = (model: Model): ReadonlyArray<BuildFile> => {
+	const folder = withoutDot(model.path);
+	const json = (path: string, value: unknown): BuildFile => ({
+		path: `${folder}/${path}`,
+		content: toJson(value),
+	});
+	return [
+		json(".platform", platform("SemanticModel", model.name, model.logicalId, model.platform)),
+		json("definition.pbism", model.pbism),
+		...(model.modelReference === undefined ? [] : [json("modelReference.json", model.modelReference)]),
+		...(model.editorSettings === undefined ? [] : [json(".pbi/editorSettings.json", model.editorSettings)]),
+		{ path: `${folder}/definition`, sourceFolder: model.definition },
+		...(model.diagramLayout === undefined
+			? []
+			: [{ path: `${folder}/diagramLayout.json`, source: model.diagramLayout }]),
+		...(model.daxQueries === undefined
+			? []
+			: [{ path: `${folder}/DAXQueries`, sourceFolder: model.daxQueries }]),
+		...(model.cache === undefined ? [] : [{ path: `${folder}/.pbi/cache.abf`, source: model.cache }]),
+	];
+};
+
+const definitionPbir = (config: Config) =>
+	config.model === undefined
+		? config.report.pbir
+		: {
+				...config.report.pbir,
+				datasetReference: { byPath: { path: `../${withoutDot(config.model.path)}` } },
+			};
+
+export const ownedFolders = (config: Config): ReadonlyArray<string> => {
+	const report = `${config.name}.Report`;
+	const model = config.model === undefined ? undefined : withoutDot(config.model.path);
+	return [
+		...(config.report.resources === undefined
+			? []
+			: [`${report}/StaticResources`, `${report}/CustomVisuals`]),
+		...(model === undefined ? [] : [`${model}/definition`]),
+		...(model === undefined || config.model?.daxQueries === undefined ? [] : [`${model}/DAXQueries`]),
+	];
+};
+
 export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	const report = `${config.name}.Report`;
-	const model = withoutDot(config.model.path);
 	const definition = `${report}/definition`;
 	const { bookmarks, extensions, pagesMetadata, resources = [] } = config.report;
 	const { $schema, ...pagesRest } = pagesMetadata;
 	const files: Array<readonly [string, unknown]> = [
 		[`${config.name}.pbip`, pbip(config, report)],
 		[`${report}/.platform`, platform("Report", config.name, config.report.logicalId, config.report.platform)],
-		[
-			`${report}/definition.pbir`,
-			{ ...config.report.pbir, datasetReference: { byPath: { path: `../${model}` } } },
-		],
+		[`${report}/definition.pbir`, definitionPbir(config)],
 		[`${definition}/report.json`, reportDefinition(config)],
 		[`${definition}/version.json`, config.report.version],
 		[
@@ -182,14 +223,6 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 		],
 		...(bookmarks === undefined ? [] : bookmarkFiles(`${definition}/bookmarks`, bookmarks)),
 		...(extensions === undefined ? [] : [[`${definition}/reportExtensions.json`, extensions] as const]),
-		[
-			`${model}/.platform`,
-			platform("SemanticModel", config.model.name, config.model.logicalId, config.model.platform),
-		],
-		[`${model}/definition.pbism`, config.model.pbism],
-		...(config.model.modelReference === undefined
-			? []
-			: [[`${model}/modelReference.json`, config.model.modelReference] as const]),
 	];
 	for (const page of config.report.pages) {
 		const { visuals, ...rest } = page;
@@ -199,5 +232,8 @@ export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	}
 	return files
 		.map(([path, value]): BuildFile => ({ path, content: toJson(value) }))
-		.concat(resources.flatMap((resource) => resourceFiles(report, resource)));
+		.concat(
+			resources.flatMap((resource) => resourceFiles(report, resource)),
+			config.model === undefined ? [] : modelFiles(config.model),
+		);
 };

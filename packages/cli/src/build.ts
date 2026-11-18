@@ -4,7 +4,7 @@ import { Console, Effect, FileSystem, Path } from "effect";
 import { Command, Flag } from "effect/cli";
 import { decodeUnknownEffect, is } from "effect/Schema";
 
-import { buildFiles } from "@pbirkit/core/build";
+import { buildFiles, ownedFolders } from "@pbirkit/core/build";
 import { checkConfig } from "@pbirkit/core/check";
 import { Config } from "@pbirkit/core/config";
 
@@ -64,32 +64,44 @@ export const build = Command.make(
 			const config = yield* loadConfig(file);
 			const files = buildFiles(config);
 			const written = new Set<string>();
+			const copy = (source: URL, relative: string, target: string) =>
+				fs
+					.copyFile(fileURLToPath(source), target)
+					.pipe(
+						Effect.mapError(
+							(cause) =>
+								new BuildError(`[ERROR] build: cannot copy ${source.href} to ${relative}: ${cause.message}`),
+						),
+					);
 			for (const item of files) {
 				const target = path.join(out, item.path);
-				yield* fs.makeDirectory(path.dirname(target), { recursive: true });
-				if ("content" in item) yield* fs.writeFileString(target, item.content);
-				else
-					yield* fs
-						.copyFile(fileURLToPath(item.source), target)
+				if ("sourceFolder" in item) {
+					const root = fileURLToPath(item.sourceFolder);
+					const entries = yield* fs
+						.readDirectory(root, { recursive: true })
 						.pipe(
 							Effect.mapError(
 								(cause) =>
-									new BuildError(
-										`[ERROR] build: cannot copy ${item.source.href} to ${item.path}: ${cause.message}`,
-									),
+									new BuildError(`[ERROR] build: cannot read ${root} for ${item.path}: ${cause.message}`),
 							),
 						);
+					for (const entry of entries) {
+						if ((yield* fs.stat(path.join(root, entry))).type !== "File") continue;
+						const destination = path.join(target, entry);
+						yield* fs.makeDirectory(path.dirname(destination), { recursive: true });
+						yield* copy(pathToFileURL(path.join(root, entry)), path.join(item.path, entry), destination);
+						written.add(destination);
+					}
+					continue;
+				}
+				yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+				if ("content" in item) yield* fs.writeFileString(target, item.content);
+				else yield* copy(item.source, item.path, target);
 				written.add(target);
 			}
-			const report = path.join(out, `${config.name}.Report`);
 			const scopes = [
-				{ root: path.join(report, "definition"), isOwned: owned },
-				...(config.report.resources === undefined
-					? []
-					: ["StaticResources", "CustomVisuals"].map((folder) => ({
-							root: path.join(report, folder),
-							isOwned: () => true,
-						}))),
+				{ root: path.join(out, `${config.name}.Report`, "definition"), isOwned: owned },
+				...ownedFolders(config).map((folder) => ({ root: path.join(out, folder), isOwned: () => true })),
 			];
 			const stale: Array<string> = [];
 			for (const { root, isOwned } of scopes) {
@@ -105,14 +117,14 @@ export const build = Command.make(
 				}
 			}
 			for (const entry of stale) yield* fs.remove(entry);
-			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, report)))].toSorted(
+			const folders = [...new Set(stale.flatMap((entry) => parents(path, entry, out)))].toSorted(
 				(a, b) => b.length - a.length,
 			);
 			for (const folder of folders) {
 				if ((yield* fs.readDirectory(folder)).length === 0) yield* fs.remove(folder, { recursive: true });
 			}
 			yield* Console.log(
-				`build: wrote ${files.length} files to ${out}${stale.length > 0 ? `, removed ${stale.length} stale files` : ""}`,
+				`build: wrote ${written.size} files to ${out}${stale.length > 0 ? `, removed ${stale.length} stale files` : ""}`,
 			);
 		}).pipe(
 			Effect.catchIf(

@@ -314,6 +314,17 @@ const checkFonts = (config: Config): ReadonlyArray<string> => {
 	);
 };
 
+const datasetIssues = (config: Config): ReadonlyArray<string> => {
+	const connected = config.report.pbir.datasetReference !== undefined;
+	if (config.model === undefined && !connected)
+		return [
+			"report: set model for a local semantic model, or report.pbir.datasetReference.byConnection for a published one",
+		];
+	if (config.model !== undefined && connected)
+		return ["report: use either model or report.pbir.datasetReference.byConnection, not both"];
+	return [];
+};
+
 export const checkConfig = (config: Config): ConfigIssues => {
 	const { pages, pagesMetadata } = config.report;
 	const pageNames = pages.map((page) => page.name);
@@ -344,11 +355,12 @@ export const checkConfig = (config: Config): ConfigIssues => {
 				? []
 				: [`report: ${key} "${name}" is not a page in this report`],
 		),
-		...(insideProject(config.model.path)
+		...(config.model === undefined || insideProject(config.model.path)
 			? []
 			: [
 					`model: path "${config.model.path}" must be a relative path inside the project, with "/" as the separator`,
 				]),
+		...datasetIssues(config),
 		...pages.flatMap((page) => checkPage(page)),
 		...duplicates([...bookmarks, ...groups].map((item) => item.name)).map(
 			(name) => `report: bookmark name "${name}" is used more than once`,

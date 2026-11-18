@@ -34,7 +34,7 @@ export const Config = Struct({
 	name: String,
 	pbip: Pbip.mapFields(omit(["artifacts"])),
 	report: ReportItem,
-	model: Model,
+	model: optionalKey(Model),
 });
 
 export type Config = typeof Config.Type;

@@ -18,6 +18,10 @@ export const SchemaUrl = {
 		"1.0.0":
 			"https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/definitionProperties/1.0.0/schema.json",
 	},
+	editorSettings: {
+		"1.0.0":
+			"https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/editorSettings/1.0.0/schema.json",
+	},
 	modelReference: {
 		"2.0.0":
 			"https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/modelReference/2.0.0/schema.json",

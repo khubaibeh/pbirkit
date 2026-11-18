@@ -27,6 +27,11 @@ export const FONT_FACES = [
 	"Trebuchet MS",
 	"Verdana",
 	"Wingdings",
+	"wf_standard-font, helvetica, arial, sans-serif",
+	"'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif",
+	"'Segoe UI Light', wf_segoe-ui_light, helvetica, arial, sans-serif",
+	"'Segoe UI Semibold', wf_segoe-ui_semibold, helvetica, arial, sans-serif",
+	"'Segoe UI Bold', wf_segoe-ui_bold, helvetica, arial, sans-serif",
 ] as const;
 
 export type BuiltinFontFace = (typeof FONT_FACES)[number];
