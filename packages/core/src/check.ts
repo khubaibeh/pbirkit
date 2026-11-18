@@ -270,14 +270,21 @@ const checkResources = (config: Config) => {
 	const { baseTheme, customTheme } = definition.themeCollection;
 	const themes = (
 		[
-			["baseTheme", baseTheme],
-			["customTheme", customTheme],
+			["baseTheme", baseTheme, ["baseTheme"]],
+			["customTheme", customTheme, ["customTheme", "builtInTheme"]],
 		] as const
-	).flatMap(([kind, theme]) =>
+	).flatMap(([slot, theme, kinds]) =>
 		theme === undefined ||
-		resources.some((resource) => resource.kind === kind && resource.name === theme.name)
+		resources.some(
+			(resource) =>
+				resource.kind !== "customVisual" &&
+				kinds.some((kind) => kind === resource.kind) &&
+				resource.name === theme.name,
+		)
 			? []
-			: [`report: themeCollection ${kind} "${theme.name}" is not a ${kind} in report.resources`],
+			: [
+					`report: themeCollection ${slot} "${theme.name}" is not a ${kinds.join(" or ")} in report.resources`,
+				],
 	);
 	const links = config.report.pages.flatMap((page) =>
 		page.visuals.flatMap((visual) =>
@@ -332,7 +339,7 @@ const checkFonts = (config: Config): ReadonlyArray<string> => {
 		}),
 		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item] as const),
 		...(config.report.resources ?? []).flatMap((resource) =>
-			resource.kind === "baseTheme" || resource.kind === "customTheme"
+			resource.kind === "baseTheme" || resource.kind === "customTheme" || resource.kind === "builtInTheme"
 				? [[resourceLabel(resource), resource.theme] as const]
 				: [],
 		),

@@ -12,11 +12,21 @@ export const CustomThemeResource = Struct({ kind: Literal("customTheme"), name: 
 
 export type CustomThemeResource = typeof CustomThemeResource.Type;
 
+export const BuiltInThemeResource = Struct({ kind: Literal("builtInTheme"), name: String, theme: Theme });
+
+export type BuiltInThemeResource = typeof BuiltInThemeResource.Type;
+
 export const ImageResource = Struct({ kind: Literal("image"), name: String, file: UrlSchema });
 
 export type ImageResource = typeof ImageResource.Type;
 
-export const Resource = Union([BaseThemeResource, CustomThemeResource, ImageResource, CustomVisualResource]);
+export const Resource = Union([
+	BaseThemeResource,
+	CustomThemeResource,
+	BuiltInThemeResource,
+	ImageResource,
+	CustomVisualResource,
+]);
 
 export type Resource = typeof Resource.Type;
 
@@ -33,6 +43,11 @@ const STATIC_ITEMS = {
 		path: (name: string) => `BaseThemes/${name}.json`,
 	},
 	customTheme: { package: "RegisteredResources", type: "CustomTheme", path: (name: string) => name },
+	builtInTheme: {
+		package: "SharedResources",
+		type: "CustomTheme",
+		path: (name: string) => `BuiltInThemes/${name}.json`,
+	},
 	image: { package: "RegisteredResources", type: "Image", path: (name: string) => name },
 } as const;
 
@@ -62,16 +77,24 @@ export const customTheme = <const N extends string>(resource: {
 	...resource,
 });
 
+export const builtInTheme = <const N extends string>(resource: {
+	readonly name: N;
+	readonly theme: Theme;
+}) => ({
+	kind: "builtInTheme" as const,
+	...resource,
+});
+
 export const image = <const N extends string>(resource: { readonly name: N; readonly file: URL }) => ({
 	kind: "image" as const,
 	...resource,
 });
 
 export const themeRef = <const N extends string, const V>(
-	theme: { readonly kind: "baseTheme" | "customTheme"; readonly name: N },
+	theme: { readonly kind: "baseTheme" | "customTheme" | "builtInTheme"; readonly name: N },
 	reportVersionAtImport: V,
 ) => ({
 	name: theme.name,
 	reportVersionAtImport,
-	type: theme.kind === "baseTheme" ? ("SharedResources" as const) : ("RegisteredResources" as const),
+	type: theme.kind === "customTheme" ? ("RegisteredResources" as const) : ("SharedResources" as const),
 });
