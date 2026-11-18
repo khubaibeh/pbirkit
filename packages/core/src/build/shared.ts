@@ -24,5 +24,6 @@ export const platform = (
 	item: Config["report"]["platform"],
 ) => {
 	const { $schema, version, ...metadata } = item;
+
 	return { $schema, metadata: { type, displayName, ...metadata }, config: { version, logicalId } };
 };

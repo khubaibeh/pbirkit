@@ -6,16 +6,20 @@ const trimZeros = (digits: string): string =>
 const general = (value: number, precision: number): string => {
 	const [mantissa = "", exponentText = "0"] = value.toExponential(precision - 1).split("e");
 	const exponent = Number(exponentText);
+
 	if (exponent < -4 || exponent >= precision) {
 		return `${trimZeros(mantissa)}E${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
 	}
+
 	return trimZeros(value.toPrecision(precision));
 };
 
 export const formatNumber = (value: number): string => {
 	if (!Number.isFinite(value)) throw new TypeError(`[ERROR] build: cannot write the number ${value} as JSON`);
 	if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
+
 	const short = general(value, 15);
+
 	return Number(short) === value ? short : general(value, 17);
 };
 
@@ -32,19 +36,25 @@ const serialize = (value: unknown, depth: number): string => {
 	if (typeof value === "number") return formatNumber(value);
 	if (typeof value === "string") return formatString(value);
 	if (typeof value === "boolean") return value ? "true" : "false";
+
 	if (typeof value !== "object") throw new TypeError(`[ERROR] build: cannot write a ${typeof value} as JSON`);
 	const inner = INDENT.repeat(depth + 1);
 	const outer = INDENT.repeat(depth);
+
 	if (Array.isArray(value)) {
 		const items: ReadonlyArray<unknown> = value;
+
 		return items.length === 0
 			? "[]"
 			: `[\n${items.map((item) => `${inner}${serialize(item, depth + 1)}`).join(",\n")}\n${outer}]`;
 	}
+
 	const entries = Object.keys(value).flatMap((key) => {
 		const item = field(value, key);
+
 		return item === undefined ? [] : [`${inner}${formatString(key)}: ${serialize(item, depth + 1)}`];
 	});
+
 	return entries.length === 0 ? "{}" : `{\n${entries.join(",\n")}\n${outer}}`;
 };
 

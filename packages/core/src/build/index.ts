@@ -1,8 +1,8 @@
 import { Option } from "effect";
 
 import type { Config } from "../config.ts";
-import { modelFiles, modelOf, modelOwnedFolders } from "./model.ts";
-import { reportFiles, reportFolder, reportOwnedFolders } from "./report.ts";
+import { modelFiles, modelFolder, modelOf } from "./model.ts";
+import { reportFiles } from "./report.ts";
 import type { BuildFile } from "./shared.ts";
 
 export { formatNumber, toJson } from "./json.ts";
@@ -16,12 +16,8 @@ const GITIGNORE: BuildFile = {
 	content: "**/.pbi/localSettings.json\r\n**/.pbi/cache.abf",
 };
 
-export const reportDefinitionFolder = (config: Config): string => `${reportFolder(config)}/definition`;
-
-export const ownedFolders = (config: Config): ReadonlyArray<string> => [
-	...reportOwnedFolders(config),
-	...Option.match(modelOf(config), { onNone: () => [], onSome: modelOwnedFolders }),
-];
+export const modelFolderOf = (config: Config): Option.Option<string> =>
+	Option.map(modelOf(config), modelFolder);
 
 export const buildFiles = (config: Config): ReadonlyArray<BuildFile> => [
 	...reportFiles(config),

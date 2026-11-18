@@ -23,6 +23,7 @@ export const modelCache = (config: Config): Option.Option<ModelCache> =>
 
 export const modelFiles = (model: Model): ReadonlyArray<BuildFile> => {
 	const folder = modelFolder(model);
+
 	return [
 		jsonFile(`${folder}/.platform`, platform("SemanticModel", model.name, model.logicalId, model.platform)),
 		jsonFile(`${folder}/definition.pbism`, model.pbism),
@@ -35,8 +36,3 @@ export const modelFiles = (model: Model): ReadonlyArray<BuildFile> => {
 		...whenSet(model.daxQueries, (sourceFolder) => [{ path: `${folder}/DAXQueries`, sourceFolder }]),
 	];
 };
-
-export const modelOwnedFolders = (model: Model): ReadonlyArray<string> => [
-	`${modelFolder(model)}/definition`,
-	...whenSet(model.daxQueries, () => [`${modelFolder(model)}/DAXQueries`]),
-];

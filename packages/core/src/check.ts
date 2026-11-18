@@ -200,6 +200,22 @@ const resourceLabel = (resource: Resource): string =>
 		? `custom visual "${resource.guid}"`
 		: `${resource.kind} "${resource.name}"`;
 
+const sourceIssues = (config: Config): ReadonlyArray<string> => {
+	const { model } = config;
+	const sources: ReadonlyArray<readonly [string, URL | undefined]> = [
+		["model: definition", model?.definition],
+		["model: diagramLayout", model?.diagramLayout],
+		["model: daxQueries", model?.daxQueries],
+		["model: cache", model?.cache],
+		...(config.report.resources ?? []).flatMap((resource) =>
+			resource.kind === "image" ? [[`${resourceLabel(resource)}: file`, resource.file] as const] : [],
+		),
+	];
+	return sources.flatMap(([where, url]) =>
+		url === undefined || url.protocol === "file:" ? [] : [`${where} "${url.href}" must be a file: URL`],
+	);
+};
+
 const checkResources = (config: Config) => {
 	const { definition, resources } = config.report;
 	if (resources === undefined) return { errors: [], warnings: [] };
@@ -346,6 +362,9 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	);
 	const resourceIssues = checkResources(config);
 	const errors = [
+		...pathIssue("config", config.name),
+		...(config.out === undefined || config.out.trim() !== "" ? [] : ["config: out must not be empty"]),
+		...sourceIssues(config),
 		...resourceIssues.errors,
 		...checkFonts(config),
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),

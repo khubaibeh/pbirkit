@@ -32,6 +32,7 @@ export type ReportItem = typeof ReportItem.Type;
 
 export const Config = Struct({
 	name: String,
+	out: optionalKey(String),
 	pbip: Pbip.mapFields(omit(["artifacts"])),
 	report: ReportItem,
 	model: optionalKey(Model),

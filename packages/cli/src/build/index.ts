@@ -1,30 +1,28 @@
 import { Console, Effect, HashMap, Option, Path } from "effect";
 import { Command, Flag } from "effect/cli";
 
-import { buildFiles, modelCache, ownedFolders, reportDefinitionFolder } from "@pbirkit/core/build";
-import type { Config } from "@pbirkit/core/config";
+import { buildFiles, modelCache, modelFolderOf } from "@pbirkit/core/build";
 
-import { applyPlan } from "./apply.ts";
-import { keepCache, restoreCache } from "./cache.ts";
+import { applyChanges } from "./apply.ts";
+import { checkSeed, keepCache, restoreCache } from "./cache.ts";
 import { loadConfig } from "./config.ts";
 import { ConflictError } from "./errors.ts";
 import type { BuildError } from "./errors.ts";
+import { requireGitRepo } from "./git.ts";
+import { changedUnder, changesBetween, mergeTrees, pendingPorts } from "./merge.ts";
 import { errorMessage, summary } from "./messages.ts";
-import { readOutputs } from "./outputs.ts";
-import { fromCwd, projectPaths } from "./paths.ts";
-import { conflictsOf, planBuild } from "./plan.ts";
-import type { Scope } from "./plan.ts";
-import { loadLastHashes, saveState } from "./state.ts";
-
-const DEFINITION_FILES: ReadonlySet<string> = new Set(["page.json", "visual.json", "bookmarks.json"]);
-
-const isDefinitionFile = (file: string): boolean =>
-	DEFINITION_FILES.has(file) || file.endsWith(".bookmark.json");
-
-const scopesOf = (config: Config): ReadonlyArray<Scope> => [
-	{ root: reportDefinitionFolder(config), isOwned: isDefinitionFile },
-	...ownedFolders(config).map((root) => ({ root, isOwned: () => true })),
-];
+import { buildTree } from "./outputs.ts";
+import { DEFAULT_OUT, checkOut, fromCwd, projectPaths, snapshotFolder } from "./paths.ts";
+import {
+	commitSnapshot,
+	loadState,
+	markPending,
+	prepareState,
+	saveSnapshot,
+	snapshotId,
+} from "./snapshot.ts";
+import type { BuildState } from "./snapshot.ts";
+import { clearFolder, readTree } from "./tree.ts";
 
 const flags = {
 	config: Flag.File("config", { mustExist: true }).pipe(
@@ -32,50 +30,97 @@ const flags = {
 		Flag.withDefault("pbirkit.config.ts"),
 		Flag.withDescription("Config file to build"),
 	),
-	out: Flag.Directory("out").pipe(
+	out: Flag.String("out").pipe(
 		Flag.withAlias("o"),
-		Flag.withDefault("dist"),
-		Flag.withDescription("Folder to write the PBIP project to, relative to the config file"),
+		Flag.optional,
+		Flag.withDescription("Write a scratch build to this folder, relative to where you run the command"),
 	),
-	force: Flag.Boolean("force").pipe(
-		Flag.withDefault(false),
-		Flag.withDescription("Overwrite or delete files that changed outside the build"),
+	prefer: Flag.Literals("prefer", ["src", "desktop"]).pipe(
+		Flag.optional,
+		Flag.withDescription("Side that wins when src and Desktop changed the same lines"),
 	),
 };
 
 const runBuild = Effect.fnUntraced(function* ({
 	config: configFlag,
 	out: outFlag,
-	force,
+	prefer,
 }: Command.Command.Config.Infer<typeof flags>) {
 	const path = yield* Path.Path;
-	const paths = projectPaths(path, configFlag, outFlag);
 
-	const config = yield* loadConfig(paths.configFile);
-	const outputs = yield* readOutputs(buildFiles(config));
+	const configFile = path.resolve(configFlag);
+	const config = yield* loadConfig(configFile);
+	const configOut = Option.getOrElse(Option.fromNullishOr(config.out), () => DEFAULT_OUT);
+	const paths = projectPaths(path, configFile, configOut, outFlag);
+	yield* checkOut(paths);
+	yield* requireGitRepo(paths.root);
 
+	const next = yield* buildTree(buildFiles(config));
+	const project = yield* readTree(paths.out);
 	const cache = modelCache(config);
-	if (Option.isSome(cache)) yield* keepCache(paths, cache.value);
+	if (Option.isSome(cache)) yield* checkSeed(cache.value);
 
-	const last = yield* loadLastHashes(paths);
-	const plan = yield* planBuild({ out: paths.out, outputs, last, scopes: scopesOf(config), force });
+	if (paths.recorded) {
+		yield* prepareState(paths);
+		if (Option.isSome(cache)) yield* keepCache(paths, cache.value);
+	}
 
-	const conflicts = conflictsOf(plan);
+	const empty: BuildState = { snapshot: Option.none(), unfinished: [] };
+	const { snapshot, unfinished } = paths.recorded ? yield* loadState(paths) : empty;
+	const shown = (id: string) => fromCwd(path, snapshotFolder(path, paths, id));
+
+	const { result, conflicts, merged } = mergeTrees({
+		snapshot: Option.map(snapshot, (found) => found.tree),
+		unfinished: unfinished.map((found) => found.tree),
+		next,
+		project,
+		prefer,
+	});
+
 	if (conflicts.length > 0) {
 		return yield* new ConflictError({
 			out: fromCwd(path, paths.out),
-			lastBuild: HashMap.isEmpty(last) ? Option.none() : Option.some(fromCwd(path, paths.lastBuild)),
+			snapshot: Option.map(snapshot, (found) => shown(found.id)),
 			conflicts,
 		});
 	}
 
-	yield* applyPlan(paths.out, plan);
+	const id = snapshotId(next);
+	if (paths.recorded) {
+		yield* saveSnapshot(paths, { id, tree: next });
+		yield* markPending(paths, id);
+	}
+
+	const changes = changesBetween(project, result);
+	yield* clearFolder(paths.staging);
+	yield* applyChanges(paths.out, paths.staging, changes);
+
 	const cacheOutcome = yield* Effect.transposeOption(
 		Option.map(cache, (found) => restoreCache(paths, found)),
 	);
 
-	yield* saveState(paths, outputs);
-	return yield* Console.log(summary(paths.out, plan, cacheOutcome));
+	if (paths.recorded) yield* commitSnapshot(paths, id);
+	yield* clearFolder(paths.staging);
+
+	const modelChanged =
+		Option.exists(cacheOutcome, (outcome) => outcome !== "missing") &&
+		Option.exists(Option.all([snapshot, modelFolderOf(config)]), ([found, folder]) =>
+			changedUnder(folder, found.tree, next),
+		);
+
+	return yield* Console.log(
+		summary({
+			out: fromCwd(path, paths.out),
+			recorded: paths.recorded,
+			changes,
+			total: HashMap.size(result),
+			merged,
+			cache: cacheOutcome,
+			modelChanged,
+			pending: pendingPorts(next, result),
+			snapshot: shown(id),
+		}),
+	);
 });
 
 const reportError = (error: BuildError) =>
@@ -87,17 +132,5 @@ const reportError = (error: BuildError) =>
 	);
 
 export const build = Command.make("build", flags, (input) =>
-	runBuild(input).pipe(
-		Effect.catchTag(
-			[
-				"ConfigLoadError",
-				"ConfigShapeError",
-				"ConfigCheckError",
-				"SourceReadError",
-				"ManifestError",
-				"ConflictError",
-			],
-			reportError,
-		),
-	),
-).pipe(Command.withDescription("Write the PBIP project that Power BI Desktop opens"));
+	runBuild(input).pipe(Effect.catch(reportError)),
+).pipe(Command.withDescription("Build the PBIP project and merge it with changes made in Desktop"));

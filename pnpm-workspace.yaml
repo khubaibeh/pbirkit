@@ -8,6 +8,7 @@ catalog:
   ajv: 8.20.0
   effect: 4.1.4
   jsonc-parser: 3.3.1
+  node-diff3: 3.2.1
   vite: npm:@voidzero-dev/vite-plus-core@1.6.0
   vite-plus: 1.6.0
 
