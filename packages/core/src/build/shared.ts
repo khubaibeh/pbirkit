@@ -12,6 +12,13 @@ export const jsonFile = (path: string, value: unknown): BuildFile => ({ path, co
 
 export const withoutDot = (path: string): string => path.replace(/^\.\//u, "").replace(/\/+$/u, "");
 
+export const rawFiles = (folder: string, files: { readonly [path: string]: URL }): ReadonlyArray<BuildFile> =>
+	Object.entries(files).map(([path, url]) => {
+		const target = `${folder}/${withoutDot(path)}`;
+
+		return path.endsWith("/") ? { path: target, sourceFolder: url } : { path: target, source: url };
+	});
+
 export const whenSet = <A, B>(
 	value: A | undefined,
 	items: (value: A) => ReadonlyArray<B>,

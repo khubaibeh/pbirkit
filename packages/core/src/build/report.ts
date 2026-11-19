@@ -5,7 +5,7 @@ import type { Resource } from "../resource.ts";
 import { modelFolder, modelOf } from "./model.ts";
 import { resourceFiles, resourcePackages } from "./resources.ts";
 import type { BuildFile } from "./shared.ts";
-import { jsonFile, platform, whenSet } from "./shared.ts";
+import { jsonFile, platform, rawFiles, whenSet } from "./shared.ts";
 
 type Report = Config["report"];
 type Bookmarks = NonNullable<Report["bookmarks"]>;
@@ -79,7 +79,7 @@ const pageFiles = (definition: string, page: Page): ReadonlyArray<BuildFile> => 
 export const reportFiles = (config: Config): ReadonlyArray<BuildFile> => {
 	const report = reportFolder(config);
 	const definition = `${report}/definition`;
-	const { bookmarks, extensions, pages, pagesMetadata, resources = [] } = config.report;
+	const { bookmarks, extensions, files, pages, pagesMetadata, resources = [] } = config.report;
 	const { $schema, ...pagesRest } = pagesMetadata;
 
 	return [
@@ -100,5 +100,9 @@ export const reportFiles = (config: Config): ReadonlyArray<BuildFile> => {
 		...whenSet(extensions, (value) => [jsonFile(`${definition}/reportExtensions.json`, value)]),
 		...pages.flatMap((page) => pageFiles(definition, page)),
 		...resources.flatMap((resource) => resourceFiles(report, resource)),
+		...whenSet(config.report.semanticModelDiagramLayout, (source) => [
+			{ path: `${report}/semanticModelDiagramLayout.json`, source },
+		]),
+		...whenSet(files, (items) => rawFiles(report, items)),
 	];
 };

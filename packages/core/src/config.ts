@@ -1,4 +1,4 @@
-import { Array, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Record, String, Struct, URL as UrlSchema, optionalKey } from "effect/Schema";
 import { omit } from "effect/Struct";
 
 import { BookmarksItem } from "#schemas/bookmarks-metadata";
@@ -26,6 +26,8 @@ export const ReportItem = Struct({
 	resources: optionalKey(Array(Resource)),
 	fonts: optionalKey(Array(String)),
 	extensions: optionalKey(ReportExtension),
+	semanticModelDiagramLayout: optionalKey(UrlSchema),
+	files: optionalKey(Record(String, UrlSchema)),
 });
 
 export type ReportItem = typeof ReportItem.Type;

@@ -3,7 +3,7 @@ import { Data, HashMap, Option } from "effect";
 import type { Conflict, ConflictReason } from "./errors.ts";
 import { mergeText } from "./text.ts";
 import type { Tree, TreeFile } from "./tree.ts";
-import { fileKey, sameFile, treeOf } from "./tree.ts";
+import { fileKey, parentKeys, sameFile, treeOf } from "./tree.ts";
 
 export type Prefer = "src" | "desktop";
 
@@ -103,12 +103,11 @@ const displayPath = (key: string, ...files: ReadonlyArray<Option.Option<TreeFile
 const folderClashes = (result: Tree): ReadonlyArray<Conflict> => {
 	const keys = new Set(HashMap.keys(result));
 
-	return [...HashMap.values(result)].flatMap((file) => {
-		const parts = fileKey(file.path).split("/");
-		const parents = parts.slice(1).map((_, index) => parts.slice(0, index + 1).join("/"));
-
-		return parents.some((parent) => keys.has(parent)) ? [{ path: file.path, reason: "file-and-folder" }] : [];
-	});
+	return [...HashMap.values(result)].flatMap((file) =>
+		parentKeys(file.path).some((parent) => keys.has(parent))
+			? [{ path: file.path, reason: "file-and-folder" }]
+			: [],
+	);
 };
 
 export const mergeTrees = ({ snapshot, unfinished, next, project, prefer }: MergeInput): MergeResult => {

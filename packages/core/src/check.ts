@@ -230,20 +230,37 @@ const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
 	);
 };
 
+const rawEntries = (owner: "model" | "report", files: { readonly [path: string]: URL } = {}) =>
+	Object.entries(files).map(([path, url]) => ({ where: `${owner}: files "${path}"`, owner, path, url }));
+
 const sourceIssues = (config: Config): ReadonlyArray<string> => {
 	const { model } = config;
+	const raw = [...rawEntries("model", model?.files), ...rawEntries("report", config.report.files)];
 	const sources: ReadonlyArray<readonly [string, URL | undefined]> = [
 		["model: definition", model?.definition],
 		["model: diagramLayout", model?.diagramLayout],
 		["model: daxQueries", model?.daxQueries],
+		["model: tmdlScripts", model?.tmdlScripts],
+		["model: unappliedChanges", model?.unappliedChanges],
 		["model: cache", model?.cache],
+		["report: semanticModelDiagramLayout", config.report.semanticModelDiagramLayout],
+		...raw.map(({ where, url }) => [where, url] as const),
 		...(config.report.resources ?? []).flatMap((resource) =>
 			resource.kind === "image" ? [[`${resourceLabel(resource)}: file`, resource.file] as const] : [],
 		),
 	];
-	return sources.flatMap(([where, url]) =>
-		url === undefined || url.protocol === "file:" ? [] : [`${where} "${url.href}" must be a file: URL`],
-	);
+	return sources
+		.flatMap(([where, url]) =>
+			url === undefined || url.protocol === "file:" ? [] : [`${where} "${url.href}" must be a file: URL`],
+		)
+		.concat(
+			raw
+				.filter(({ path }) => !insideProject(path))
+				.map(
+					({ where, owner }) =>
+						`${where}: path must be a relative path inside the ${owner} folder, with "/" as the separator`,
+				),
+		);
 };
 
 const checkResources = (config: Config) => {

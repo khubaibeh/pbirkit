@@ -17,6 +17,12 @@ const DESKTOP_ONLY = ["/.pbi/localsettings.json", "/.pbi/cache.abf"];
 
 export const fileKey = (path: string): string => path.toLowerCase();
 
+export const parentKeys = (path: string): ReadonlyArray<string> => {
+	const parts = fileKey(path).split("/");
+
+	return parts.slice(1).map((_, index) => parts.slice(0, index + 1).join("/"));
+};
+
 export const hash = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
 export const treeFile = (path: string, bytes: Uint8Array): TreeFile => ({ path, bytes, hash: hash(bytes) });

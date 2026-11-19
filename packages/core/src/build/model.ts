@@ -2,7 +2,7 @@ import { Option } from "effect";
 
 import type { Config } from "../config.ts";
 import type { BuildFile } from "./shared.ts";
-import { jsonFile, platform, whenSet, withoutDot } from "./shared.ts";
+import { jsonFile, platform, rawFiles, whenSet, withoutDot } from "./shared.ts";
 
 type Model = NonNullable<Config["model"]>;
 
@@ -34,5 +34,10 @@ export const modelFiles = (model: Model): ReadonlyArray<BuildFile> => {
 		{ path: `${folder}/definition`, sourceFolder: model.definition },
 		...whenSet(model.diagramLayout, (source) => [{ path: `${folder}/diagramLayout.json`, source }]),
 		...whenSet(model.daxQueries, (sourceFolder) => [{ path: `${folder}/DAXQueries`, sourceFolder }]),
+		...whenSet(model.tmdlScripts, (sourceFolder) => [{ path: `${folder}/TMDLScripts`, sourceFolder }]),
+		...whenSet(model.unappliedChanges, (source) => [
+			{ path: `${folder}/.pbi/unappliedChanges.json`, source },
+		]),
+		...whenSet(model.files, (files) => rawFiles(folder, files)),
 	];
 };

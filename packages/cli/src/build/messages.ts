@@ -29,6 +29,9 @@ const CACHE_NOTES: Record<CacheOutcome, string> = {
 
 const IGNORED_NOTE = `The diff also lists cache.abf, localSettings.json and ${MARKER}, which the build leaves alone.`;
 
+const ADDED_NOTE =
+	"If no config field writes an added file, map it to a source file in model.files or report.files.";
+
 const fileCount = (count: number): string => `${count} ${count === 1 ? "file" : "files"}`;
 
 export const diffCommand = (snapshot: string, out: string): string =>
@@ -105,6 +108,7 @@ const pendingBlock = ({ out, pending, snapshot }: Summary): ReadonlyArray<string
 		: [
 				`Desktop changes not in src yet (${fileCount(pending.length)}). Port them to src, then build again:`,
 				...pending.map(({ path, kind }) => `  ${PENDING[kind]}: ${path}`),
+				...(pending.some(({ kind }) => kind === "added") ? [ADDED_NOTE] : []),
 				"To see them, run:",
 				diffCommand(snapshot, out),
 				IGNORED_NOTE,
