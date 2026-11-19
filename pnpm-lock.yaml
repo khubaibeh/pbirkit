@@ -176,6 +176,9 @@ catalogs:
     '@effect/platform-node':
       specifier: 4.1.4
       version: 4.1.4
+    '@microsoft/powerbi-desktop-bridge-cli':
+      specifier: 1.0.0
+      version: 1.0.0
     '@types/node':
       specifier: 26.6.6
       version: 26.6.6
@@ -220,6 +223,9 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.4(effect@4.1.4)(redis@6.3.1)
+      '@microsoft/powerbi-desktop-bridge-cli':
+        specifier: 'catalog:'
+        version: 1.0.0
       '@pbirkit/core':
         specifier: workspace:*
         version: link:../core
@@ -278,6 +284,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@microsoft/powerbi-desktop-bridge-cli@1.0.0':
+    resolution: {integrity: sha512-hDkGzJIrHYucbL7I14MYKS8p4ZE3Vq9kiCJdK9S0uEs+85RZpZc66vjWgZJcOKf600IFpL5p30JiXGzL64jlJw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@oxc-project/runtime@0.158.0':
     resolution: {integrity: sha512-OYWBlK/wnZHyol5jkvBJadD8KTR6DJfFDRClqrU6kBDQKHd4bXNZALg3qfXk0aFl6F5loSxMT24EZurNWE4MKQ==}
@@ -925,6 +936,10 @@ packages:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
     engines: {node: '>=18'}
 
+  commander@13.1.0:
+    resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
+    engines: {node: '>=18'}
+
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
@@ -1369,6 +1384,10 @@ packages:
       jsdom:
         optional: true
 
+  vscode-jsonrpc@8.2.1:
+    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
+    engines: {node: '>=14.0.0'}
+
   why-is-node-running@3.2.1:
     resolution: {integrity: sha512-Tb2FUhB4vUsGQlfSquQLYkApkuPAFQXGFzxWKHHumVz2dK+X1RUm/HnID4+TfIGYJ1kTcwOaCk/buYCEJr6YjQ==}
     engines: {node: '>=20.11'}
@@ -1435,6 +1454,11 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@microsoft/powerbi-desktop-bridge-cli@1.0.0':
+    dependencies:
+      commander: 13.1.0
+      vscode-jsonrpc: 8.2.1
 
   '@oxc-project/runtime@0.158.0': {}
 
@@ -1821,6 +1845,8 @@ snapshots:
 
   chai@6.3.0: {}
 
+  commander@13.1.0: {}
+
   convert-source-map@2.0.0: {}
 
   dequal@2.0.3: {}
@@ -2122,6 +2148,8 @@ snapshots:
       '@vitest/ui': 5.1.0(vitest@5.1.0)
     transitivePeerDependencies:
       - msw
+
+  vscode-jsonrpc@8.2.1: {}
 
   why-is-node-running@3.2.1: {}
 
