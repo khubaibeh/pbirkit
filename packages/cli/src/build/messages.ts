@@ -30,7 +30,7 @@ const CACHE_NOTES: Record<CacheOutcome, string> = {
 const IGNORED_NOTE = `The diff also lists cache.abf, localSettings.json and ${MARKER}, which the build leaves alone.`;
 
 const ADDED_NOTE =
-	"If no config field writes an added file, map it to a source file in model.files or report.files.";
+	"If no config field writes an added file, map it in model.files or report.files, or list it in desktopOwned.";
 
 const fileCount = (count: number): string => `${count} ${count === 1 ? "file" : "files"}`;
 

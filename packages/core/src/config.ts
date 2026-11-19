@@ -28,6 +28,7 @@ export const ReportItem = Struct({
 	extensions: optionalKey(ReportExtension),
 	semanticModelDiagramLayout: optionalKey(UrlSchema),
 	files: optionalKey(Record(String, UrlSchema)),
+	desktopOwned: optionalKey(Array(String)),
 });
 
 export type ReportItem = typeof ReportItem.Type;

@@ -3,7 +3,7 @@ import { Data, HashMap, Option } from "effect";
 import type { Conflict, ConflictReason } from "./errors.ts";
 import { mergeText } from "./text.ts";
 import type { Tree, TreeFile } from "./tree.ts";
-import { fileKey, parentKeys, sameFile, treeOf } from "./tree.ts";
+import { fileKey, isOwned, parentKeys, sameFile, treeOf } from "./tree.ts";
 
 export type Prefer = "src" | "desktop";
 
@@ -34,6 +34,7 @@ export interface MergeInput {
 	readonly next: Tree;
 	readonly project: Option.Option<Tree>;
 	readonly prefer: Option.Option<Prefer>;
+	readonly owned: ReadonlyArray<string>;
 }
 
 export interface MergeResult {
@@ -110,14 +111,23 @@ const folderClashes = (result: Tree): ReadonlyArray<Conflict> => {
 	);
 };
 
-export const mergeTrees = ({ snapshot, unfinished, next, project, prefer }: MergeInput): MergeResult => {
+export const mergeTrees = ({
+	snapshot,
+	unfinished,
+	next,
+	project,
+	prefer,
+	owned,
+}: MergeInput): MergeResult => {
 	const result: Array<TreeFile> = [];
 	const conflicts: Array<Conflict> = [];
 	const merged: Array<string> = [];
 
 	for (const key of keysOf(snapshot, Option.some(next), project)) {
 		const versions = { key, next: HashMap.get(next, key), project: lookup(project, key) };
-		const outcome = mergeFile(snapshot, unfinished, versions);
+		const outcome = isOwned(owned, key)
+			? Outcome.Resolved({ file: versions.project, merged: false })
+			: mergeFile(snapshot, unfinished, versions);
 
 		if (Outcome.$is("Resolved")(outcome)) {
 			if (outcome.merged) merged.push(displayPath(key, outcome.file));
@@ -153,8 +163,13 @@ export const changesBetween = (project: Option.Option<Tree>, result: Tree): Read
 	return [...deletes, ...writes];
 };
 
-export const pendingPorts = (next: Tree, result: Tree): ReadonlyArray<Pending> =>
+export const pendingPorts = (
+	next: Tree,
+	result: Tree,
+	owned: ReadonlyArray<string>,
+): ReadonlyArray<Pending> =>
 	keysOf(Option.some(next), Option.some(result))
+		.filter((key) => !isOwned(owned, key))
 		.toSorted()
 		.flatMap((key): ReadonlyArray<Pending> => {
 			const built = HashMap.get(next, key);

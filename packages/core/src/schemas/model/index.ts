@@ -1,4 +1,4 @@
-import { Record, String, Struct, URL as UrlSchema, optionalKey } from "effect/Schema";
+import { Array, Record, String, Struct, URL as UrlSchema, optionalKey } from "effect/Schema";
 
 import { EditorSettings } from "#schemas/editor-settings/1.0.0.ts";
 import { ModelReference } from "#schemas/model-reference/2.0.0.ts";
@@ -20,6 +20,7 @@ export const Model = Struct({
 	cache: optionalKey(UrlSchema),
 	modelReference: optionalKey(ModelReference),
 	files: optionalKey(Record(String, UrlSchema)),
+	desktopOwned: optionalKey(Array(String)),
 });
 
 export type Model = typeof Model.Type;

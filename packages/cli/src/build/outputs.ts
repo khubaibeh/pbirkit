@@ -8,7 +8,7 @@ import type { BuildFile } from "@pbirkit/core/build";
 import { ConfigCheckError, SourceReadError } from "./errors.ts";
 import { toPosix } from "./paths.ts";
 import type { TreeFile } from "./tree.ts";
-import { fileKey, isTracked, parentKeys, pathClashes, treeFile, treeOf } from "./tree.ts";
+import { fileKey, isOwned, isTracked, parentKeys, pathClashes, treeFile, treeOf } from "./tree.ts";
 
 const encoder = new TextEncoder();
 
@@ -125,18 +125,24 @@ const folderClashes = (files: ReadonlyArray<TreeFile>): ReadonlyArray<string> =>
 		.map(([, path]) => `[ERROR] build: ${path} would be written as a file and as a folder`);
 };
 
-const buildIssues = (files: ReadonlyArray<TreeFile>): ReadonlyArray<string> => [
+const buildIssues = (files: ReadonlyArray<TreeFile>, owned: ReadonlyArray<string>): ReadonlyArray<string> => [
 	...pathClashes(files).map((pair) => `[ERROR] build: ${pair} would be written to the same file`),
 	...folderClashes(files),
 	...files
 		.filter((file) => !isTracked(file.path))
 		.map((file) => `[ERROR] build: ${file.path} is a file only Desktop writes, so remove it from the source`),
+	...files
+		.filter((file) => isOwned(owned, file.path))
+		.map((file) => `[ERROR] build: ${file.path} is listed in desktopOwned, so remove it from the source`),
 ];
 
-export const buildTree = Effect.fnUntraced(function* (files: ReadonlyArray<BuildFile>) {
+export const buildTree = Effect.fnUntraced(function* (
+	files: ReadonlyArray<BuildFile>,
+	owned: ReadonlyArray<string>,
+) {
 	const built = (yield* Effect.forEach(files, readBuildFile)).flat();
 
-	const issues = buildIssues(built);
+	const issues = buildIssues(built, owned);
 	if (issues.length > 0) return yield* new ConfigCheckError({ issues });
 
 	return treeOf(built);

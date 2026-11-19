@@ -17,6 +17,11 @@ const DESKTOP_ONLY = ["/.pbi/localsettings.json", "/.pbi/cache.abf"];
 
 export const fileKey = (path: string): string => path.toLowerCase();
 
+export const isOwned = (owned: ReadonlyArray<string>, path: string): boolean =>
+	owned.some((entry) =>
+		entry.endsWith("/") ? fileKey(path).startsWith(fileKey(entry)) : fileKey(path) === fileKey(entry),
+	);
+
 export const parentKeys = (path: string): ReadonlyArray<string> => {
 	const parts = fileKey(path).split("/");
 

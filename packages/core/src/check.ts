@@ -233,6 +233,17 @@ const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
 const rawEntries = (owner: "model" | "report", files: { readonly [path: string]: URL } = {}) =>
 	Object.entries(files).map(([path, url]) => ({ where: `${owner}: files "${path}"`, owner, path, url }));
 
+const ownedIssues = (config: Config): ReadonlyArray<string> =>
+	[
+		...(config.model?.desktopOwned ?? []).map((path) => ["model", path] as const),
+		...(config.report.desktopOwned ?? []).map((path) => ["report", path] as const),
+	]
+		.filter(([, path]) => !insideProject(path))
+		.map(
+			([owner, path]) =>
+				`${owner}: desktopOwned "${path}": path must be a relative path inside the ${owner} folder, with "/" as the separator`,
+		);
+
 const sourceIssues = (config: Config): ReadonlyArray<string> => {
 	const { model } = config;
 	const raw = [...rawEntries("model", model?.files), ...rawEntries("report", config.report.files)];
@@ -419,6 +430,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 		...pathIssue("config", config.name),
 		...(config.out === undefined || config.out.trim() !== "" ? [] : ["config: out must not be empty"]),
 		...sourceIssues(config),
+		...ownedIssues(config),
 		...resourceIssues.errors,
 		...checkFonts(config),
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),
