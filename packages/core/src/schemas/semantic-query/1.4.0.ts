@@ -33,6 +33,8 @@ export const QueryExpressionAnnotations = StructWithRest(
 	[Annotations],
 );
 
+export type QueryExpressionAnnotations = typeof QueryExpressionAnnotations.Type;
+
 interface Recursion {
 	readonly expression: QueryExpressionContainer;
 }
@@ -70,10 +72,17 @@ export const {
 	FilterDefinition,
 } = queryDefinitions(Expression, SortDirection);
 
+export type EntitySource = typeof EntitySource.Type;
+export type QuerySortClause = typeof QuerySortClause.Type;
+export type Axis = typeof Axis.Type;
+export type QueryTransform = typeof QueryTransform.Type;
+
 export const QuerySparklineDataExpression = Struct({
 	...querySparklineDataFields(Expression),
 	ApplyCalculationGroupTo: optionalKey(ApplyCalculationGroupTo),
 });
+
+export type QuerySparklineDataExpression = typeof QuerySparklineDataExpression.Type;
 
 export const QueryExpressionContainer: Codec<QueryExpressionContainer> = oneKeyOf(
 	QueryExpressionBase.fields,

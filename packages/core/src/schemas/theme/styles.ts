@@ -41,11 +41,15 @@ export const VisualStyleProperties = StructWithRest(
 	],
 );
 
+export type VisualStyleProperties = typeof VisualStyleProperties.Type;
+
 export const VisualBackground = Struct({
 	color: optionalKey(ThemeFill),
 	show: optionalKey(Boolean),
 	transparency: optionalKey(Transparency),
 });
+
+export type VisualBackground = typeof VisualBackground.Type;
 
 export const VisualBorder = Struct({
 	color: optionalKey(ThemeFill),
@@ -53,6 +57,8 @@ export const VisualBorder = Struct({
 	show: optionalKey(Boolean),
 	width: optionalKey(Number),
 });
+
+export type VisualBorder = typeof VisualBorder.Type;
 
 export const VisualHeader = Struct({
 	background: optionalKey(ThemeFill),
@@ -83,6 +89,8 @@ export const VisualHeader = Struct({
 	showVisualWarningButton: optionalKey(Boolean),
 });
 
+export type VisualHeader = typeof VisualHeader.Type;
+
 const tooltipText = {
 	background: optionalKey(ThemeFill),
 	themedBackground: optionalKey(ThemeFill),
@@ -112,10 +120,14 @@ export const VisualTooltip = Struct({
 	showValuesInBold: optionalKey(Boolean),
 });
 
+export type VisualTooltip = typeof VisualTooltip.Type;
+
 export const VisualHeaderTooltip = Struct({
 	...tooltipText,
 	text: optionalKey(String),
 });
+
+export type VisualHeaderTooltip = typeof VisualHeaderTooltip.Type;
 
 export const FilterPane = Struct({
 	backgroundColor: optionalKey(ThemeFill),
@@ -132,6 +144,8 @@ export const FilterPane = Struct({
 	width: optionalKey(Int),
 });
 
+export type FilterPane = typeof FilterPane.Type;
+
 export const FilterCard = Struct({
 	$id: Literals(["Applied", "Available"]),
 	backgroundColor: optionalKey(ThemeFill),
@@ -144,11 +158,15 @@ export const FilterCard = Struct({
 	textSize: optionalKey(FontSize),
 });
 
+export type FilterCard = typeof FilterCard.Type;
+
 export const PageArea = Struct({
 	color: optionalKey(ThemeFill),
 	image: optionalKey(Unknown),
 	transparency: optionalKey(Transparency),
 });
+
+export type PageArea = typeof PageArea.Type;
 
 const StyleObjects = Record(String, Array(VisualStyleProperties));
 

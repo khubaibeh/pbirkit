@@ -3,7 +3,11 @@ import type { Constraint } from "effect/Schema";
 
 export const HighlightMatching = Literals([0, 1, 2]);
 
+export type HighlightMatching = typeof HighlightMatching.Type;
+
 export const DataViewWildcardMatchingOption = Literals([0, 1, 2]);
+
+export type DataViewWildcardMatchingOption = typeof DataViewWildcardMatchingOption.Type;
 
 export const DataViewWildcard = Struct({
 	matchingOption: DataViewWildcardMatchingOption,
@@ -12,6 +16,8 @@ export const DataViewWildcard = Struct({
 export type DataViewWildcard = typeof DataViewWildcard.Type;
 
 export const DataViewObjectPropertyDefinitions = Record(String, Unknown);
+
+export type DataViewObjectPropertyDefinitions = typeof DataViewObjectPropertyDefinitions.Type;
 
 export const dataRepetitionSelector = <E extends Constraint>(Expression: E) =>
 	Struct({

@@ -49,7 +49,14 @@ export const {
 	FilterDefinition,
 } = queryDefinitions(Expression, Unknown);
 
+export type EntitySource = typeof EntitySource.Type;
+export type QuerySortClause = typeof QuerySortClause.Type;
+export type Axis = typeof Axis.Type;
+export type QueryTransform = typeof QueryTransform.Type;
+
 export const QuerySparklineDataExpression = Struct(querySparklineDataFields(Expression));
+
+export type QuerySparklineDataExpression = typeof QuerySparklineDataExpression.Type;
 
 export const QueryExpressionContainer: Codec<QueryExpressionContainer> = oneKeyOf(
 	QueryExpressionBase.fields,

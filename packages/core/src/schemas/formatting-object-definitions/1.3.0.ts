@@ -8,6 +8,8 @@ export * from "./shared.ts";
 
 export const HierarchyMatching = Literals([0, 1]);
 
+export type HierarchyMatching = typeof HierarchyMatching.Type;
+
 export const DataRepetitionSelector = dataRepetitionSelector(QueryExpressionContainer);
 
 export type DataRepetitionSelector = typeof DataRepetitionSelector.Type;

@@ -14,3 +14,4 @@ export const { FilterContainerFormattingObjects, FilterContainer, FilterConfig }
 
 export type FilterContainer = typeof FilterContainer.Type;
 export type FilterConfig = typeof FilterConfig.Type;
+export type FilterContainerFormattingObjects = typeof FilterContainerFormattingObjects.Type;

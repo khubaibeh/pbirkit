@@ -26,7 +26,11 @@ export type VisualContainerPosition = typeof VisualContainerPosition.Type;
 
 export const Border = Struct(BorderFields);
 
+export type Border = typeof Border.Type;
+
 export const VisualHeader = Struct(VisualHeaderFields);
+
+export type VisualHeader = typeof VisualHeader.Type;
 
 export const { Query, VisualContainerFormattingObjects, VisualConfiguration } = visualConfiguration(
 	{ QueryExpressionContainer, Selector, DataViewObjectDefinitions },
@@ -38,6 +42,7 @@ export const { Query, VisualContainerFormattingObjects, VisualConfiguration } = 
 
 export type VisualContainerFormattingObjects = typeof VisualContainerFormattingObjects.Type;
 export type VisualConfiguration = typeof VisualConfiguration.Type;
+export type Query = typeof Query.Type;
 
 export const VisualGroupConfig = visualGroupConfig(Selector);
 

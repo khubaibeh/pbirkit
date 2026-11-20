@@ -9,6 +9,8 @@ export interface NodeExpansionState<E> {
 
 export const AIDecompositionMethod = Literals(["BestSplit", "MaxSplit", "MinSplit"]);
 
+export type AIDecompositionMethod = typeof AIDecompositionMethod.Type;
+
 export const AILevelInformation = Struct({
 	method: AIDecompositionMethod,
 	disabled: optionalKey(Boolean),

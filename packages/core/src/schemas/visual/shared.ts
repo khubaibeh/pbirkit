@@ -33,7 +33,11 @@ export const HowCreatedValues = [
 
 export const GroupLayoutMode = Literals(["ScaleMode", "ScrollMode"]);
 
+export type GroupLayoutMode = typeof GroupLayoutMode.Type;
+
 export const VisualGroupGeneral = Struct(formattingProperties("x", "y", "width", "height", "altText"));
+
+export type VisualGroupGeneral = typeof VisualGroupGeneral.Type;
 
 export const VisualGroupFormattingProperties = {
 	background: Background,

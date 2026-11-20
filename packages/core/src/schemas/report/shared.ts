@@ -4,6 +4,8 @@ import { formattingProperties } from "#schemas/common/formatting.ts";
 
 export const ThemeResourcePackageType = Literals(["RegisteredResources", "SharedResources"]);
 
+export type ThemeResourcePackageType = typeof ThemeResourcePackageType.Type;
+
 export const OutspacePane = Struct(formattingProperties("expanded", "visible"));
 
 export type OutspacePane = typeof OutspacePane.Type;
@@ -27,12 +29,16 @@ export const ReportSource = Literals([
 	"DataExplore",
 ]);
 
+export type ReportSource = typeof ReportSource.Type;
+
 export const ResourcePackageType = Literals([
 	"CustomVisual",
 	"RegisteredResources",
 	"SharedResources",
 	"OrganizationalStoreCustomVisual",
 ]);
+
+export type ResourcePackageType = typeof ResourcePackageType.Type;
 
 export const ResourcePackageItemType = Literals([
 	"CustomVisualJavascript",
@@ -52,6 +58,8 @@ export const ResourcePackageItemType = Literals([
 	"AppTheme",
 	"AppBaseTheme",
 ]);
+
+export type ResourcePackageItemType = typeof ResourcePackageItemType.Type;
 
 export const ResourcePackageItem = Struct({
 	id: optionalKey(Number),

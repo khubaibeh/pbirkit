@@ -27,6 +27,8 @@ export const PbivizVisual = StructWithRest(
 	[Record(String, Unknown)],
 );
 
+export type PbivizVisual = typeof PbivizVisual.Type;
+
 export const Pbiviz = StructWithRest(
 	Struct({ visual: PbivizVisual, author: optionalKey(Struct({ name: String, email: String })) }),
 	[Record(String, Unknown)],

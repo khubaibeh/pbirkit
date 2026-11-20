@@ -43,6 +43,8 @@ export type FilterContainerHowCreated = typeof FilterContainerHowCreated.Type;
 
 export const VisualContainerDisplayMode = Literals(["maximize", "spotlight", "elevation", "hidden"]);
 
+export type VisualContainerDisplayMode = typeof VisualContainerDisplayMode.Type;
+
 export const VisualContainerDisplayState = Struct({
 	mode: VisualContainerDisplayMode,
 	maximizedOptions: optionalKey(Struct({ dataTable: optionalKey(Literals(["accessible", "normal"])) })),
@@ -62,7 +64,11 @@ export const VisualContainerGroupState: Codec<VisualContainerGroupState> = Struc
 
 export const IndexValueMap = Record(String, String);
 
+export type IndexValueMap = typeof IndexValueMap.Type;
+
 export const JsonFilter = Struct({ filterType: Unknown });
+
+export type JsonFilter = typeof JsonFilter.Type;
 
 export const UntypedFilterMetadata = {
 	FilterLabelIdPair: Unknown,

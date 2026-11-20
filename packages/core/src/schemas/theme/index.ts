@@ -32,7 +32,11 @@ export const TextClasses = Struct({
 	smallDataLabel: optionalKey(TextClass),
 });
 
+export type TextClasses = typeof TextClasses.Type;
+
 export const ThemeIcon = Struct({ url: String, description: optionalKey(String) });
+
+export type ThemeIcon = typeof ThemeIcon.Type;
 
 export const Theme = Struct({
 	$schema: optionalKey(String),

@@ -49,6 +49,8 @@ export type ExplorationSettings = typeof ExplorationSettings.Type;
 
 export const LayoutOptimization = Literals(["None", "PhonePortrait"]);
 
+export type LayoutOptimization = typeof LayoutOptimization.Type;
+
 export const Report = Struct({
 	$schema: Literal(SchemaUrl.report["1.0.0"]),
 	filterConfig: optionalKey(FilterConfig),

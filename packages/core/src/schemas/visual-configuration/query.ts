@@ -3,6 +3,8 @@ import type { Constraint } from "effect/Schema";
 
 export const SortDirection = Literals(["Ascending", "Descending"]);
 
+export type SortDirection = typeof SortDirection.Type;
+
 export const VisualQueryOptions = Struct({
 	allowBinnedLineSample: optionalKey(Boolean),
 	allowOverlappingPointsSample: optionalKey(Boolean),

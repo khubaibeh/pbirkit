@@ -28,6 +28,7 @@ export const { Query, VisualContainerFormattingObjects, VisualConfiguration } = 
 
 export type VisualContainerFormattingObjects = typeof VisualContainerFormattingObjects.Type;
 export type VisualConfiguration = typeof VisualConfiguration.Type;
+export type Query = typeof Query.Type;
 
 export const VisualGroupConfig = visualGroupConfig(Selector);
 

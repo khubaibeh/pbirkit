@@ -12,7 +12,11 @@ export const PageDisplayOption = Literals([
 	"ActualSizeTopLeft",
 ]);
 
+export type PageDisplayOption = typeof PageDisplayOption.Type;
+
 export const BindingType = Literals(["Default", "Drillthrough", "Tooltip"]);
+
+export type BindingType = typeof BindingType.Type;
 
 export const bindingParameterFields = <E extends Constraint>(Expression: E) => ({
 	name: String,
@@ -109,6 +113,8 @@ export const PageFormattingProperties = {
 
 export const VisualInteractionFilterType = Literals(["Default", "DataFilter", "HighlightFilter", "NoFilter"]);
 
+export type VisualInteractionFilterType = typeof VisualInteractionFilterType.Type;
+
 export const VisualInteraction = Struct({
 	source: String,
 	target: String,
@@ -158,3 +164,5 @@ export const PageFields = {
 };
 
 export const PageVisuals = Array(AnyVisual);
+
+export type PageVisuals = typeof PageVisuals.Type;

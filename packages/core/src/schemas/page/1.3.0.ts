@@ -11,6 +11,8 @@ export { AutoPageGenerationConfig, BindingParameter, FilterConfig, PageBinding, 
 
 export const PageType = Literals(["Drillthrough", "Tooltip"]);
 
+export type PageType = typeof PageType.Type;
+
 export const Page = Struct({
 	$schema: Literal(SchemaUrl.page["1.3.0"]),
 	...PageFields,

@@ -17,6 +17,8 @@ export const VisualHeader = Struct({
 	...formattingProperties("showCopilotSummaryButton"),
 });
 
+export type VisualHeader = typeof VisualHeader.Type;
+
 export const {
 	RoleFieldParameter,
 	ProjectionState,
@@ -35,3 +37,6 @@ export const {
 export type Query = typeof Query.Type;
 export type VisualContainerFormattingObjects = typeof VisualContainerFormattingObjects.Type;
 export type VisualConfiguration = typeof VisualConfiguration.Type;
+export type RoleFieldParameter = typeof RoleFieldParameter.Type;
+export type ProjectionState = typeof ProjectionState.Type;
+export type ExpansionState = typeof ExpansionState.Type;

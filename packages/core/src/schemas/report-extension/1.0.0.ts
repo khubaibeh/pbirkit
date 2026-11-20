@@ -20,6 +20,8 @@ export const PrimitiveTypeName = Literals([
 	"Variant",
 ]);
 
+export type PrimitiveTypeName = typeof PrimitiveTypeName.Type;
+
 export const ReportExtensionMeasureTemplate = Struct({
 	daxTemplateName: String,
 	version: Number,

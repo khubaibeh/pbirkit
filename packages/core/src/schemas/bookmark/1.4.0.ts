@@ -23,6 +23,9 @@ export const { FilterLabelIdPair, FilterExpressionMetadata } = filterMetadata({
 	DataRepetitionSelector,
 });
 
+export type FilterLabelIdPair = typeof FilterLabelIdPair.Type;
+export type FilterExpressionMetadata = typeof FilterExpressionMetadata.Type;
+
 export const {
 	FilterContainerState,
 	FiltersState,

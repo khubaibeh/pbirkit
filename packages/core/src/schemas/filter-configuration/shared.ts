@@ -18,13 +18,22 @@ export const FilterTypeValues = [
 
 export const FilterType = Literals([...FilterTypeValues, "VisualTopN"]);
 
+export type FilterType = typeof FilterType.Type;
+
 export const FilterHowCreated = Literals(["Auto", "User", "Drill", "Include", "Exclude", "Drillthrough"]);
 
+export type FilterHowCreated = typeof FilterHowCreated.Type;
+
 export const FilterSortOrder = Literals(["Ascending", "Descending", "Custom"]);
+
+export type FilterSortOrder = typeof FilterSortOrder.Type;
 
 export const FilterContainerFormattingObjectsProperties = Struct(
 	formattingProperties("requireSingleSelect", "isInvertedSelectionMode"),
 );
+
+export type FilterContainerFormattingObjectsProperties =
+	typeof FilterContainerFormattingObjectsProperties.Type;
 
 export const FilterContainerFields = {
 	name: String,

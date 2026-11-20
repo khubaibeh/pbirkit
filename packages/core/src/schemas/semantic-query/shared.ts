@@ -20,42 +20,74 @@ export const StandaloneSourceRefExpression = Struct({
 	Entity: String,
 });
 
+export type StandaloneSourceRefExpression = typeof StandaloneSourceRefExpression.Type;
+
 export const QuerySourceRefExpression = Struct({
 	Source: String,
 });
 
+export type QuerySourceRefExpression = typeof QuerySourceRefExpression.Type;
+
 export const SourceRef = Union([StandaloneSourceRefExpression, QuerySourceRefExpression]);
+
+export type SourceRef = typeof SourceRef.Type;
 
 export const IncludeAllTypes = Literals([0, 1, 2]);
 
+export type IncludeAllTypes = typeof IncludeAllTypes.Type;
+
 export const QueryAggregateFunction = Literals([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+
+export type QueryAggregateFunction = typeof QueryAggregateFunction.Type;
 
 export const TimeUnit = Literals([0, 1, 2, 3, 4, 5, 6, 7]);
 
+export type TimeUnit = typeof TimeUnit.Type;
+
 export const ArithmeticOperatorKind = Literals([0, 1, 2, 3]);
+
+export type ArithmeticOperatorKind = typeof ArithmeticOperatorKind.Type;
 
 export const QueryComparisonKind = Literals([0, 1, 2, 3, 4]);
 
+export type QueryComparisonKind = typeof QueryComparisonKind.Type;
+
 export const EntitySourceType = Literals([0, 1, 2]);
+
+export type EntitySourceType = typeof EntitySourceType.Type;
 
 export const QueryLiteralExpression = Struct({ Value: String });
 
+export type QueryLiteralExpression = typeof QueryLiteralExpression.Type;
+
 export const QueryNowExpression = Struct({});
+
+export type QueryNowExpression = typeof QueryNowExpression.Type;
 
 export const QueryDefaultValueExpression = Struct({});
 
+export type QueryDefaultValueExpression = typeof QueryDefaultValueExpression.Type;
+
 export const QueryAllRolesRefExpression = Struct({});
+
+export type QueryAllRolesRefExpression = typeof QueryAllRolesRefExpression.Type;
 
 export const QueryAnyValueExpression = Struct({
 	DefaultValueOverridesAncestors: optionalKey(Boolean),
 });
 
+export type QueryAnyValueExpression = typeof QueryAnyValueExpression.Type;
+
 export const QueryTransformTableRefExpression = Struct({ Source: String });
+
+export type QueryTransformTableRefExpression = typeof QueryTransformTableRefExpression.Type;
 
 export const QueryTransformOutputRoleRefExpression = Struct({
 	Role: String,
 	Transform: optionalKey(String),
 });
+
+export type QueryTransformOutputRoleRefExpression = typeof QueryTransformOutputRoleRefExpression.Type;
 
 export const QueryResourcePackageItem = Struct({
 	PackageName: String,
@@ -63,16 +95,26 @@ export const QueryResourcePackageItem = Struct({
 	ItemName: String,
 });
 
+export type QueryResourcePackageItem = typeof QueryResourcePackageItem.Type;
+
 export const QueryRoleRefExpression = Struct({ Role: String });
+
+export type QueryRoleRefExpression = typeof QueryRoleRefExpression.Type;
 
 export const QuerySummaryValueRefExpression = Struct({ Name: String });
 
+export type QuerySummaryValueRefExpression = typeof QuerySummaryValueRefExpression.Type;
+
 export const QuerySelectRefExpression = Struct({ ExpressionName: String });
+
+export type QuerySelectRefExpression = typeof QuerySelectRefExpression.Type;
 
 export const QueryThemeDataColorExpression = Struct({
 	ColorId: Number,
 	Percent: Number,
 });
+
+export type QueryThemeDataColorExpression = typeof QueryThemeDataColorExpression.Type;
 
 export const QueryNativeVisualCalcFields = {
 	Language: Literal("dax"),
@@ -81,6 +123,8 @@ export const QueryNativeVisualCalcFields = {
 };
 
 export const Annotations = Record(String, Unknown);
+
+export type Annotations = typeof Annotations.Type;
 
 export const QueryExpressionBaseFields = {
 	Name: optionalKey(String),
