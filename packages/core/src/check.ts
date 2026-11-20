@@ -352,7 +352,9 @@ const fontSizes = (value: unknown): ReadonlyArray<unknown> =>
 			)
 		: [];
 
-const checkFonts = (config: Config): ReadonlyArray<string> => {
+const checkFonts = (
+	config: Config,
+): { readonly errors: ReadonlyArray<string>; readonly warnings: ReadonlyArray<string> } => {
 	const fonts = config.report.fonts ?? [];
 	const registered = registeredFamilies(fonts);
 	const sources: ReadonlyArray<readonly [string, unknown]> = [
@@ -374,27 +376,29 @@ const checkFonts = (config: Config): ReadonlyArray<string> => {
 	const families = fonts
 		.filter((font) => !fontFamilies(font).every((family) => isFamilyName(family)))
 		.map((font) => `report.fonts: "${font}" has an empty or badly quoted font family name`);
-	return families.concat(
-		sources.flatMap(([where, value]) =>
-			[...new Set(fontFaces(value))]
-				.flatMap((face) => unknownFamilies(face, registered).map((family) => [face, family] as const))
-				.map(([face, family]) =>
-					isFamilyName(family)
-						? face === family
-							? `${where}: font "${face}" is not a Power BI font, add "${family}" to report.fonts and to the Register`
-							: `${where}: font "${face}" uses "${family}", which is not a Power BI font, add "${family}" to report.fonts and to the Register`
-						: `${where}: font "${face}" has an empty or badly quoted font family name`,
-				)
-				.concat(
-					[...new Set(fontSizes(value))]
-						.filter((size) => !isFontSize(size))
-						.map(
-							(size) =>
-								`${where}: font size ${JSON.stringify(size)} must be a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
-						),
+	return {
+		errors: families.concat(
+			sources.flatMap(([where, value]) =>
+				[...new Set(fontFaces(value))]
+					.flatMap((face) => unknownFamilies(face, registered).map((family) => [face, family] as const))
+					.map(([face, family]) =>
+						isFamilyName(family)
+							? face === family
+								? `${where}: font "${face}" is not a Power BI font, add "${family}" to report.fonts and to the Register`
+								: `${where}: font "${face}" uses "${family}", which is not a Power BI font, add "${family}" to report.fonts and to the Register`
+							: `${where}: font "${face}" has an empty or badly quoted font family name`,
+					),
+			),
+		),
+		warnings: sources.flatMap(([where, value]) =>
+			[...new Set(fontSizes(value))]
+				.filter((size) => !isFontSize(size))
+				.map(
+					(size) =>
+						`${where}: font size ${JSON.stringify(size)} is not a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
 				),
 		),
-	);
+	};
 };
 
 const datasetIssues = (config: Config): ReadonlyArray<string> => {
@@ -428,13 +432,14 @@ export const checkConfig = (config: Config): ConfigIssues => {
 		pages.map((page) => [page.name, new Map(page.visuals.map((visual) => [visual.name, visual]))]),
 	);
 	const resourceIssues = checkResources(config);
+	const fontIssues = checkFonts(config);
 	const errors = [
 		...pathIssue("config", config.name),
 		...(config.out === undefined || config.out.trim() !== "" ? [] : ["config: out must not be empty"]),
 		...sourceIssues(config),
 		...ownedIssues(config),
 		...resourceIssues.errors,
-		...checkFonts(config),
+		...fontIssues.errors,
 		...duplicates(pageNames).map((name) => `report: page name "${name}" is used more than once`),
 		...duplicates(bindings).map((name) => `report: pageBinding name "${name}" is used more than once`),
 		...Object.entries(pageRefs).flatMap(([key, name]) =>
@@ -457,6 +462,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	];
 	const warnings = [
 		...resourceIssues.warnings,
+		...fontIssues.warnings,
 		...visualTypeIssues(config),
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
 		...pages.flatMap((page) =>
