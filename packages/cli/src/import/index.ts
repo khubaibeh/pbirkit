@@ -1,6 +1,3 @@
-import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
-
 import { Console, Effect, FileSystem, Option, Path, Result } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
@@ -41,22 +38,7 @@ const fail = Effect.sync(() => {
 });
 
 const verify = Effect.fnUntraced(function* (file: string, project: Project) {
-	const config = yield* Effect.acquireUseRelease(
-		Effect.sync(() => {
-			const generatedConfig = pathToFileURL(file).href;
-			return registerHooks({
-				resolve: (specifier, context, nextResolve) =>
-					specifier === "@pbirkit/core/config" && context.parentURL === generatedConfig
-						? nextResolve(specifier, { ...context, parentURL: import.meta.url })
-						: nextResolve(specifier, context),
-			});
-		}),
-		() => loadConfig(file),
-		(hooks) =>
-			Effect.sync(() => {
-				hooks.deregister();
-			}),
-	);
+	const config = yield* loadConfig(file);
 	const built = new Map(fileTreeOf(yield* buildTree(buildFiles(config), desktopOwnedPaths(config))));
 	built.delete(".gitignore");
 	const source = fileTreeOf(yield* readProjectTree(project));
@@ -67,17 +49,7 @@ const verify = Effect.fnUntraced(function* (file: string, project: Project) {
 	return { differences, verified };
 });
 
-const runImport = Effect.fnUntraced(function* ({
-	source,
-	out: outFlag,
-	force,
-}: Command.Command.Config.Infer<typeof flags>) {
-	const fs = yield* FileSystem.FileSystem;
-	const path = yield* Path.Path;
-	const project = yield* findProject(source);
-	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	yield* checkOutput(out, project, force);
-
+export const projectConfig = Effect.fnUntraced(function* (project: Project) {
 	const output = new ImportOutput();
 	const { report, registration } = yield* importReport(
 		project,
@@ -95,11 +67,25 @@ const runImport = Effect.fnUntraced(function* ({
 			"Kept the reference because the local model could not be found inside the project",
 		);
 	}
-	output.module(
+	const config = output.module(
 		CONFIG_FILE,
 		{ name: project.name, pbip: project.pbip, report, ...(model === undefined ? {} : { model }) },
 		registration,
 	);
+	return { output, config };
+});
+
+const runImport = Effect.fnUntraced(function* ({
+	source,
+	out: outFlag,
+	force,
+}: Command.Command.Config.Infer<typeof flags>) {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+	const project = yield* findProject(source);
+	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
+	yield* checkOutput(out, project, force);
+	const { output } = yield* projectConfig(project);
 
 	const clashes = pathClashes(output.files);
 	if (clashes.length > 0) return yield* new PathClashError({ folder: out, pairs: clashes });

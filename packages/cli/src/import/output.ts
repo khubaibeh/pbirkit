@@ -12,9 +12,11 @@ type VisualRegistration = {
 
 class ModuleReference {
 	readonly file: string;
+	readonly data: unknown;
 
-	constructor(file: string) {
+	constructor(file: string, data: unknown) {
 		this.file = file;
+		this.data = data;
 	}
 }
 
@@ -67,6 +69,16 @@ export class ImportOutput {
 
 	fallback(group: string, reason: string) {
 		this.fallbacks.push({ group, reason });
+	}
+
+	resolve(value: unknown): unknown {
+		if (value instanceof ModuleReference) return this.resolve(value.data);
+		if (value instanceof AssetReference) return new URL(urlPath(value.file), "file:///");
+		if (Array.isArray(value)) return value.map((item: unknown) => this.resolve(item));
+		if (typeof value === "object" && value !== null) {
+			return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.resolve(item)]));
+		}
+		return value;
 	}
 
 	module(file: string, data: unknown, registration?: VisualRegistration) {
@@ -140,6 +152,6 @@ export class ImportOutput {
 		lines.push(isConfig ? `export default defineConfig(${body});` : `export default ${body} as const;`, "");
 		this.files.push(treeFile(file, encoder.encode(lines.join("\n"))));
 
-		return new ModuleReference(file);
+		return new ModuleReference(file, data);
 	}
 }

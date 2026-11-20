@@ -1,14 +1,20 @@
-import { Console, Effect, Path } from "effect";
+import { Console, Effect, Option, Path } from "effect";
 import { Command, Flag } from "effect/cli";
+import { decodeUnknownEffect } from "effect/Schema";
 
+import { Config } from "@pbirkit/core/config";
 import { reportTree } from "@pbirkit/core/tree";
 
 import { readConfig } from "../build/config.ts";
-import type { ConfigLoadError, ConfigShapeError } from "../build/errors.ts";
+import { ConfigShapeError } from "../build/errors.ts";
+import { projectConfig } from "../import/index.ts";
+import { errorMessage as importErrorMessage } from "../import/messages.ts";
+import { findProject } from "../import/source.ts";
 import { errorMessage, treeMessage } from "./messages.ts";
 
 const HELP = [
 	"List the pages, visuals and bookmarks of the project as a tree.",
+	"Use either --pbip for a PBIP folder or .pbip file, or --config for a config file.",
 	"",
 	"The first line counts the pages, visuals and bookmarks.",
 	"Each later line has this form:",
@@ -43,24 +49,48 @@ const HELP = [
 const flags = {
 	config: Flag.String("config").pipe(
 		Flag.withAlias("c"),
-		Flag.withDefault("pbirkit.config.ts"),
-		Flag.withDescription("Config file of the project"),
+		Flag.optional,
+		Flag.withDescription("Config file of the project (defaults to pbirkit.config.ts)"),
 	),
+	pbip: Flag.String("pbip").pipe(Flag.optional, Flag.withDescription("PBIP project folder or .pbip file")),
 };
 
-const reportError = (error: ConfigLoadError | ConfigShapeError) =>
+const reportError = (message: string) =>
 	Effect.andThen(
-		Console.error(errorMessage(error)),
+		Console.error(message),
 		Effect.sync(() => {
 			process.exitCode = 1;
 		}),
 	);
 
-export const tree = Command.make("tree", flags, ({ config }) =>
+const readProjectConfig = Effect.fnUntraced(function* (source: string) {
+	const project = yield* findProject(source);
+	const { output, config } = yield* projectConfig(project);
+	return yield* decodeUnknownEffect(Config)(output.resolve(config), { onExcessProperty: "error" }).pipe(
+		Effect.mapError((error) => new ConfigShapeError({ file: source, detail: error.message })),
+	);
+});
+
+export const tree = Command.make("tree", flags, ({ config, pbip }) =>
 	Effect.gen(function* () {
+		if (Option.isSome(config) && Option.isSome(pbip)) {
+			return yield* reportError("[ERROR] tree: --config and --pbip are mutually exclusive");
+		}
 		const path = yield* Path.Path;
-		return yield* Console.log(treeMessage(reportTree(yield* readConfig(path.resolve(config)))));
-	}).pipe(Effect.catch(reportError)),
+		const data = yield* Option.match(pbip, {
+			onNone: () => readConfig(path.resolve(Option.getOrElse(config, () => "pbirkit.config.ts"))),
+			onSome: readProjectConfig,
+		});
+		return yield* Console.log(treeMessage(reportTree(data)));
+	}).pipe(
+		Effect.catch((error) =>
+			reportError(
+				error._tag === "ConfigLoadError" || error._tag === "ConfigShapeError"
+					? errorMessage(error)
+					: importErrorMessage(error),
+			),
+		),
+	),
 ).pipe(
 	Command.withDescription(HELP),
 	Command.withShortDescription("List the pages, visuals and bookmarks of the project as a tree"),
@@ -69,6 +99,10 @@ export const tree = Command.make("tree", flags, ({ config }) =>
 		{
 			command: `${commandPath.join(" ")} -c other.config.ts`,
 			description: "Print the tree of another config file",
+		},
+		{
+			command: `${commandPath.join(" ")} --pbip ./project`,
+			description: "Print the tree of a PBIP project directly",
 		},
 	]),
 );
