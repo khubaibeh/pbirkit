@@ -66,7 +66,12 @@ type ExtraVisualOf<R> = R extends { readonly builtinVisuals: ReadonlyArray<infer
 	? V
 	: never;
 
-export type VisualTypeOf<R> = BuiltinVisual | CustomVisualOf<R> | ExtraVisualOf<R>;
+type ImportedVisuals<R> = R[Extract<keyof R, `import:${string}`>];
+
+export type VisualTypeOf<R> =
+	| BuiltinVisual
+	| CustomVisualOf<R | ImportedVisuals<R>>
+	| ExtraVisualOf<R | ImportedVisuals<R>>;
 
 export type VisualType = VisualTypeOf<Register>;
 

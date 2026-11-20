@@ -11,7 +11,9 @@ interface ResourcePackage {
 	readonly items: Array<PackageItem["item"]>;
 }
 
-export const resourcePackages = (resources: ReadonlyArray<Resource>): ReadonlyArray<ResourcePackage> => {
+export const resourcePackages = (
+	resources: ReadonlyArray<Parameters<typeof packageItem>[0]>,
+): ReadonlyArray<ResourcePackage> => {
 	const packages = new Map<string, ResourcePackage>();
 
 	for (const resource of resources) {

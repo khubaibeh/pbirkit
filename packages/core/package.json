@@ -18,6 +18,7 @@
 		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",
 		"./custom-visual": "./src/custom-visual.ts",
+		"./diff": "./src/diff.ts",
 		"./expr": "./src/expr/index.ts",
 		"./filter-configuration/*": "./src/schemas/filter-configuration/*.ts",
 		"./font": "./src/font.ts",

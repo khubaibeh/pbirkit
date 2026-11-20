@@ -51,7 +51,11 @@ const STATIC_ITEMS = {
 	image: { package: "RegisteredResources", type: "Image", path: (name: string) => name },
 } as const;
 
-export const packageItem = (resource: Resource): PackageItem => {
+type ResourceIdentity =
+	| Pick<CustomVisualResource, "kind" | "guid">
+	| { readonly kind: Exclude<Resource["kind"], "customVisual">; readonly name: string };
+
+export const packageItem = (resource: ResourceIdentity): PackageItem => {
 	if (resource.kind === "customVisual") {
 		const name = `${resource.guid}.pbiviz.json`;
 		return {
