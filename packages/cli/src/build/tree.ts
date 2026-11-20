@@ -136,7 +136,7 @@ export const readTree = Effect.fnUntraced(function* (folder: string, owned?: Rea
 	}
 
 	const clashes = pathClashes(files);
-	if (clashes.length > 0) yield* new PathClashError({ folder, pairs: clashes });
+	if (clashes.length > 0) return yield* new PathClashError({ folder, pairs: clashes });
 
 	return Option.some(treeOf(files));
 });

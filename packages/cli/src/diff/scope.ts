@@ -24,7 +24,7 @@ export const selectedScope = Effect.fnUntraced(function* (
 	const selected = new Set<string>();
 	for (const { kind, item } of pending) {
 		const matches = indexes.flatMap((index) => selectedPaths(index, kind, item));
-		if (matches.length === 0) return yield* new SelectorNotFoundError({ kind, name: item });
+		if (matches.length === 0) return yield* new SelectorNotFoundError({ kind, selector: item });
 		for (const path of matches) selected.add(fileKey(path));
 	}
 

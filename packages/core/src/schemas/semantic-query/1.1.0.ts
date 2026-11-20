@@ -1,4 +1,4 @@
-import { Number, Struct, Unknown, suspend } from "effect/Schema";
+import { Finite, Struct, suspend, Unknown } from "effect/Schema";
 import type { Codec } from "effect/Schema";
 
 import { oneKeyOf } from "#schemas/common/one-key.ts";
@@ -15,7 +15,7 @@ import type { QueryDefinitions, QueryExpressionKindsOf, QuerySparklineDataFields
 export * from "./shared.ts";
 export { QueryNativeVisualCalc };
 
-export const QueryVisualTopNExpression = Struct({ ItemCount: Number });
+export const QueryVisualTopNExpression = Struct({ ItemCount: Finite });
 
 export type QueryVisualTopNExpression = typeof QueryVisualTopNExpression.Type;
 

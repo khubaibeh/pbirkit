@@ -1,4 +1,4 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literals, optionalKey, String, Struct } from "effect/Schema";
 
 import { formattingProperties } from "#schemas/common/formatting.ts";
 
@@ -62,7 +62,7 @@ export const ResourcePackageItemType = Literals([
 export type ResourcePackageItemType = typeof ResourcePackageItemType.Type;
 
 export const ResourcePackageItem = Struct({
-	id: optionalKey(Number),
+	id: optionalKey(Finite),
 	name: String,
 	path: String,
 	type: ResourcePackageItemType,
@@ -71,7 +71,7 @@ export const ResourcePackageItem = Struct({
 export type ResourcePackageItem = typeof ResourcePackageItem.Type;
 
 export const ResourcePackage = Struct({
-	id: optionalKey(Number),
+	id: optionalKey(Finite),
 	name: String,
 	type: ResourcePackageType,
 	items: Array(ResourcePackageItem),

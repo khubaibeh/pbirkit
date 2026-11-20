@@ -1,16 +1,16 @@
 import {
 	Array,
 	Boolean,
+	Finite,
 	Literal,
 	Literals,
-	Number,
+	optionalKey,
 	Record,
 	String,
 	Struct,
+	suspend,
 	Union,
 	Unknown,
-	optionalKey,
-	suspend,
 } from "effect/Schema";
 import type { Codec, Constraint } from "effect/Schema";
 
@@ -178,8 +178,8 @@ export const bookmarkDefinitions = <
 
 	const ParameterState = Struct({
 		expr: Expression,
-		index: Number,
-		length: Number,
+		index: Finite,
+		length: Finite,
 		...drift.parameterState,
 	});
 
@@ -202,7 +202,7 @@ export const bookmarkDefinitions = <
 
 	const DecomposedSelectors = Struct({
 		decomposedIdentities: optionalKey(decomposedIdentities(Expression)),
-		queryNameMap: optionalKey(Array(Record(String, Array(Number)))),
+		queryNameMap: optionalKey(Array(Record(String, Array(Finite)))),
 		queryNames: optionalKey(Array(String)),
 		metadata: optionalKey(Array(Array(String))),
 		id: optionalKey(Array(String)),

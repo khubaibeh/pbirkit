@@ -1,18 +1,18 @@
 import {
 	Array,
 	Boolean,
+	Finite,
 	Int,
+	isBetween,
+	isPattern,
 	Literals,
-	Number,
+	optionalKey,
 	Record,
 	String,
 	Struct,
 	StructWithRest,
 	TemplateLiteral,
 	Unknown,
-	isBetween,
-	isPattern,
-	optionalKey,
 } from "effect/Schema";
 
 import { FontFace, FontSize } from "#core/font.ts";
@@ -25,7 +25,7 @@ export const ThemeFill = Struct({ solid: Struct({ color: ThemeColor }) });
 
 export type ThemeFill = typeof ThemeFill.Type;
 
-const Transparency = Number.check(isBetween({ minimum: 0, maximum: 100 }));
+const Transparency = Finite.check(isBetween({ minimum: 0, maximum: 100 }));
 
 export const VisualStyleProperties = StructWithRest(
 	Struct({
@@ -53,9 +53,9 @@ export type VisualBackground = typeof VisualBackground.Type;
 
 export const VisualBorder = Struct({
 	color: optionalKey(ThemeFill),
-	radius: optionalKey(Number),
+	radius: optionalKey(Finite),
 	show: optionalKey(Boolean),
-	width: optionalKey(Number),
+	width: optionalKey(Finite),
 });
 
 export type VisualBorder = typeof VisualBorder.Type;

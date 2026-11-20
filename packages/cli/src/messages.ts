@@ -36,7 +36,8 @@ export const errorMessage = (command: string): ((error: CliError) => string) => 
 			].join("\n"),
 		ConflictError: conflictMessage,
 		TargetMissingError: ({ folder }) => `${prefix} target folder ${folder} does not exist`,
-		SelectorNotFoundError: ({ kind, name }) => `${prefix} --${kind} ${JSON.stringify(name)} matched no files`,
+		SelectorNotFoundError: ({ kind, selector }) =>
+			`${prefix} --${kind} ${JSON.stringify(selector)} matched no files`,
 		ProjectSourceError: ({ path, detail }) => `${prefix} cannot read ${path}: ${detail}`,
 		ImportOutputError: ({ path, detail }) => `${prefix} cannot write to ${path}: ${detail}`,
 	});

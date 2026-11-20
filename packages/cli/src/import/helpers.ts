@@ -2,17 +2,17 @@ import { Array as Arr, Option, Predicate, Record } from "effect";
 import {
 	Array as ArraySchema,
 	Boolean as BooleanSchema,
+	declare,
+	decodeUnknownOption,
+	Finite,
 	Literal,
 	Literals,
-	Number as NumberSchema,
+	optionalKey,
 	Record as RecordSchema,
 	String as StringSchema,
 	Struct,
 	Tuple,
 	Unknown,
-	declare,
-	decodeUnknownOption,
-	optionalKey,
 } from "effect/Schema";
 import type { ConstraintDecoder } from "effect/Schema";
 import { omit } from "effect/Struct";
@@ -264,7 +264,7 @@ const RULES: ReadonlyMap<string, ReadonlyArray<Rule>> = new Map(
 			),
 		],
 		Aggregation: [
-			rule(Struct({ Aggregation: Struct({ Expression, Function: NumberSchema }) }), ({ Aggregation }) =>
+			rule(Struct({ Aggregation: Struct({ Expression, Function: Finite }) }), ({ Aggregation }) =>
 				Option.flatMap(nameOf(expr.Aggregate, Aggregation.Function), (name) =>
 					helper("agg", [name, Aggregation.Expression]),
 				),
@@ -277,14 +277,14 @@ const RULES: ReadonlyMap<string, ReadonlyArray<Rule>> = new Map(
 		],
 		ThemeDataColor: [
 			rule(
-				Struct({ ThemeDataColor: Struct({ ColorId: NumberSchema, Percent: NumberSchema }) }),
+				Struct({ ThemeDataColor: Struct({ ColorId: Finite, Percent: Finite }) }),
 				({ ThemeDataColor: { ColorId, Percent } }) =>
 					helper("theme", Percent === 0 ? [ColorId] : [ColorId, Percent]),
 			),
 		],
 		Comparison: [
 			rule(
-				Struct({ Comparison: Struct({ ComparisonKind: NumberSchema, Left: Expression, Right: Expression }) }),
+				Struct({ Comparison: Struct({ ComparisonKind: Finite, Left: Expression, Right: Expression }) }),
 				({ Comparison }) =>
 					Option.flatMap(nameOf(expr.ComparisonKind, Comparison.ComparisonKind), (name) =>
 						helper(name, [Comparison.Left, Comparison.Right]),
@@ -410,7 +410,7 @@ const RULES: ReadonlyMap<string, ReadonlyArray<Rule>> = new Map(
 			rule(
 				Struct({
 					name: StringSchema,
-					ordinal: optionalKey(NumberSchema),
+					ordinal: optionalKey(Finite),
 					field: Expression,
 					type: StringSchema,
 					filter: optionalKey(Unknown),

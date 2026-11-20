@@ -1,6 +1,6 @@
 /* User explicitly asked for this test in here */
 
-import { decodeUnknownSync } from "effect/Schema";
+import { decodeSync } from "effect/Schema";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import { ExpansionState } from "#schemas/visual-configuration/2.8.0.ts";
@@ -81,8 +81,8 @@ describe("nest", () => {
 					),
 				],
 			},
-		} satisfies typeof ExpansionState.Type;
-		expect(decodeUnknownSync(ExpansionState)(state, { onExcessProperty: "error" })).toStrictEqual({
+		} satisfies ExpansionState;
+		expect(decodeSync(ExpansionState)(state, { onExcessProperty: "error" })).toStrictEqual({
 			roles: ["Rows"],
 			root: {
 				children: [

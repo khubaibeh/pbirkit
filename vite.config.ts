@@ -1,6 +1,11 @@
+import { recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "vite-plus";
 
 const ignorePatterns = ["dist", "playground", ".local", "archive"];
+
+const effect = process.env.NODE_OPTIONS?.includes("@effect/tsgo/lib/oxlint-bridge") ?? false;
+const effectPlugins = effect ? (recommended.plugins ?? []) : [];
+const effectRules = effect ? { ...recommended.rules, "effecttsgo/unstable-api-usage": "off" as const } : {};
 
 export default defineConfig({
 	fmt: {
@@ -30,7 +35,7 @@ export default defineConfig({
 		ignorePatterns,
 	},
 	lint: {
-		plugins: ["typescript", "unicorn", "oxc", "import", "promise", "node"],
+		plugins: ["typescript", "unicorn", "oxc", "import", "promise", "node", ...effectPlugins],
 		categories: {
 			correctness: "error",
 			suspicious: "error",
@@ -42,6 +47,8 @@ export default defineConfig({
 			node: true,
 		},
 		rules: {
+			...effectRules,
+			"typescript/consistent-return": "off",
 			"max-classes-per-file": "off",
 			"no-underscore-dangle": "off",
 			"max-lines": "off",
@@ -64,7 +71,7 @@ export default defineConfig({
 		],
 	},
 	staged: {
-		"*.{ts,mts,cts,js,mjs,cjs}": "vp check --fix",
+		"*.{ts,mts,cts,js,mjs,cjs}": "effect-tsgo vp check --fix",
 		"*.json": "vp fmt",
 	},
 });

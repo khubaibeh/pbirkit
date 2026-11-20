@@ -1,4 +1,4 @@
-import { Literal, Number, Struct, Union, optionalKey } from "effect/Schema";
+import { Finite, Literal, optionalKey, Struct, Union } from "effect/Schema";
 
 import type { WithoutSchema } from "#schemas/common/define.ts";
 import { FilterConfig } from "#schemas/filter-configuration/1.0.0.ts";
@@ -18,7 +18,7 @@ export type VisualGroupConfig = typeof VisualGroupConfig.Type;
 
 export const VisualContainerPosition = Struct({
 	...PositionFields,
-	angle: optionalKey(Number),
+	angle: optionalKey(Finite),
 });
 
 export type VisualContainerPosition = typeof VisualContainerPosition.Type;

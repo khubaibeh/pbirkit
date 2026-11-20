@@ -7,15 +7,16 @@
 	"scripts": {
 		"prepare": "vp config",
 		"build": "pnpm -r build",
-		"check": "vp check",
-		"lint": "vp lint",
-		"lint:fix": "vp lint --fix",
+		"check": "effect-tsgo vp check",
+		"lint": "effect-tsgo vp lint",
+		"lint:fix": "effect-tsgo vp lint --fix",
 		"format": "vp fmt",
 		"format:check": "vp fmt --check",
 		"typecheck": "pnpm -r typecheck",
 		"test": "vp test run"
 	},
 	"devDependencies": {
+		"@effect/tsgo": "catalog:",
 		"@types/node": "catalog:",
 		"@typescript/native-preview": "catalog:",
 		"vite-plus": "catalog:"
