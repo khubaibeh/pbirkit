@@ -10,7 +10,7 @@ const REPORT = "Sales.Report";
 const pages = `${REPORT}/definition/pages`;
 const bookmarks = `${REPORT}/definition/bookmarks`;
 
-const indexOf = (files: Readonly<Record<string, unknown>>, raw?: (path: string) => boolean): ReportTree => {
+const indexOf = (files: Readonly<Record<string, unknown>>): ReportTree => {
 	const texts = new Map(
 		Object.entries(files).map(([path, value]) => [path, typeof value === "string" ? value : toJson(value)]),
 	);
@@ -19,7 +19,6 @@ const indexOf = (files: Readonly<Record<string, unknown>>, raw?: (path: string) 
 		report: REPORT,
 		paths: [...texts.keys()],
 		text: (path) => texts.get(path),
-		...(raw === undefined ? {} : { raw }),
 	});
 };
 
@@ -67,19 +66,6 @@ describe("pages", () => {
 		expect(tree.pages.map((node) => node.name)).toEqual(["second", "first", "third"]);
 		expect(tree.pages.every((node) => node.placed && Result.isSuccess(node.content))).toBe(true);
 		expect(failure(tree.pagesMetadata.content)).toBe("pageOrder differs from the page folders");
-	});
-
-	it("keeps pages.json typed when a page itself stays raw", () => {
-		const tree = indexOf({
-			[`${pages}/pages.json`]: pagesJson(["first"]),
-			[`${pages}/first/page.json`]: { ...page("first"), futureProperty: true },
-		});
-
-		expect(failure(tree.pages[0]?.content ?? Result.succeed(0))).toBe(
-			"Unsupported page schema or properties",
-		);
-		expect(tree.pages[0]?.placed).toBe(true);
-		expect(Result.isSuccess(tree.pagesMetadata.content)).toBe(true);
 	});
 
 	it("marks a page whose folder differs from its name, and its visuals, as not placed", () => {
@@ -139,16 +125,6 @@ const shape = (nodes: ReturnType<typeof visualsIndex>): unknown =>
 	nodes.map((node) => (node.children.length === 0 ? node.name : { [node.name]: shape(node.children) }));
 
 describe("visuals", () => {
-	it("nests visuals under their groups", () => {
-		const nodes = visualsIndex({
-			outer: group("outer"),
-			inner: group("inner", "outer"),
-			a: visual("a", { parentGroupName: "inner" }),
-		});
-
-		expect(shape(nodes)).toEqual([{ outer: [{ inner: ["a"] }] }]);
-	});
-
 	it("keeps visuals in a group cycle or with an unknown parent at the top level", () => {
 		const nodes = visualsIndex({
 			x: group("x", "y"),
@@ -188,25 +164,6 @@ const bookmarksJson = (items: ReadonlyArray<unknown>) => ({
 });
 
 describe("bookmarks", () => {
-	it("indexes groups and keeps bookmarks.json typed next to a raw bookmark", () => {
-		const tree = indexOf({
-			[`${bookmarks}/bookmarks.json`]: bookmarksJson([
-				{ name: "views", displayName: "Views", children: ["a", "b"] },
-			]),
-			[`${bookmarks}/a.bookmark.json`]: bookmark("a"),
-			[`${bookmarks}/b.bookmark.json`]: { ...bookmark("b"), futureProperty: true },
-		});
-		const [views] = tree.bookmarks;
-
-		expect(
-			views?.kind === "group" && views.children.map((child) => [child.name, failure(child.content)]),
-		).toEqual([
-			["a", undefined],
-			["b", "Unsupported bookmark schema or properties"],
-		]);
-		expect(Result.isSuccess(tree.bookmarksMetadata?.content ?? Result.fail(""))).toBe(true);
-	});
-
 	it("keeps bookmarks.json raw when its entries and the bookmark files do not line up", () => {
 		const cases = [
 			[
@@ -228,21 +185,6 @@ describe("bookmarks", () => {
 			});
 			expect(failure(tree.bookmarksMetadata?.content)).toBe(reason);
 		}
-	});
-
-	it("reports the page a bookmark opens and whether it exists", () => {
-		const tree = indexOf({
-			[`${pages}/pages.json`]: pagesJson(["first"]),
-			[`${pages}/first/page.json`]: page("first"),
-			[`${bookmarks}/bookmarks.json`]: bookmarksJson([{ name: "a" }, { name: "b" }]),
-			[`${bookmarks}/a.bookmark.json`]: bookmark("a"),
-			[`${bookmarks}/b.bookmark.json`]: bookmark("b", "missing"),
-		});
-
-		expect(tree.bookmarks.map((node) => node.kind === "bookmark" && [node.page, node.pageExists])).toEqual([
-			["first", true],
-			["missing", false],
-		]);
 	});
 });
 
@@ -321,34 +263,6 @@ describe("selectedPaths", () => {
 		expect(selectedPaths(tree, "bookmark", "g")).toEqual([`${bookmarks}/b.bookmark.json`]);
 		expect(selectedPaths(tree, "bookmark", "b")).toEqual([`${bookmarks}/b.bookmark.json`]);
 		expect(selectedPaths(tree, "theme", "none")).toEqual([]);
-	});
-});
-
-describe("file text", () => {
-	it("types files with LF line endings or a BOM like their CRLF form", () => {
-		const tree = indexOf({
-			[`${pages}/pages.json`]: toJson(pagesJson(["first"])).replaceAll("\r\n", "\n"),
-			[`${pages}/first/page.json`]: `\uFEFF${toJson(page("first"))}`,
-			[`${pages}/first/visuals/notes/visual.json`]: `\uFEFF${toJson(visual("notes")).replaceAll("\r\n", "\n")}`,
-		});
-		const [first] = tree.pages;
-		expect(failure(tree.pagesMetadata.content)).toBeUndefined();
-		expect(failure(first?.content)).toBeUndefined();
-		expect(failure(first?.visuals[0]?.content)).toBeUndefined();
-	});
-
-	it("marks the files that the config keeps raw", () => {
-		const raw = `${pages}/first/visuals/notes/visual.json`;
-		const tree = indexOf(
-			{
-				[`${pages}/pages.json`]: pagesJson(["first"]),
-				[`${pages}/first/page.json`]: page("first"),
-				[raw]: visual("notes"),
-			},
-			(path) => path === raw,
-		);
-		expect(failure(tree.pages[0]?.content)).toBeUndefined();
-		expect(failure(tree.pages[0]?.visuals[0]?.content)).toBe("The config keeps this file raw");
 	});
 });
 

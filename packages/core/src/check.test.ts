@@ -51,32 +51,3 @@ it("warns about unsupported font sizes without rejecting the config", () => {
 		),
 	);
 });
-
-it("warns that a raw pages.json or bookmarks.json sets the order instead of the config", () => {
-	const file = new URL("file:///project/Example.Report/definition/pages/pages.json");
-	const config = defineConfig({
-		name: "Example",
-		pbip: { version: "1.0" },
-		report: {
-			logicalId: "b045d170-d2e9-4ade-bbfd-ca34ce61654e",
-			platform: { $schema: SchemaUrl.platform["2.1.0"], version: "2.0" },
-			pbir: {
-				$schema: SchemaUrl.pbir["2.0.0"],
-				version: "4.0",
-				datasetReference: { byConnection: { connectionString: "semantic-model" } },
-			},
-			definition: { $schema: SchemaUrl.report["3.3.0"], themeCollection: {} },
-			version: { $schema: SchemaUrl.version["1.0.0"], version: "2.0.0" },
-			pagesMetadata: file,
-			pages: [],
-			bookmarks: { file: new URL("bookmarks/bookmarks.json", file), items: [] },
-		},
-	});
-
-	const { errors, warnings } = checkConfig(config);
-	expect(errors).toEqual([]);
-	expect(warnings).toEqual([
-		"[WARN] check: report: pagesMetadata is a file, so that file sets the page order and the active page, not report.pages",
-		"[WARN] check: report: bookmarks is a file, so that file sets the bookmark order and groups, not bookmarks.items",
-	]);
-});

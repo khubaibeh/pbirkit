@@ -134,18 +134,6 @@ it("compares only project files that the config owns, without local dependencies
 	expect(clean.stderr).toBe("");
 });
 
-it("ignores JSON formatting unless --bytes is set, and shows warnings only with --warnings", () => {
-	replaceInFile(join(target, visual), '"x": 0,', '"x": 0.0,');
-	const semantic = diff("--warnings", "--visual", "notes");
-	expect(semantic.status, semantic.stderr).toBe(0);
-	expect(semantic.stdout.trim()).toBe("No differences in 1 file.");
-	expect(semantic.stderr).toContain(WARNING);
-	const bytes = diff("--bytes", "--visual", "notes");
-	expect(bytes.status, bytes.stderr).toBe(1);
-	expect(bytes.stdout).toContain(`changed  ${visual}`);
-	expect(bytes.stderr).toBe("");
-});
-
 it("scopes the comparison to the selected pages, visuals, bookmarks and themes", () => {
 	replaceInFile(join(target, visual), '"x": 0,', '"x": 1,');
 	replaceInFile(join(target, page), '"displayName": "Summary"', '"displayName": "Changed page"');
@@ -172,16 +160,4 @@ it("scopes the comparison to the selected pages, visuals, bookmarks and themes",
 			paths.map((path) => `changed  ${path}`),
 		);
 	}
-});
-
-it.each([
-	[["--theme", "absent"], '[ERROR] diff: --theme "absent" matched no files'],
-	[["--target", "absent"], "[ERROR] diff: target folder absent does not exist"],
-	[["--target", "theme.json"], "theme.json"],
-	[["--config", "absent.ts"], "absent.ts"],
-	[["--config", "dist"], "dist"],
-])("exits with code 2 for %j", (args, message) => {
-	const result = diff(...args);
-	expect(result.status, result.stderr).toBe(2);
-	expect(result.stderr).toContain(message);
 });

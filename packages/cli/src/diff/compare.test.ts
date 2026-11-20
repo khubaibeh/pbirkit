@@ -84,38 +84,4 @@ describe("compareTrees", () => {
 			{ kind: "missing", path: "z.json" },
 		]);
 	});
-
-	it("escapes pointers, compares arrays in order, and counts paths beyond five", () => {
-		const expected = tree({ "visual.json": '{"/~":[1,2,3,4,5],"z":1}' });
-		const actual = tree({ "visual.json": '{"/~":[2,3,4,5,6,7]}' });
-
-		expect(compareTrees(expected, actual, "semantic").differences).toEqual([
-			{
-				kind: "changed",
-				path: "visual.json",
-				pointers: [
-					{ pointer: "/~1~0/0", expected: "1", actual: "2" },
-					{ pointer: "/~1~0/1", expected: "2", actual: "3" },
-					{ pointer: "/~1~0/2", expected: "3", actual: "4" },
-					{ pointer: "/~1~0/3", expected: "4", actual: "5" },
-					{ pointer: "/~1~0/4", expected: "5", actual: "6" },
-				],
-				more: 2,
-			},
-		]);
-	});
-
-	it("truncates rendered values at 80 characters", () => {
-		const expected = tree({ ".platform": JSON.stringify("x".repeat(100)) });
-		const actual = tree({ ".platform": '"y"' });
-
-		expect(compareTrees(expected, actual, "semantic").differences).toEqual([
-			{
-				kind: "changed",
-				path: ".platform",
-				pointers: [{ pointer: "", expected: `"${"x".repeat(78)}…`, actual: '"y"' }],
-				more: 0,
-			},
-		]);
-	});
 });

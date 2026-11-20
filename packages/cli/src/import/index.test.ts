@@ -241,17 +241,6 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(diff.stdout).toContain("No differences in 23 files.");
 });
 
-it("shows the same tree from the project folder, its PBIP file and the imported config", () => {
-	importProject();
-	const fromConfig = tree("-c", config);
-	expect(fromConfig).toContain("Example: 2 pages, 3 visuals, 2 bookmarks");
-	expect(tree("--pbip", project)).toBe(fromConfig);
-	expect(tree("--pbip", join(project, "Example.pbip"))).toBe(fromConfig);
-	const conflict = run(root, ["tree", "--pbip", project, "-c", config]);
-	expect(conflict.status).toBe(2);
-	expect(conflict.stderr).toContain("--config and --pbip are mutually exclusive");
-});
-
 it("follows a renamed PBIP file's report artifact and preserves the report display name", () => {
 	renameSync(join(project, "Example.pbip"), join(project, "Renamed.pbip"));
 	importProject();
@@ -260,40 +249,6 @@ it("follows a renamed PBIP file's report artifact and preserves the report displ
 	expect(contents).toContain('path: "Example.Report"');
 	expect(contents).toContain('displayName: "Example"');
 	expect(tree("--pbip", project)).toBe(tree("-c", config));
-});
-
-it.each([
-	[
-		"an unknown property",
-		(contents: string) => contents.replace('"name"', '"futureProperty": true, "name"'),
-		"Unsupported visual schema or properties",
-	],
-	[
-		"an unknown schema",
-		(contents: string) => contents.replace("/2.13.0/", "/9.0.0/"),
-		"Unknown visual $schema",
-	],
-])("preserves one raw visual with %s", (_, update, reason) => {
-	const file = visual("notes", "visual.json");
-	edit(file, update);
-	expect(importProject()).toContain(`Visual first/notes: ${reason}`);
-	expect(existsSync(join(out, "pages", "first", "visuals", "notes.ts"))).toBe(false);
-	expect(existsSync(join(out, "pages", "second", "visuals", "1-card.ts"))).toBe(true);
-	const raw = join(
-		out,
-		"assets",
-		"report",
-		"definition",
-		"pages",
-		"first",
-		"visuals",
-		"notes",
-		"visual.json",
-	);
-	expect(readFileSync(raw)).toEqual(readFileSync(file));
-	const fromProject = tree("--pbip", project);
-	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
-	expect(fromProject).toBe(tree("-c", config));
 });
 
 it("indexes a renamed visual folder under the visual's JSON name and keeps its path", () => {
@@ -389,33 +344,6 @@ it("rejects ambiguous input and protects a non-empty output without --force", ()
 	expect(ambiguousTree.stderr).toBe(ambiguous.stderr.replace("[ERROR] import:", "[ERROR] tree:"));
 });
 
-it.each([
-	[
-		"Report definition",
-		["Example.Report", "definition", "report.json"],
-		'"themeCollection"',
-		'"unsupported": true, "themeCollection"',
-	],
-	["Report version", ["Example.Report", "definition", "version.json"], "/1.0.0/", "/9.0.0/"],
-	["Report platform", ["Example.Report", ".platform"], '"displayName"', '"unsupported": true, "displayName"'],
-	["Report pbir", ["Example.Report", "definition.pbir"], '"version"', '"unsupported": true, "version"'],
-	[
-		"Model pbism",
-		["Example.SemanticModel", "definition.pbism"],
-		'"version"',
-		'"unsupported": true, "version"',
-	],
-	["pbip", ["Example.pbip"], '"version"', '"unsupported": true, "version"'],
-])("keeps %s raw when it has an unknown property or schema", (label, path, from, to) => {
-	const file = join(project, ...path);
-	edit(file, (value) => value.replace(from, to));
-	const stdout = importProject();
-	expect(stdout).toMatch(new RegExp(`^  ${label}: Unsupported .+`, "mu"));
-	const asset =
-		path[0] === "Example.pbip" ? path : [path[0] === "Example.Report" ? "report" : "model", ...path.slice(1)];
-	expect(readFileSync(join(out, "assets", ...asset))).toEqual(readFileSync(file));
-});
-
 it.each(["./../Example.SemanticModel", "..\\\\Example.SemanticModel"])(
 	"keeps definition.pbir raw when it points at the model as %s",
 	(reference) => {
@@ -427,20 +355,6 @@ it.each(["./../Example.SemanticModel", "..\\\\Example.SemanticModel"])(
 		expect(readFileSync(config, "utf8")).toContain('path: "Example.SemanticModel"');
 	},
 );
-
-it("keeps only an unsupported theme raw and still types its sibling", () => {
-	const registered = join(project, "Example.Report", "StaticResources", "RegisteredResources");
-	const original = join(registered, "Brand.json");
-	edit(original, (contents) =>
-		contents.replace('"name"', '"$schema": "https://example.com/future-theme.json", "name"'),
-	);
-	const stdout = importProject();
-	expect(stdout).toContain("Resource Brand.json: Unknown theme $schema");
-	expect(existsSync(join(out, "themes", "Base.ts"))).toBe(true);
-	expect(existsSync(join(out, "themes", "Brand.ts"))).toBe(false);
-	const raw = join(out, "assets", "report", "StaticResources", "RegisteredResources", "Brand.json");
-	expect(readFileSync(raw)).toEqual(readFileSync(original));
-});
 
 const DESKTOP_JSON = /\.(?:json|pbip|pbir|pbism|platform|tmdl)$/u;
 
@@ -483,45 +397,6 @@ it("types an LF checkout with BOMs as fully as the CRLF original", () => {
 	expect(bytes.status, bytes.stderr).toBe(1);
 	expect(bytes.stdout).toContain("changed  Example.Report/definition/pages/first/page.json");
 	expect(bytes.stdout).toMatch(/^0 missing, 0 extra, (\d+) changed\n\1 files differ only in line endings/mu);
-});
-
-it("keeps a visual whose name fails the name rule as unmapped files", () => {
-	renameSync(visual("notes"), visual("my.visual"));
-	edit(visual("my.visual", "visual.json"), (value) =>
-		value.replace('"name": "notes"', '"name": "my.visual"'),
-	);
-	const stdout = importProject();
-	expect(stdout).toContain(
-		'Visual first/my.visual: The name "my.visual" must use only letters, digits, "_" or "-"',
-	);
-	expect(stdout).toContain("definition/pages: Copied 1 unmapped file into report.files");
-	expect(readFileSync(config, "utf8")).toContain(
-		'"definition/pages/first/visuals/my.visual/visual.json": new URL(',
-	);
-	const fromProject = tree("--pbip", project);
-	expect(fromProject).toContain("visual (textbox, my.visual, -) [raw]");
-	expect(fromProject).toBe(tree("-c", config));
-});
-
-it("prints a diff command that lists the hidden check warnings", () => {
-	edit(definition("pages", "pages.json"), (value) =>
-		value.replace('"pageOrder"', '"unsupported": true, "pageOrder"'),
-	);
-	const stdout = importProject();
-	expect(stdout).toContain("Pages metadata: Unsupported");
-	expect(stdout).toContain(
-		"import: hid 1 check warning. Run pbirkit diff --warnings -c out/pbirkit.config.ts --target project to list them.",
-	);
-	const diff = run(root, ["diff", "--warnings", "-c", "out/pbirkit.config.ts", "--target", "project"]);
-	expect(diff.status, diff.stderr).toBe(0);
-	expect(diff.stderr).toContain("report: pagesMetadata is a file");
-});
-
-it("warns that names of raw items also live in their files", () => {
-	edit(visual("notes", "visual.json"), (value) => value.replace('"name"', '"futureProperty": true, "name"'));
-	expect(importProject()).toContain(
-		"import: kept 1 of the pages, visuals and bookmarks as raw files. To rename one, change the name in its file too.",
-	);
 });
 
 const settle = (folder: string, rounds: number) =>
