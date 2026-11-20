@@ -45,15 +45,46 @@ export type FamilyName<F extends string> = F extends "" | ` ${string}` | `${stri
 		? never
 		: F;
 
-export type FontFaceOf<R> = R extends { readonly fonts: ReadonlyArray<infer F extends string> }
-	? BuiltinFontFace | FamilyName<F>
-	: BuiltinFontFace;
+export const FALLBACK_FONTS = ["helvetica", "arial", "sans-serif", "serif", "monospace"] as const;
+
+export type WebFont = `wf_${string}`;
+
+type BuiltinFamily = Exclude<BuiltinFontFace, `${string}${"," | "'"}${string}`>;
+
+type Space = " " | "\t" | "\n" | "\r";
+
+type Trim<S extends string> = S extends `${Space}${infer T}`
+	? Trim<T>
+	: S extends `${infer T}${Space}`
+		? Trim<T>
+		: S;
+
+type Unquote<S extends string> = S extends `'${infer T}'` ? T : S extends `"${infer T}"` ? T : S;
+
+type Family<S extends string> = Unquote<Trim<S>>;
+
+export type Families<S extends string, A extends string = never> = S extends `${infer H},${infer T}`
+	? Families<T, A | Family<H>>
+	: A | Family<S>;
+
+type Quoted<F extends string> = F | `'${F}'` | `"${F}"`;
+
+export type FontStack<F extends string> = Quoted<F> | `${Quoted<F>},${string}`;
+
+type RegisteredOf<R> = R extends { readonly fonts: ReadonlyArray<infer F extends string> }
+	? FamilyName<Families<F>>
+	: never;
+
+type KnownFamily<R> = BuiltinFamily | (typeof FALLBACK_FONTS)[number] | WebFont | RegisteredOf<R>;
+
+export type FontFaceOf<R> = BuiltinFontFace | FontStack<KnownFamily<R> | Lowercase<KnownFamily<R>>>;
 
 export type FontFace = FontFaceOf<Register>;
 
-export const FontFace = declare((input: unknown): input is FontFace => typeof input === "string", {
-	expected: "a font family",
-});
+export const FontFace = declare(
+	(input: unknown): input is FontFace => typeof input === "string" && isFontStack(input),
+	{ expected: "a font family, or a stack of font families separated by commas" },
+);
 
 export const font = <const F extends string>(family: F & FamilyName<F>): F => family;
 
@@ -62,6 +93,36 @@ export const isFamilyName = (family: string): boolean =>
 
 export const isFontKey = (key: string): boolean =>
 	key === "fontFace" || key === "fontFamily" || key.endsWith("FontFamily");
+
+const unquote = (part: string): string => /^(['"])(.*)\1$/su.exec(part)?.[2] ?? part;
+
+export const fontFamilies = (face: string): ReadonlyArray<string> =>
+	face.split(",").map((part) => unquote(part.trim()));
+
+export const isBuiltinFont = (face: string): boolean => FONT_FACES.some((builtin) => builtin === face);
+
+export const isFontStack = (face: string): boolean =>
+	isBuiltinFont(face) || fontFamilies(face).every((family) => isFamilyName(family));
+
+const BUILTIN_FAMILIES: ReadonlySet<string> = new Set(
+	[...FONT_FACES.flatMap((face) => fontFamilies(face)), ...FALLBACK_FONTS]
+		.filter((family) => isFamilyName(family))
+		.map((family) => family.toLowerCase()),
+);
+
+export const registeredFamilies = (fonts: ReadonlyArray<string>): ReadonlySet<string> =>
+	new Set(fonts.flatMap((entry) => fontFamilies(entry)).map((family) => family.toLowerCase()));
+
+export const unknownFamilies = (face: string, registered: ReadonlySet<string>): ReadonlyArray<string> =>
+	isBuiltinFont(face)
+		? []
+		: fontFamilies(face).filter((family) => {
+				const name = family.toLowerCase();
+				return (
+					!isFamilyName(family) ||
+					!(name.startsWith("wf_") || BUILTIN_FAMILIES.has(name) || registered.has(name))
+				);
+			});
 
 export const MIN_FONT_SIZE = 8;
 
@@ -82,5 +143,3 @@ export const FontSize = declare(isFontSize, {
 
 export const isFontSizeKey = (key: string): boolean =>
 	key === "fontSize" || key === "textSize" || key.endsWith("FontSize") || key.endsWith("TextSize");
-
-export const isBuiltinFont = (face: string): boolean => FONT_FACES.some((builtin) => builtin === face);

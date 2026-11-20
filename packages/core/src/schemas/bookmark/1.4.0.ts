@@ -57,6 +57,24 @@ export const Bookmark = Struct({
 
 export type Bookmark = typeof Bookmark.Type;
 
+export type FilterContainerState = typeof FilterContainerState.Type;
+
+export type FiltersState = typeof FiltersState.Type;
+
+export type DataViewObjectDefinitionUpdates = typeof DataViewObjectDefinitionUpdates.Type;
+
+export type ParameterState = typeof ParameterState.Type;
+
+export type SingleVisualConfigState = typeof SingleVisualConfigState.Type;
+
+export type HighlightState = typeof HighlightState.Type;
+
+export type VisualContainerState = typeof VisualContainerState.Type;
+
+export type SectionState = typeof SectionState.Type;
+
+export type ExplorationState = typeof ExplorationState.Type;
+
 export const defineBookmark = (bookmark: Omit<Bookmark, "$schema">): Bookmark => ({
 	$schema: Bookmark.fields.$schema.literal,
 	...bookmark,

@@ -5,11 +5,13 @@ import { at as valueAt } from "./expr/query.ts";
 import {
 	MAX_FONT_SIZE,
 	MIN_FONT_SIZE,
-	isBuiltinFont,
+	fontFamilies,
 	isFamilyName,
 	isFontKey,
 	isFontSize,
 	isFontSizeKey,
+	registeredFamilies,
+	unknownFamilies,
 } from "./font.ts";
 import { packageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
@@ -355,7 +357,8 @@ const fontSizes = (value: unknown): ReadonlyArray<unknown> =>
 		: [];
 
 const checkFonts = (config: Config): ReadonlyArray<string> => {
-	const registered = new Set(config.report.fonts ?? []);
+	const fonts = config.report.fonts ?? [];
+	const registered = registeredFamilies(fonts);
 	const sources: ReadonlyArray<readonly [string, unknown]> = [
 		["report", config.report.definition],
 		...config.report.pages.flatMap((page) => {
@@ -372,16 +375,19 @@ const checkFonts = (config: Config): ReadonlyArray<string> => {
 				: [],
 		),
 	];
-	const families = [...registered]
-		.filter((family) => !isFamilyName(family))
-		.map((family) => `report.fonts: "${family}" must be one font family name, without commas or quotes`);
+	const families = fonts
+		.filter((font) => !fontFamilies(font).every((family) => isFamilyName(family)))
+		.map((font) => `report.fonts: "${font}" has an empty or badly quoted font family name`);
 	return families.concat(
 		sources.flatMap(([where, value]) =>
 			[...new Set(fontFaces(value))]
-				.filter((face) => !isBuiltinFont(face) && !registered.has(face))
-				.map(
-					(face) =>
-						`${where}: font "${face}" is not a Power BI font, add it to report.fonts and to the Register`,
+				.flatMap((face) => unknownFamilies(face, registered).map((family) => [face, family] as const))
+				.map(([face, family]) =>
+					isFamilyName(family)
+						? face === family
+							? `${where}: font "${face}" is not a Power BI font, add "${family}" to report.fonts and to the Register`
+							: `${where}: font "${face}" uses "${family}", which is not a Power BI font, add "${family}" to report.fonts and to the Register`
+						: `${where}: font "${face}" has an empty or badly quoted font family name`,
 				)
 				.concat(
 					[...new Set(fontSizes(value))]

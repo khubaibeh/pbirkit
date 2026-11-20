@@ -16,6 +16,8 @@ export { VisualContainerPosition };
 
 export const HowCreated = Literals([...HowCreatedValues, "SummarizeVisualContainer"]);
 
+export type HowCreated = typeof HowCreated.Type;
+
 export const { Query, VisualContainerFormattingObjects, VisualConfiguration } = visualConfiguration(
 	{ QueryExpressionContainer, Selector, DataViewObjectDefinitions },
 	{

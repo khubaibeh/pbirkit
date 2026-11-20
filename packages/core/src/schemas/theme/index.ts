@@ -1,4 +1,4 @@
-import { Array, Record, String, Struct, Union, optionalKey } from "effect/Schema";
+import { Array, Record, String, Struct, Union, decodeUnknownSync, optionalKey } from "effect/Schema";
 
 import { FontFace, FontSize } from "#core/font.ts";
 
@@ -82,3 +82,6 @@ export const Theme = Struct({
 export type Theme = typeof Theme.Type;
 
 export const defineTheme = (theme: Theme): Theme => theme;
+
+export const decodeTheme = (json: unknown): Theme =>
+	decodeUnknownSync(Theme)(json, { onExcessProperty: "error" });

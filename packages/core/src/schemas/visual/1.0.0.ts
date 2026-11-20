@@ -18,6 +18,8 @@ export * from "./shared.ts";
 
 export const HowCreated = Literals(HowCreatedValues);
 
+export type HowCreated = typeof HowCreated.Type;
+
 export const VisualContainerPosition = Struct(PositionFields);
 
 export type VisualContainerPosition = typeof VisualContainerPosition.Type;

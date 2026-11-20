@@ -1,5 +1,6 @@
 import { Unknown } from "effect/Schema";
 
+import type { QueryExpressionContainer } from "#schemas/semantic-query/1.0.0.ts";
 import { queryExpressionKinds } from "#schemas/semantic-query/shared.ts";
 import type { QueryExpressionKindName } from "#schemas/semantic-query/shared.ts";
 
@@ -10,6 +11,8 @@ export type ExpressionKind =
 	| "VisualTopN";
 
 export type Expression = { readonly [K in ExpressionKind]: { readonly [P in K]: unknown } }[ExpressionKind];
+
+export type Field = QueryExpressionContainer;
 
 const kinds: ReadonlySet<string> = new Set([
 	...Object.keys(queryExpressionKinds(Unknown, Unknown, Unknown)),

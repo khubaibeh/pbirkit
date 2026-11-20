@@ -65,6 +65,8 @@ export type PropertyOf<V> = V extends Value ? { readonly expr: ExpressionOf<V> }
 
 export type Properties<P> = { readonly [K in keyof P]: PropertyOf<P[K]> };
 
+export const style = <const P extends FormattingInput>(properties: P): P => properties;
+
 export function props<const P extends FormattingInput>(properties: P): Properties<P>;
 export function props(properties: FormattingInput): unknown {
 	return toProperties(properties);
