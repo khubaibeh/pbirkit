@@ -36,6 +36,22 @@ export const parentKeys = (path: string): ReadonlyArray<string> => {
 
 export const hash = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
+const BOM = [0xef, 0xbb, 0xbf];
+
+const LF = 10;
+
+const CR = 13;
+
+const textBody = (bytes: Uint8Array): Uint8Array => {
+	const start = BOM.every((byte, index) => bytes[index] === byte) ? BOM.length : 0;
+	return bytes.subarray(start).filter((byte, index, body) => byte !== CR || body[index + 1] !== LF);
+};
+
+export const sameText = (left: TreeFile, right: TreeFile): boolean =>
+	!left.bytes.includes(0) &&
+	!right.bytes.includes(0) &&
+	hash(textBody(left.bytes)) === hash(textBody(right.bytes));
+
 export const treeFile = (path: string, bytes: Uint8Array): TreeFile => ({ path, bytes, hash: hash(bytes) });
 
 export const treeOf = (files: Iterable<TreeFile>): Tree =>

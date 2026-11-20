@@ -13,8 +13,9 @@ import type { Resource } from "@pbirkit/core/resource";
 import { decoded, flattenVisuals } from "@pbirkit/core/tree";
 import type { BookmarkNode, Content, PageNode, ReportTree } from "@pbirkit/core/tree";
 
-import { fileKey, hash, isOwned, projectEntries } from "../build/tree.ts";
+import { fileKey, isOwned, projectEntries, sameText, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { jsonDifferences, parseJson } from "../diff/compare.ts";
 import type { Project } from "../pbip/project.ts";
 import { fileJson } from "../pbip/tree.ts";
 
@@ -33,13 +34,27 @@ export interface Draft {
 	readonly fallbacks: ReadonlyArray<Fallback>;
 }
 
-type Levels = ReadonlyMap<string, number>;
+interface Settled {
+	readonly rejected: ReadonlyMap<string, ReadonlySet<string>>;
+	readonly reasons: ReadonlyMap<string, string>;
+}
+
+interface DraftRound extends Draft {
+	readonly chosen: ReadonlyMap<string, string>;
+}
+
+interface Drift {
+	readonly key: string;
+	readonly reason: string;
+}
 
 type Placed = { readonly placed: boolean; readonly content: Content<unknown> };
 
 const REBUILD_DIFFERS = "The rebuilt JSON differs from the source file";
 
-const MAX_ROUNDS = 8;
+const TYPED = "typed";
+
+export const MAX_ROUNDS = 8;
 
 const encoder = new TextEncoder();
 
@@ -86,40 +101,56 @@ const leftoverGroup = (relative: string): string => {
 const byPath = (left: { readonly path: string }, right: { readonly path: string }): number =>
 	left.path < right.path ? -1 : left.path > right.path ? 1 : 0;
 
-const draftContext = (project: Project, levels: Levels) => {
+const draftContext = (project: Project, settled: Settled) => {
 	const fallbacks: Array<Fallback> = [];
+	const chosen = new Map<string, string>();
 	const files = Array.from(HashMap.values(project.tree));
 	const url = (path: string) => pathToFileURL(join(project.root, path));
-	const level = (path: string) => levels.get(fileKey(path)) ?? 0;
 	const fallback = (label: string, reason: string) => {
 		fallbacks.push({ label, reason });
 	};
+	const reasonOf = (path: string) => settled.reasons.get(fileKey(path)) ?? REBUILD_DIFFERS;
+	const choose = (path: string, id: string) => {
+		if (settled.rejected.get(fileKey(path))?.has(id) === true) return false;
+		chosen.set(fileKey(path), id);
+		return true;
+	};
 
-	const pick = <A>(path: string, label: string, candidates: ReadonlyArray<Content<A>>): A | URL => {
-		const typed = candidates.filter((candidate): candidate is Result.Success<A, string> =>
-			Result.isSuccess(candidate),
+	const pickFrom = <A>(
+		path: string,
+		label: string,
+		candidates: Readonly<Record<string, Content<A>>>,
+	): A | URL => {
+		const entries = Object.entries(candidates);
+		for (const [id, candidate] of entries)
+			if (Result.isSuccess(candidate) && choose(path, id)) return candidate.success;
+		const failures = entries.flatMap(([, candidate]) =>
+			Result.isFailure(candidate) ? [candidate.failure] : [],
 		);
-		const chosen = typed[level(path)];
-		if (chosen !== undefined) return chosen.success;
-		const failure = candidates.find((candidate) => Result.isFailure(candidate));
-		fallback(label, typed.length === 0 && failure !== undefined ? failure.failure : REBUILD_DIFFERS);
+		const [failure] = failures;
+		fallback(label, failures.length === entries.length && failure !== undefined ? failure : reasonOf(path));
 		return url(path);
 	};
+	const pick = <A>(path: string, label: string, candidate: Content<A>): A | URL =>
+		pickFrom(path, label, { [TYPED]: candidate });
 
 	return {
 		project,
 		files,
 		fallbacks,
+		chosen,
 		url,
-		level,
 		fallback,
+		reasonOf,
+		choose,
 		pick,
+		pickFrom,
 		json: (path: string) => fileJson(project.tree, path),
 		has: (path: string) => HashMap.has(project.tree, fileKey(path)),
 		hasUnder: (folder: string) => files.some((file) => fileKey(file.path).startsWith(fileKey(`${folder}/`))),
 		folderUrl: (path: string) => pathToFileURL(`${join(project.root, path)}${sep}`),
 		item: <A>(path: string, label: string, name: string, content: Content<A>) => {
-			const value = pick(path, label, [content]);
+			const value = pick(path, label, content);
 			return value instanceof URL ? { name, file: value } : value;
 		},
 		placed: (node: Placed, label: string) => {
@@ -138,7 +169,7 @@ const draftPage = (context: Context, page: PageNode): Page => {
 		.map((visual) =>
 			context.item(visual.path, `Visual ${page.name}/${visual.name}`, visual.name, visual.content),
 		);
-	const value = context.pick(page.path, `Page ${page.name}`, [page.content]);
+	const value = context.pick(page.path, `Page ${page.name}`, page.content);
 	return value instanceof URL ? { name: page.name, file: value, visuals } : { ...value, visuals };
 };
 
@@ -156,7 +187,7 @@ const draftBookmarks = (
 		groupFailure === undefined
 			? Result.map(metadata.content, (value) => omit(value, ["items"]))
 			: Result.fail(groupFailure);
-	const typed = context.pick(metadata.path, "Bookmarks metadata", [content]);
+	const typed = context.pick(metadata.path, "Bookmarks metadata", content);
 	if (!(typed instanceof URL))
 		return {
 			...typed,
@@ -192,13 +223,13 @@ const draftResources = (context: Context, index: ReportTree): ReadonlyArray<Reso
 		const data = node.content.success;
 		if (data.kind === "customVisual") return [{ kind: data.kind, guid: data.guid, source: data.source }];
 		if (data.kind === "image") return [{ kind: data.kind, name: data.name, file: context.url(node.path) }];
-		if (context.level(node.path) === 0) return [data];
-		context.fallback(label, REBUILD_DIFFERS);
+		if (context.choose(node.path, TYPED)) return [data];
+		context.fallback(label, context.reasonOf(node.path));
 		return [];
 	});
 
 const draftReport = (context: Context, index: ReportTree): Report => {
-	const { project, json, pick } = context;
+	const { project, json, pick, pickFrom } = context;
 	const inReport = (file: string) => `${project.report}/${file}`;
 	const resources = draftResources(context, index);
 	const definitionValue = json(inReport("definition/report.json"));
@@ -206,13 +237,15 @@ const draftReport = (context: Context, index: ReportTree): Report => {
 	const strippable =
 		resources.length > 0 &&
 		isDeepStrictEqual(resourcePackages(resources), at(definitionValue, "resourcePackages"));
-	const platform = pick(inReport(".platform"), "Report platform", [
+	const platform = pick(
+		inReport(".platform"),
+		"Report platform",
 		platformParts(json(inReport(".platform")), "Report"),
-	]);
+	);
 	const pbir = json(inReport("definition.pbir"));
 	const extensionsPath = inReport("definition/reportExtensions.json");
 	const extensions = context.has(extensionsPath)
-		? pick(extensionsPath, "Report extensions", [readExtensions(json(extensionsPath))])
+		? pick(extensionsPath, "Report extensions", readExtensions(json(extensionsPath)))
 		: undefined;
 	const diagramPath = inReport("semanticModelDiagramLayout.json");
 
@@ -227,18 +260,24 @@ const draftReport = (context: Context, index: ReportTree): Report => {
 					logicalId: platform.logicalId,
 					platform: platform.item,
 				}),
-		pbir: pick(inReport("definition.pbir"), "Report pbir", [
+		pbir: pick(
+			inReport("definition.pbir"),
+			"Report pbir",
 			readPbir(project.model === undefined ? pbir : without(pbir, "datasetReference")),
-		]),
-		definition: pick(
+		),
+		definition: pickFrom(
 			inReport("definition/report.json"),
 			"Report definition",
-			strippable ? [readReport(without(definitionValue, "resourcePackages")), definition] : [definition],
+			strippable
+				? { stripped: readReport(without(definitionValue, "resourcePackages")), [TYPED]: definition }
+				: { [TYPED]: definition },
 		),
-		version: pick(inReport("definition/version.json"), "Report version", [
+		version: pick(
+			inReport("definition/version.json"),
+			"Report version",
 			readVersion(json(inReport("definition/version.json"))),
-		]),
-		pagesMetadata: pick(index.pagesMetadata.path, "Pages metadata", [index.pagesMetadata.content]),
+		),
+		pagesMetadata: pick(index.pagesMetadata.path, "Pages metadata", index.pagesMetadata.content),
 		pages: index.pages
 			.filter((page) => context.placed(page, `Page ${page.name}`))
 			.map((page) => draftPage(context, page)),
@@ -255,15 +294,17 @@ const draftModel = (context: Context, folder: string): ModelConfig => {
 	const { has, json, pick } = context;
 	const inModel = (file: string) => `${folder}/${file}`;
 	const typedJson = <A>(file: string, label: string, read: (value: unknown) => Content<A>) => {
-		const value = has(inModel(file)) ? pick(inModel(file), label, [read(json(inModel(file)))]) : undefined;
+		const value = has(inModel(file)) ? pick(inModel(file), label, read(json(inModel(file)))) : undefined;
 		return value instanceof URL ? undefined : value;
 	};
 	const source = (file: string) => (has(inModel(file)) ? context.url(inModel(file)) : undefined);
 	const sourceFolder = (file: string) =>
 		context.hasUnder(inModel(file)) ? context.folderUrl(inModel(file)) : undefined;
-	const platform = pick(inModel(".platform"), "Model platform", [
+	const platform = pick(
+		inModel(".platform"),
+		"Model platform",
 		platformParts(json(inModel(".platform")), "SemanticModel"),
-	]);
+	);
 	const modelReference = typedJson("modelReference.json", "Model reference", readModelReference);
 	const editorSettings = typedJson(".pbi/editorSettings.json", "Model editor settings", readEditorSettings);
 	const diagramLayout = source("diagramLayout.json");
@@ -281,7 +322,7 @@ const draftModel = (context: Context, folder: string): ModelConfig => {
 					logicalId: platform.logicalId,
 					platform: platform.item,
 				}),
-		pbism: pick(inModel("definition.pbism"), "Model pbism", [readPbism(json(inModel("definition.pbism")))]),
+		pbism: pick(inModel("definition.pbism"), "Model pbism", readPbism(json(inModel("definition.pbism")))),
 		definition: context.folderUrl(inModel("definition")),
 		...(modelReference === undefined ? {} : { modelReference }),
 		...(editorSettings === undefined ? {} : { editorSettings }),
@@ -315,11 +356,13 @@ const leftoverFiles = (context: Context, config: Config) => {
 	};
 };
 
-const draftConfig = (project: Project, index: ReportTree, levels: Levels): Draft => {
-	const context = draftContext(project, levels);
-	const pbip = context.pick(project.filename, "pbip", [
+const draftConfig = (project: Project, index: ReportTree, settled: Settled): DraftRound => {
+	const context = draftContext(project, settled);
+	const pbip = context.pick(
+		project.filename,
+		"pbip",
 		readPbip(without(context.json(project.filename), "artifacts")),
-	]);
+	);
 	const report = draftReport(context, index);
 	const model = project.model === undefined ? undefined : draftModel(context, project.model);
 	const typed: Config = { name: project.name, pbip, report, ...(model === undefined ? {} : { model }) };
@@ -331,28 +374,46 @@ const draftConfig = (project: Project, index: ReportTree, levels: Levels): Draft
 			? {}
 			: { model: { ...model, ...leftovers(project.model, "model") } }),
 	};
-	return { config, fallbacks: context.fallbacks };
+	return { config, fallbacks: context.fallbacks, chosen: context.chosen };
 };
-const sameContent = (file: TreeFile | undefined, content: string): boolean =>
-	file !== undefined && file.hash === hash(encoder.encode(content));
 
-const driftedPaths = (project: Project, config: Config): ReadonlyArray<string> => {
+const driftReason = (source: TreeFile, built: TreeFile): string => {
+	const [first] = jsonDifferences(parseJson(built.bytes), parseJson(source.bytes));
+	return first === undefined
+		? `${REBUILD_DIFFERS} in key order or number format`
+		: `${REBUILD_DIFFERS} at ${first.pointer === "" ? "the top level" : first.pointer}`;
+};
+
+const driftedFiles = (project: Project, config: Config): ReadonlyArray<Drift> => {
 	const owned = projectEntries(project.filename, project.report, project.model);
-	return buildFiles(config).flatMap((file) =>
-		"content" in file &&
-		isOwned(owned, file.path) &&
-		!sameContent(Option.getOrUndefined(HashMap.get(project.tree, fileKey(file.path))), file.content)
-			? [fileKey(file.path)]
-			: [],
-	);
+	return buildFiles(config).flatMap((file) => {
+		if (!("content" in file) || !isOwned(owned, file.path)) return [];
+		const built = treeFile(file.path, encoder.encode(file.content));
+		const source = Option.getOrUndefined(HashMap.get(project.tree, fileKey(file.path)));
+		if (source !== undefined && (source.hash === built.hash || sameText(source, built))) return [];
+		return [
+			{
+				key: fileKey(file.path),
+				reason: source === undefined ? REBUILD_DIFFERS : driftReason(source, built),
+			},
+		];
+	});
 };
 
-export const settleConfig = (project: Project, index: ReportTree): Draft => {
-	const levels = new Map<string, number>();
+export const settleConfig = (project: Project, index: ReportTree, maxRounds: number = MAX_ROUNDS): Draft => {
+	const rejected = new Map<string, Set<string>>();
+	const reasons = new Map<string, string>();
 	for (let round = 1; ; round += 1) {
-		const draft = draftConfig(project, index, levels);
-		const drifted = driftedPaths(project, draft.config);
-		if (drifted.length === 0 || round === MAX_ROUNDS) return draft;
-		for (const key of drifted) levels.set(key, (levels.get(key) ?? 0) + 1);
+		const { config, fallbacks, chosen } = draftConfig(project, index, { rejected, reasons });
+		const drifted = driftedFiles(project, config);
+		const changed = drifted.filter(({ key, reason }) => {
+			const id = chosen.get(key);
+			const ids = rejected.get(key) ?? new Set<string>();
+			if (id === undefined || ids.has(id)) return false;
+			rejected.set(key, ids.add(id));
+			reasons.set(key, reason);
+			return true;
+		});
+		if (changed.length === 0 || round === maxRounds) return { config, fallbacks };
 	}
 };

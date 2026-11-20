@@ -18,6 +18,7 @@ export interface ReportFiles {
 	readonly has: (path: string) => boolean;
 	readonly json: (path: string) => unknown;
 	readonly text: (path: string) => string | undefined;
+	readonly raw: (path: string) => boolean;
 }
 
 export const string = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
@@ -36,6 +37,8 @@ export const sameList = (left: ReadonlyArray<string>, right: ReadonlyArray<strin
 
 export const nameOf = (value: unknown): string | undefined => string(at(value, "name"));
 
+const desktopText = (text: string): string => text.replace(/^\uFEFF/u, "").replaceAll(/\r?\n/gu, "\r\n");
+
 export const decoded = <S extends Top & { readonly DecodingServices: never }>(schema: S, label: string) => {
 	const read = decodeUnknownOption(schema);
 	const matches = is(schema);
@@ -43,8 +46,17 @@ export const decoded = <S extends Top & { readonly DecodingServices: never }>(sc
 	return (value: unknown, text?: string): Content<S["Type"]> => {
 		if (Option.isNone(read(value, { onExcessProperty: "error" })) || !matches(value))
 			return Result.fail(`Unsupported ${label} schema or properties`);
-		if (text !== undefined && toJson(value) !== text)
+		if (text !== undefined && toJson(value) !== desktopText(text))
 			return Result.fail(`The ${label} JSON does not rebuild to the same text`);
 		return Result.succeed(value);
 	};
 };
+
+const RAW_IN_CONFIG = "The config keeps this file raw";
+
+export const fileContent = <A>(
+	files: ReportFiles,
+	path: string,
+	value: unknown,
+	read: (value: unknown, text?: string) => Content<A>,
+): Content<A> => (files.raw(path) ? Result.fail(RAW_IN_CONFIG) : read(value, files.text(path)));

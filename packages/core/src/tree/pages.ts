@@ -10,8 +10,9 @@ import { AnyVisual } from "#schemas/visual";
 import { insideProject } from "../build/shared.ts";
 import { textOf } from "../expr/literal.ts";
 import { at } from "../expr/query.ts";
+import { nameFailure } from "../name.ts";
 import type { Content, IndexedFile, ReportFiles } from "./shared.ts";
-import { basename, decoded, list, nameOf, parent, sameList, string, strings } from "./shared.ts";
+import { basename, decoded, fileContent, list, nameOf, parent, sameList, string, strings } from "./shared.ts";
 
 export interface VisualNode extends IndexedFile<AnyVisual> {
 	readonly kind: "visual" | "group";
@@ -91,20 +92,22 @@ const titleOf = (visual: unknown): string | undefined => {
 const visualEntry = (files: ReportFiles, page: PageNodeBase, path: string): VisualEntry => {
 	const value = files.json(path);
 	const name = nameOf(value) ?? basename(parent(path));
-	const placed =
+	const misplaced =
 		page.placed &&
 		insideProject(name) &&
-		path === `${pagesFolder(files.report)}/${page.name}/visuals/${name}/visual.json`;
+		path === `${pagesFolder(files.report)}/${page.name}/visuals/${name}/visual.json`
+			? nameFailure(name)
+			: "Visual or page folder differs from its name";
 	return {
 		name,
 		path,
 		value,
-		placed,
+		placed: misplaced === undefined,
 		isGroup: at(value, "visualGroup") !== undefined,
 		content: page.exists
-			? placed
-				? readVisual(value, files.text(path))
-				: Result.fail("Visual or page folder differs from its name")
+			? misplaced === undefined
+				? fileContent(files, path, value, readVisual)
+				: Result.fail(misplaced)
 			: Result.fail("Page file is missing"),
 	};
 };
@@ -168,7 +171,8 @@ const pageFolders = (files: ReportFiles): ReadonlyArray<PageFolder> => {
 const pageNode = (files: ReportFiles, folder: PageFolder): PageNode => {
 	const { name, path, value } = folder;
 	const exists = files.has(path);
-	const base = { name, exists, placed: exists && folder.folder === name };
+	const misplaced = folder.folder === name ? nameFailure(name) : "Page folder differs from its name";
+	const base = { name, exists, placed: exists && misplaced === undefined };
 	const binding = string(at(at(value, "pageBinding"), "type"));
 	return {
 		name,
@@ -178,9 +182,9 @@ const pageNode = (files: ReportFiles, folder: PageFolder): PageNode => {
 		type: string(at(value, "type")) ?? (binding === "Default" ? undefined : binding),
 		hidden: at(value, "visibility") === "HiddenInViewMode",
 		content: exists
-			? base.placed
-				? readPage(value, files.text(path))
-				: Result.fail("Page folder differs from its name")
+			? misplaced === undefined
+				? fileContent(files, path, value, readPage)
+				: Result.fail(misplaced)
 			: Result.fail("Page file is missing"),
 		visuals: visualNodes(folder.visuals.map((visual) => visualEntry(files, base, visual))),
 	};

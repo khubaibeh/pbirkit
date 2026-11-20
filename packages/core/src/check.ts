@@ -17,12 +17,10 @@ import {
 	registeredFamilies,
 	unknownFamilies,
 } from "./font.ts";
+import { nameProblems } from "./name.ts";
 import { packageItem, samePackageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
 import { isBuiltinVisual } from "./visual-type.ts";
-
-const NAME = /^[\p{L}\p{Mn}\p{Nd}\p{Pc}-]+$/u;
-const MAX_NAME = 50;
 
 type Page = Config["report"]["pages"][number];
 type Visual = Page["visuals"][number];
@@ -45,10 +43,8 @@ export interface ConfigIssues {
 
 const LINKS = { bookmark: "bookmark", navigationSection: "page", drillthroughSection: "page" } as const;
 
-const nameIssue = (where: string, name: string): ReadonlyArray<string> => [
-	...(NAME.test(name) ? [] : [`${where}: name "${name}" must use only letters, digits, "_" or "-"`]),
-	...(name.length > MAX_NAME ? [`${where}: name "${name}" is longer than ${MAX_NAME} characters`] : []),
-];
+const nameIssue = (where: string, name: string): ReadonlyArray<string> =>
+	nameProblems(name).map((problem) => `${where}: name "${name}" ${problem}`);
 
 const duplicates = (names: ReadonlyArray<string>): ReadonlyArray<string> => [
 	...new Set(names.filter((name, index) => names.indexOf(name) !== index)),
@@ -509,6 +505,14 @@ const ignoredFields = (config: Config): ReadonlyArray<string> => {
 			: []),
 		...(model?.platform instanceof URL && (model.name !== undefined || model.logicalId !== undefined)
 			? ["model: name and logicalId have no effect because platform is a file"]
+			: []),
+		...(report.pagesMetadata instanceof URL
+			? [
+					"report: pagesMetadata is a file, so that file sets the page order and the active page, not report.pages",
+				]
+			: []),
+		...(report.bookmarks !== undefined && isRaw(report.bookmarks)
+			? ["report: bookmarks is a file, so that file sets the bookmark order and groups, not bookmarks.items"]
 			: []),
 	];
 };

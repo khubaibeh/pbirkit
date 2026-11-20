@@ -10,7 +10,7 @@ const REPORT = "Sales.Report";
 const pages = `${REPORT}/definition/pages`;
 const bookmarks = `${REPORT}/definition/bookmarks`;
 
-const indexOf = (files: Readonly<Record<string, unknown>>): ReportTree => {
+const indexOf = (files: Readonly<Record<string, unknown>>, raw?: (path: string) => boolean): ReportTree => {
 	const texts = new Map(
 		Object.entries(files).map(([path, value]) => [path, typeof value === "string" ? value : toJson(value)]),
 	);
@@ -19,6 +19,7 @@ const indexOf = (files: Readonly<Record<string, unknown>>): ReportTree => {
 		report: REPORT,
 		paths: [...texts.keys()],
 		text: (path) => texts.get(path),
+		...(raw === undefined ? {} : { raw }),
 	});
 };
 
@@ -210,7 +211,7 @@ describe("bookmarks", () => {
 		const cases = [
 			[
 				bookmarksJson([{ name: "a" }, { name: "gone" }]),
-				"Some listed bookmarks have no file at the expected path",
+				"Some listed bookmarks have no valid name or no file at the expected path",
 			],
 			[bookmarksJson([]), "Some bookmark files are not listed in bookmarks.json"],
 			[bookmarksJson([{ name: "a" }, { name: "a" }]), "A bookmark is listed more than once"],
@@ -320,5 +321,62 @@ describe("selectedPaths", () => {
 		expect(selectedPaths(tree, "bookmark", "g")).toEqual([`${bookmarks}/b.bookmark.json`]);
 		expect(selectedPaths(tree, "bookmark", "b")).toEqual([`${bookmarks}/b.bookmark.json`]);
 		expect(selectedPaths(tree, "theme", "none")).toEqual([]);
+	});
+});
+
+describe("file text", () => {
+	it("types files with LF line endings or a BOM like their CRLF form", () => {
+		const tree = indexOf({
+			[`${pages}/pages.json`]: toJson(pagesJson(["first"])).replaceAll("\r\n", "\n"),
+			[`${pages}/first/page.json`]: `\uFEFF${toJson(page("first"))}`,
+			[`${pages}/first/visuals/notes/visual.json`]: `\uFEFF${toJson(visual("notes")).replaceAll("\r\n", "\n")}`,
+		});
+		const [first] = tree.pages;
+		expect(failure(tree.pagesMetadata.content)).toBeUndefined();
+		expect(failure(first?.content)).toBeUndefined();
+		expect(failure(first?.visuals[0]?.content)).toBeUndefined();
+	});
+
+	it("marks the files that the config keeps raw", () => {
+		const raw = `${pages}/first/visuals/notes/visual.json`;
+		const tree = indexOf(
+			{
+				[`${pages}/pages.json`]: pagesJson(["first"]),
+				[`${pages}/first/page.json`]: page("first"),
+				[raw]: visual("notes"),
+			},
+			(path) => path === raw,
+		);
+		expect(failure(tree.pages[0]?.content)).toBeUndefined();
+		expect(failure(tree.pages[0]?.visuals[0]?.content)).toBe("The config keeps this file raw");
+	});
+});
+
+const nameRule = (name: string) => `The name "${name}" must use only letters, digits, "_" or "-"`;
+
+describe("names", () => {
+	it("leaves pages, visuals, bookmarks and groups with invalid names unplaced", () => {
+		const tree = indexOf({
+			[`${pages}/pages.json`]: pagesJson(["first", "bad.page"]),
+			[`${pages}/first/page.json`]: page("first"),
+			[`${pages}/first/visuals/my.visual/visual.json`]: visual("my.visual"),
+			[`${pages}/bad.page/page.json`]: page("bad.page"),
+			[`${bookmarks}/bookmarks.json`]: {
+				$schema: SchemaUrl.bookmarksMetadata["1.0.0"],
+				items: [{ name: "bad group", displayName: "Group", children: ["bad.mark"] }],
+			},
+			[`${bookmarks}/bad.mark.bookmark.json`]: bookmark("bad.mark"),
+		});
+		const [first, bad] = tree.pages;
+		const [bookmarkGroup] = tree.bookmarks;
+		expect(first?.visuals[0]?.placed).toBe(false);
+		expect(failure(first?.visuals[0]?.content)).toBe(nameRule("my.visual"));
+		expect(bad?.placed).toBe(false);
+		expect(failure(bad?.content)).toBe(nameRule("bad.page"));
+		expect(failure(tree.pagesMetadata.content)).toBe("pageOrder differs from the page folders");
+		expect(failure(bookmarkGroup?.content)).toBe(nameRule("bad group"));
+		expect(bookmarkGroup?.kind === "group" ? failure(bookmarkGroup.children[0]?.content) : undefined).toBe(
+			nameRule("bad.mark"),
+		);
 	});
 });

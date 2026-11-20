@@ -1,14 +1,18 @@
-import { Effect, FileSystem, Path } from "effect";
+import { fileURLToPath } from "node:url";
+
+import { Effect, FileSystem, Option, Path, Predicate } from "effect";
 
 import { insideProject } from "@pbirkit/core/build";
+import { at } from "@pbirkit/core/expr";
 
 import { onFileSystem } from "../build/errors.ts";
+import { toPosix } from "../build/paths.ts";
 import { treeOf, writeTree } from "../build/tree.ts";
+import type { TreeFile } from "../build/tree.ts";
 import { containedBy } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
 import { ImportOutputError } from "./errors.ts";
-import type { ImportFiles } from "./modules.ts";
-import { supportFiles } from "./modules.ts";
+import type { ImportFiles, TypePaths } from "./modules.ts";
 
 export const MANIFEST = ".pbirkit-import.json";
 
@@ -78,14 +82,44 @@ export const checkOutput = Effect.fnUntraced(function* (
 	return yield* Effect.void;
 });
 
-export const writeImport = Effect.fnUntraced(function* (out: string, files: ImportFiles, version: string) {
+const exportsOf = (value: unknown): ReadonlyArray<readonly [string, string]> =>
+	Predicate.isReadonlyObject(value)
+		? Object.entries(value).flatMap(([key, target]) =>
+				typeof target === "string" ? [[key, target] as const] : [],
+			)
+		: [];
+
+export const coreTypePaths = Effect.fnUntraced(function* () {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+
+	const root = fileURLToPath(new URL("../", import.meta.resolve("@pbirkit/core/config")));
+	const manifest = yield* fs.readFileString(path.join(root, "package.json")).pipe(Effect.option);
+	const value = Option.getOrUndefined(
+		Option.flatMap(manifest, (text) => Option.liftThrowable((): unknown => JSON.parse(text))()),
+	);
+	if (at(value, "name") !== "@pbirkit/core") return {};
+	const paths: TypePaths = Object.fromEntries(
+		exportsOf(at(value, "exports")).map(([key, target]) => [
+			`@pbirkit/core${key.slice(1)}`,
+			[toPosix(path, path.join(root, target))],
+		]),
+	);
+	return paths;
+});
+
+export const writeImport = Effect.fnUntraced(function* (
+	out: string,
+	files: ImportFiles,
+	support: ReadonlyArray<TreeFile>,
+) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
 
 	for (const file of yield* readManifest(out)) yield* removeFile(out, file);
 
 	const missing: Array<(typeof files.files)[number]> = [];
-	for (const file of supportFiles(version)) {
+	for (const file of support) {
 		const target = path.join(out, file.path);
 		if (!(yield* fs.exists(target).pipe(onFileSystem("check", target)))) missing.push(file);
 	}

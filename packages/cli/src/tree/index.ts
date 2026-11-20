@@ -5,7 +5,7 @@ import { buildFiles, reportFolder } from "@pbirkit/core/build";
 
 import { readConfig } from "../build/config.ts";
 import { buildTree } from "../build/outputs.ts";
-import { isOwned } from "../build/tree.ts";
+import { fileKey, isOwned } from "../build/tree.ts";
 import { errorMessage, exitWith } from "../messages.ts";
 import { findProject } from "../pbip/project.ts";
 import { indexTree } from "../pbip/tree.ts";
@@ -64,7 +64,8 @@ const configIndex = Effect.fnUntraced(function* (file: string) {
 	const config = yield* readConfig(file);
 	const report = reportFolder(config);
 	const files = buildFiles(config).filter((entry) => isOwned([`${report}/`], entry.path));
-	return indexTree(config.name, report, yield* buildTree(files, []));
+	const raw = new Set(files.flatMap((entry) => ("source" in entry ? [fileKey(entry.path)] : [])));
+	return indexTree(config.name, report, yield* buildTree(files, []), (path) => raw.has(fileKey(path)));
 });
 
 const readIndex = Effect.fnUntraced(function* (config: Option.Option<string>, pbip: Option.Option<string>) {
@@ -78,10 +79,10 @@ const readIndex = Effect.fnUntraced(function* (config: Option.Option<string>, pb
 
 export const tree = Command.make("tree", flags, ({ config, pbip }) =>
 	Option.isSome(config) && Option.isSome(pbip)
-		? exitWith(1)("[ERROR] tree: --config and --pbip are mutually exclusive")
+		? exitWith(2)("[ERROR] tree: --config and --pbip are mutually exclusive")
 		: readIndex(config, pbip).pipe(
 				Effect.flatMap((index) => Console.log(treeMessage(index))),
-				Effect.catch((error) => exitWith(1)(errorMessage("tree")(error))),
+				Effect.catch((error) => exitWith(2)(errorMessage("tree")(error))),
 			),
 ).pipe(
 	Command.withDescription(HELP),

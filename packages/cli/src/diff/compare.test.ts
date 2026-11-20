@@ -14,7 +14,7 @@ describe("compareTrees", () => {
 		const expected = tree({ "Sales.pbip": '{\r\n  "a": 1,\r\n  "b": [2]\r\n}' });
 		const actual = tree({ "Sales.pbip": '{"b":[2],"a":1.0}' });
 
-		expect(compareTrees(expected, actual, "semantic")).toEqual({ differences: [], checked: 1 });
+		expect(compareTrees(expected, actual, "semantic")).toEqual({ differences: [], endings: [], checked: 1 });
 		expect(compareTrees(expected, actual, "bytes").differences).toEqual([
 			{ kind: "changed", path: "Sales.pbip", pointers: [], more: 0 },
 		]);
@@ -32,7 +32,32 @@ describe("compareTrees", () => {
 				{ kind: "changed", path: "a.txt", pointers: [], more: 0 },
 				{ kind: "changed", path: "b.json", pointers: [], more: 0 },
 			],
+			endings: [],
 			checked: 3,
+		});
+	});
+
+	it("lists files that differ only in line endings or a BOM apart from real differences", () => {
+		const expected = treeOf([
+			treeFile("model.tmdl", encoder.encode("model Model\r\n\ttable A\r\n")),
+			treeFile("page.json", encoder.encode('{\r\n  "a": 1\r\n}')),
+			treeFile("other.txt", encoder.encode("a\r\nb")),
+			treeFile("image.png", Uint8Array.from([0, 13, 10])),
+		]);
+		const actual = treeOf([
+			treeFile("model.tmdl", encoder.encode("model Model\n\ttable A\n")),
+			treeFile("page.json", encoder.encode('\uFEFF{\n  "a": 1\n}')),
+			treeFile("other.txt", encoder.encode("a\nc")),
+			treeFile("image.png", Uint8Array.from([0, 10])),
+		]);
+
+		expect(compareTrees(expected, actual, "bytes")).toEqual({
+			differences: [
+				{ kind: "changed", path: "image.png", pointers: [], more: 0 },
+				{ kind: "changed", path: "other.txt", pointers: [], more: 0 },
+			],
+			endings: ["model.tmdl", "page.json"],
+			checked: 4,
 		});
 	});
 

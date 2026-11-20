@@ -12,11 +12,10 @@ import { ProjectSourceError } from "../pbip/errors.ts";
 import { findProject } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
 import { indexTree } from "../pbip/tree.ts";
-import { VERSION } from "../version.ts";
 import { settleConfig } from "./draft.ts";
-import { verifiedMessage, writtenMessage } from "./messages.ts";
-import { CONFIG_FILE, importFiles } from "./modules.ts";
-import { checkOutput, writeImport } from "./output.ts";
+import { diffCommand, verifiedMessage, writtenMessage } from "./messages.ts";
+import { CONFIG_FILE, importFiles, supportFiles } from "./modules.ts";
+import { checkOutput, coreTypePaths, writeImport } from "./output.ts";
 
 const flags = {
 	source: Argument.String("source").pipe(
@@ -73,10 +72,10 @@ const runImport = Effect.fnUntraced(function* ({
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
 	const files = importFiles(project, config);
 	yield* checkOutput(out, project, files, force);
-	yield* writeImport(out, files, VERSION);
+	yield* writeImport(out, files, supportFiles(yield* coreTypePaths()));
 
 	const configFile = path.join(out, CONFIG_FILE);
-	yield* Console.log(writtenMessage(fromCwd(path, configFile), fallbacks));
+	yield* Console.log(writtenMessage(fromCwd(path, configFile), config, fallbacks));
 	const loaded = yield* loadConfig(configFile, false);
 	const comparison = yield* compareProject(loaded.config, project.root, "bytes", NO_SELECTORS);
 	if (comparison.differences.length > 0) {
@@ -84,7 +83,13 @@ const runImport = Effect.fnUntraced(function* ({
 		process.exitCode = 1;
 		return;
 	}
-	yield* Console.log(verifiedMessage(comparison.checked, loaded.warnings.length));
+	yield* Console.log(
+		verifiedMessage(
+			comparison,
+			loaded.warnings.length,
+			diffCommand(fromCwd(path, configFile), fromCwd(path, project.root)),
+		),
+	);
 });
 
 export const importCommand = Command.make("import", flags, (input) =>

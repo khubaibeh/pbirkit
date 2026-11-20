@@ -34,25 +34,27 @@ export interface ReportIndexInput {
 	readonly report: string;
 	readonly paths: ReadonlyArray<string>;
 	readonly text: (path: string) => string | undefined;
+	readonly raw?: (path: string) => boolean;
 }
 
 const parseJson = (text: string | undefined): unknown => {
 	if (text === undefined) return undefined;
 	try {
-		const value: unknown = JSON.parse(text);
+		const value: unknown = JSON.parse(text.replace(/^\uFEFF/u, ""));
 		return value;
 	} catch {
 		return undefined;
 	}
 };
 
-const reportFiles = ({ report, paths, text }: ReportIndexInput): ReportFiles => {
+const reportFiles = ({ report, paths, text, raw = () => false }: ReportIndexInput): ReportFiles => {
 	const known = new Set(paths);
 	const parsed = new Map<string, unknown>();
 	return {
 		report,
 		paths,
 		text,
+		raw,
 		has: (path) => known.has(path),
 		json: (path) => {
 			if (!parsed.has(path)) parsed.set(path, parseJson(text(path)));

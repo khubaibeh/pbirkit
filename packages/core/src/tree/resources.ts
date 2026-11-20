@@ -7,7 +7,7 @@ import { at } from "../expr/query.ts";
 import { packageItem, samePackageItem } from "../resource.ts";
 import type { ResourceIdentity } from "../resource.ts";
 import type { Content, IndexedFile, ReportFiles } from "./shared.ts";
-import { decoded, list, string } from "./shared.ts";
+import { decoded, fileContent, list, string } from "./shared.ts";
 
 type ThemeIdentity = Extract<
 	ResourceIdentity,
@@ -78,7 +78,7 @@ const contentOf = (
 	if (identity.kind === "image") return Result.succeed(identity);
 	const value = files.json(path);
 	if (at(value, "$schema") !== undefined) return Result.fail("Unknown theme $schema");
-	return Result.map(readTheme(value, files.text(path)), (theme) => ({ ...identity, theme }));
+	return Result.map(fileContent(files, path, value, readTheme), (theme) => ({ ...identity, theme }));
 };
 
 export const resourcesOf = (files: ReportFiles): ReadonlyArray<ResourceNode> => {

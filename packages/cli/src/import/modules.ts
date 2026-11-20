@@ -146,6 +146,8 @@ export const renderModule = (
 	].join("\n");
 };
 
+export const registerKey = (name: string): string => `import:${name}`;
+
 const registerBlock = (config: Config): string => {
 	const guids = new Set(
 		(config.report.resources ?? []).flatMap((resource) =>
@@ -182,7 +184,9 @@ const registerBlock = (config: Config): string => {
 		: [
 				'declare module "@pbirkit/core/register" {',
 				"\tinterface Register {",
-				...fields.map((field) => `\t\t${field}`),
+				`\t\treadonly ${JSON.stringify(registerKey(config.name))}: {`,
+				...fields.map((field) => `\t\t\t${field}`),
+				"\t\t};",
 				"\t}",
 				"}",
 			].join("\n");
@@ -248,8 +252,10 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			? Object.values(value).flatMap((item) => urlsIn(item))
 			: [];
 
-const SUPPORT_FILES = (version: string) => ({
-	"package.json": { type: "module", devDependencies: { "@pbirkit/core": version } },
+export type TypePaths = Readonly<Record<string, ReadonlyArray<string>>>;
+
+const SUPPORT_FILES = (paths: TypePaths) => ({
+	"package.json": { type: "module" },
 	"tsconfig.json": {
 		compilerOptions: {
 			target: "ES2024",
@@ -258,13 +264,14 @@ const SUPPORT_FILES = (version: string) => ({
 			noEmit: true,
 			allowImportingTsExtensions: true,
 			skipLibCheck: true,
+			...(Object.keys(paths).length === 0 ? {} : { paths }),
 		},
 		include: [CONFIG_FILE],
 	},
 });
 
-export const supportFiles = (version: string): ReadonlyArray<TreeFile> =>
-	Object.entries(SUPPORT_FILES(version)).map(([path, value]) =>
+export const supportFiles = (paths: TypePaths): ReadonlyArray<TreeFile> =>
+	Object.entries(SUPPORT_FILES(paths)).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
 	);
 

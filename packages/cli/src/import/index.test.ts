@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
@@ -15,12 +16,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { NodeServices } from "@effect/platform-node";
+import { Effect, Predicate } from "effect";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vite-plus/test";
+
+import { toJson } from "@pbirkit/core/build";
+
+import { findProject } from "../pbip/project.ts";
+import { indexTree } from "../pbip/tree.ts";
+import { MAX_ROUNDS, settleConfig } from "./draft.ts";
 
 vi.setConfig({ testTimeout: 30_000 });
 
 const main = fileURLToPath(new URL("../main.ts", import.meta.url));
 const core = fileURLToPath(new URL("../../../core", import.meta.url));
+const tsgo = fileURLToPath(new URL("../../../../node_modules/.bin/tsgo", import.meta.url));
 
 const sourceConfig = `import { defineConfig } from "@pbirkit/core/config";
 import { SchemaUrl } from "@pbirkit/core/schema-url";
@@ -167,6 +177,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(contents).toContain("children: [\n\t\t\t\t\t\t_overview,\n\t\t\t\t\t\t_detail,");
 	expect(contents).toContain('kind: "customVisual"');
 	expect(contents).toContain('declare module "@pbirkit/core/register"');
+	expect(contents).toContain('readonly "import:Example": {');
 	expect(contents).toContain('readonly visuals: readonly [{ readonly guid: "FileVisual" }];');
 	expect(contents).toContain('readonly builtinVisuals: readonly ["PublicVisual"];');
 	expect(contents).toContain(
@@ -182,12 +193,29 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(
 		readFileSync(join(out, "assets", "report", "CustomVisuals", "FileVisual", "extra.txt"), "utf8"),
 	).toBe("Unmapped\n");
-	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
-		type: "module",
-		devDependencies: { "@pbirkit/core": "0.0.0" },
-	});
+	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({ type: "module" });
 	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toContain('"noEmit": true');
 	expect(existsSync(join(out, "node_modules"))).toBe(false);
+	writeFileSync(
+		join(out, "other.ts"),
+		[
+			'import type { VisualType } from "@pbirkit/core/visual-type";',
+			"",
+			'declare module "@pbirkit/core/register" {',
+			"\tinterface Register {",
+			'\t\treadonly "import:Other": { readonly builtinVisuals: readonly ["OtherVisual"] };',
+			"\t}",
+			"}",
+			"",
+			'export const visualTypes: ReadonlyArray<VisualType> = ["OtherVisual", "PublicVisual", "FileVisual"];',
+			"",
+		].join("\n"),
+	);
+	edit(join(out, "tsconfig.json"), (value) =>
+		value.replace('"pbirkit.config.ts"', '"pbirkit.config.ts", "other.ts"'),
+	);
+	const typecheck = spawnSync(tsgo, ["-p", out], { encoding: "utf8" });
+	expect(typecheck.status, typecheck.stdout + typecheck.stderr).toBe(0);
 	const diff = run(root, ["diff", "-c", config, "--target", project]);
 	expect(diff.status, diff.stderr).toBe(0);
 	expect(diff.stdout).toContain("No differences in 23 files.");
@@ -200,7 +228,7 @@ it("shows the same tree from the project folder, its PBIP file and the imported 
 	expect(tree("--pbip", project)).toBe(fromConfig);
 	expect(tree("--pbip", join(project, "Example.pbip"))).toBe(fromConfig);
 	const conflict = run(root, ["tree", "--pbip", project, "-c", config]);
-	expect(conflict.status).toBe(1);
+	expect(conflict.status).toBe(2);
 	expect(conflict.stderr).toContain("--config and --pbip are mutually exclusive");
 });
 
@@ -337,7 +365,7 @@ it("rejects ambiguous input and protects a non-empty output without --force", ()
 	expect(ambiguous.status).toBe(2);
 	expect(ambiguous.stderr).toContain("name the one to use");
 	const ambiguousTree = run(project, ["tree", "--pbip", "."]);
-	expect(ambiguousTree.status).toBe(1);
+	expect(ambiguousTree.status).toBe(2);
 	expect(ambiguousTree.stderr).toBe(ambiguous.stderr.replace("[ERROR] import:", "[ERROR] tree:"));
 });
 
@@ -392,4 +420,112 @@ it("keeps only an unsupported theme raw and still types its sibling", () => {
 	expect(existsSync(join(out, "themes", "Brand.ts"))).toBe(false);
 	const raw = join(out, "assets", "report", "StaticResources", "RegisteredResources", "Brand.json");
 	expect(readFileSync(raw)).toEqual(readFileSync(original));
+});
+
+const DESKTOP_JSON = /\.(?:json|pbip|pbir|pbism|platform|tmdl)$/u;
+
+const textFiles = (folder: string): ReadonlyArray<string> =>
+	readdirSync(folder, { recursive: true, encoding: "utf8" })
+		.filter((entry) => DESKTOP_JSON.test(entry))
+		.map((entry) => join(folder, entry));
+
+const modules = (folder: string): Readonly<Record<string, string>> =>
+	Object.fromEntries(
+		readdirSync(folder, { recursive: true, encoding: "utf8" })
+			.filter((entry) => entry.endsWith(".ts"))
+			.toSorted()
+			.map((entry) => [entry, readFileSync(join(folder, entry), "utf8")]),
+	);
+
+it("types an LF checkout with BOMs as fully as the CRLF original", () => {
+	const crlf = importProject();
+	const original = modules(out);
+	rmSync(out, { recursive: true });
+	for (const file of textFiles(project)) edit(file, (value) => value.replaceAll("\r\n", "\n"));
+	for (const file of [
+		definition("pages", "first", "page.json"),
+		definition("bookmarks", "overview.bookmark.json"),
+	])
+		edit(file, (value) => `\uFEFF${value}`);
+	const stdout = importProject();
+	expect(stdout.split("\n").filter((line) => line.startsWith("  "))).toEqual(
+		crlf.split("\n").filter((line) => line.startsWith("  ")),
+	);
+	expect(stdout).toMatch(
+		/^\d+ files differ only in line endings or a BOM; build writes CRLF like Desktop$/mu,
+	);
+	expect(modules(out)).toEqual(original);
+	expect(tree("--pbip", project)).toBe(tree("-c", config));
+	const diff = run(root, ["diff", "--bytes", "-c", config, "--target", project]);
+	expect(diff.status, diff.stderr).toBe(0);
+	expect(diff.stdout).toMatch(/^No differences in \d+ files\.\n\d+ files differ only in line endings/u);
+});
+
+it("keeps a visual whose name fails the name rule as unmapped files", () => {
+	renameSync(visual("notes"), visual("my.visual"));
+	edit(visual("my.visual", "visual.json"), (value) =>
+		value.replace('"name": "notes"', '"name": "my.visual"'),
+	);
+	const stdout = importProject();
+	expect(stdout).toContain(
+		'Visual first/my.visual: The name "my.visual" must use only letters, digits, "_" or "-"',
+	);
+	expect(stdout).toContain("definition/pages: Copied 1 unmapped file into report.files");
+	expect(readFileSync(config, "utf8")).toContain(
+		'"definition/pages/first/visuals/my.visual/visual.json": new URL(',
+	);
+	const fromProject = tree("--pbip", project);
+	expect(fromProject).toContain("visual (textbox, my.visual, -) [raw]");
+	expect(fromProject).toBe(tree("-c", config));
+});
+
+it("prints a diff command that lists the hidden check warnings", () => {
+	edit(definition("pages", "pages.json"), (value) =>
+		value.replace('"pageOrder"', '"unsupported": true, "pageOrder"'),
+	);
+	const stdout = importProject();
+	expect(stdout).toContain("Pages metadata: Unsupported");
+	expect(stdout).toContain(
+		"import: hid 1 check warning. Run pbirkit diff --warnings -c out/pbirkit.config.ts --target project to list them.",
+	);
+	const diff = run(root, ["diff", "--warnings", "-c", "out/pbirkit.config.ts", "--target", "project"]);
+	expect(diff.status, diff.stderr).toBe(0);
+	expect(diff.stderr).toContain("report: pagesMetadata is a file");
+});
+
+it("warns that names of raw items also live in their files", () => {
+	edit(visual("notes", "visual.json"), (value) => value.replace('"name"', '"futureProperty": true, "name"'));
+	expect(importProject()).toContain(
+		"import: kept 1 of the pages, visuals and bookmarks as raw files. To rename one, change the name in its file too.",
+	);
+});
+
+const settle = (folder: string, rounds: number) =>
+	Effect.runPromise(
+		findProject(folder).pipe(
+			Effect.map((found) => settleConfig(found, indexTree(found.name, found.report, found.tree), rounds)),
+			Effect.provide(NodeServices.layer),
+		),
+	);
+
+const resourcePackagesFirst = (value: string): string => {
+	const parsed: unknown = JSON.parse(value);
+	const entries = Predicate.isReadonlyObject(parsed) ? Object.entries(parsed) : [];
+	return toJson(
+		Object.fromEntries([
+			...entries.filter(([key]) => key === "resourcePackages"),
+			...entries.filter(([key]) => key !== "resourcePackages"),
+		]),
+	);
+};
+
+it("settles a drifted report.json over several rounds and stops at the round limit", async () => {
+	edit(definition("report.json"), resourcePackagesFirst);
+	const settled = await settle(project, MAX_ROUNDS);
+	expect(settled.fallbacks.map(({ label }) => label)).not.toContain("Report definition");
+	expect(Object.keys(settled.config.report.definition)[0]).toBe("resourcePackages");
+	const limited = await settle(project, 1);
+	expect(limited.config.report.definition).not.toHaveProperty("resourcePackages");
+	const stdout = importProject();
+	expect(stdout).not.toContain("Report definition");
 });

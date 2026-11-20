@@ -5,7 +5,7 @@ import type { Config } from "@pbirkit/core/config";
 
 import { buildTree } from "../build/outputs.ts";
 import { fromCwd } from "../build/paths.ts";
-import { isOwned, projectEntries, readTree } from "../build/tree.ts";
+import { isOwned, projectEntries, readTree, sameText } from "../build/tree.ts";
 import type { Tree, TreeFile } from "../build/tree.ts";
 import { TargetMissingError } from "./errors.ts";
 import { selectedScope } from "./scope.ts";
@@ -31,8 +31,11 @@ export type FileDifference =
 	| { readonly kind: "extra"; readonly path: string }
 	| ChangedFile;
 
+type FileResult = FileDifference | { readonly kind: "endings"; readonly path: string };
+
 export interface Comparison {
 	readonly differences: ReadonlyArray<FileDifference>;
+	readonly endings: ReadonlyArray<string>;
 	readonly checked: number;
 }
 
@@ -42,7 +45,7 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 
 const JSON_PATH = /\.(?:json|pbip|pbir|pbism|platform)$/iu;
 
-const parseJson = (bytes: Uint8Array): unknown => {
+export const parseJson = (bytes: Uint8Array): unknown => {
 	try {
 		const value: unknown = JSON.parse(decoder.decode(bytes));
 		return value;
@@ -58,7 +61,7 @@ const renderValue = (value: unknown): string => {
 
 const pointerSegment = (key: string): string => key.replaceAll("~", "~0").replaceAll("/", "~1");
 
-const jsonDifferences = (expected: unknown, actual: unknown): ReadonlyArray<PointerDifference> => {
+export const jsonDifferences = (expected: unknown, actual: unknown): ReadonlyArray<PointerDifference> => {
 	const found: Array<PointerDifference> = [];
 
 	const visit = (left: unknown, right: unknown, pointer: string): void => {
@@ -84,8 +87,9 @@ const jsonDifferences = (expected: unknown, actual: unknown): ReadonlyArray<Poin
 	return found;
 };
 
-const changedFile = (mode: CompareMode, left: TreeFile, right: TreeFile): ChangedFile | undefined => {
+const changedFile = (mode: CompareMode, left: TreeFile, right: TreeFile): FileResult | undefined => {
 	if (left.hash === right.hash) return undefined;
+	if (sameText(left, right)) return { kind: "endings", path: left.path };
 
 	const changed = (pointers: ReadonlyArray<PointerDifference>): ChangedFile => ({
 		kind: "changed",
@@ -107,7 +111,7 @@ const fileDifference = (
 	mode: CompareMode,
 	left: Option.Option<TreeFile>,
 	right: Option.Option<TreeFile>,
-): Option.Option<FileDifference> =>
+): Option.Option<FileResult> =>
 	Option.match(left, {
 		onNone: () => Option.map(right, (file) => ({ kind: "extra" as const, path: file.path })),
 		onSome: (expected) =>
@@ -120,10 +124,13 @@ const fileDifference = (
 export const compareTrees = (expected: Tree, actual: Tree, mode: CompareMode): Comparison => {
 	const keys = [...new Set([...HashMap.keys(expected), ...HashMap.keys(actual)])].toSorted();
 
+	const results = keys.flatMap((key) =>
+		Option.toArray(fileDifference(mode, HashMap.get(expected, key), HashMap.get(actual, key))),
+	);
+
 	return {
-		differences: keys.flatMap((key) =>
-			Option.toArray(fileDifference(mode, HashMap.get(expected, key), HashMap.get(actual, key))),
-		),
+		differences: results.filter((result): result is FileDifference => result.kind !== "endings"),
+		endings: results.flatMap((result) => (result.kind === "endings" ? [result.path] : [])),
 		checked: keys.length,
 	};
 };
