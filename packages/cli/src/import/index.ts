@@ -15,7 +15,7 @@ import { indexTree } from "../pbip/tree.ts";
 import { settleConfig } from "./draft.ts";
 import { diffCommand, verifiedMessage, writtenMessage } from "./messages.ts";
 import { CONFIG_FILE, importFiles, supportFiles } from "./modules.ts";
-import { checkOutput, coreTypePaths, writeImport } from "./output.ts";
+import { checkOutput, writeImport } from "./output.ts";
 
 const flags = {
 	source: Argument.String("source").pipe(
@@ -72,12 +72,12 @@ const runImport = Effect.fnUntraced(function* ({
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
 	const files = importFiles(project, config);
 	yield* checkOutput(out, project, files, force);
-	yield* writeImport(out, files, supportFiles(yield* coreTypePaths()));
+	yield* writeImport(out, files, supportFiles());
 
 	const configFile = path.join(out, CONFIG_FILE);
 	yield* Console.log(writtenMessage(fromCwd(path, configFile), config, fallbacks));
 	const loaded = yield* loadConfig(configFile, false);
-	const comparison = yield* compareProject(loaded.config, project.root, "bytes", NO_SELECTORS);
+	const comparison = yield* compareProject(loaded.config, project.root, "text", NO_SELECTORS);
 	if (comparison.differences.length > 0) {
 		yield* Console.log(renderComparison(comparison));
 		process.exitCode = 1;

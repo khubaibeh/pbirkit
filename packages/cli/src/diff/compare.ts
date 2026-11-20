@@ -11,7 +11,7 @@ import { TargetMissingError } from "./errors.ts";
 import { selectedScope } from "./scope.ts";
 import type { Selectors } from "./scope.ts";
 
-export type CompareMode = "semantic" | "bytes";
+export type CompareMode = "semantic" | "text" | "bytes";
 
 interface PointerDifference {
 	readonly pointer: string;
@@ -97,7 +97,7 @@ const changedFile = (mode: CompareMode, left: TreeFile, right: TreeFile): FileRe
 		pointers: pointers.slice(0, MAX_POINTERS),
 		more: Math.max(0, pointers.length - MAX_POINTERS),
 	});
-	if (mode === "bytes" || !JSON_PATH.test(left.path)) return changed([]);
+	if (mode !== "semantic" || !JSON_PATH.test(left.path)) return changed([]);
 
 	const expected = parseJson(left.bytes);
 	const actual = parseJson(right.bytes);
@@ -129,7 +129,13 @@ export const compareTrees = (expected: Tree, actual: Tree, mode: CompareMode): C
 	);
 
 	return {
-		differences: results.filter((result): result is FileDifference => result.kind !== "endings"),
+		differences: results.flatMap((result): ReadonlyArray<FileDifference> =>
+			result.kind === "endings"
+				? mode === "bytes"
+					? [{ kind: "changed", path: result.path, pointers: [], more: 0 }]
+					: []
+				: [result],
+		),
 		endings: results.flatMap((result) => (result.kind === "endings" ? [result.path] : [])),
 		checked: keys.length,
 	};

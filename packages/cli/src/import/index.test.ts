@@ -194,7 +194,13 @@ it("imports split modules, model assets and unmapped files without local depende
 		readFileSync(join(out, "assets", "report", "CustomVisuals", "FileVisual", "extra.txt"), "utf8"),
 	).toBe("Unmapped\n");
 	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({ type: "module" });
-	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toContain('"noEmit": true');
+	const settings = readFileSync(join(out, "tsconfig.json"), "utf8");
+	expect(settings).toContain('"extends": "./.pbirkit/tsconfig.json"');
+	expect(settings).not.toContain(core);
+	expect(readFileSync(join(out, ".gitignore"), "utf8")).toBe(".pbirkit/\n");
+	expect(readFileSync(join(out, ".pbirkit", "tsconfig.json"), "utf8")).toContain(
+		`"@pbirkit/core/config": [\n\t\t\t\t"${join(core, "src", "config.ts")}"`,
+	);
 	expect(existsSync(join(out, "node_modules"))).toBe(false);
 	writeFileSync(
 		join(out, "other.ts"),
@@ -204,18 +210,32 @@ it("imports split modules, model assets and unmapped files without local depende
 			'declare module "@pbirkit/core/register" {',
 			"\tinterface Register {",
 			'\t\treadonly "import:Other": { readonly builtinVisuals: readonly ["OtherVisual"] };',
+			'\t\treadonly "import:Broken": unknown;',
+			"\t\treadonly loose: any;",
+			'\t\treadonly other: { readonly builtinVisuals: readonly ["Wide"] };',
 			"\t}",
 			"}",
 			"",
 			'export const visualTypes: ReadonlyArray<VisualType> = ["OtherVisual", "PublicVisual", "FileVisual"];',
+			'export const narrow: "Wide" extends VisualType ? false : string extends VisualType ? false : true = true;',
 			"",
 		].join("\n"),
 	);
 	edit(join(out, "tsconfig.json"), (value) =>
 		value.replace('"pbirkit.config.ts"', '"pbirkit.config.ts", "other.ts"'),
 	);
-	const typecheck = spawnSync(tsgo, ["-p", out], { encoding: "utf8" });
-	expect(typecheck.status, typecheck.stdout + typecheck.stderr).toBe(0);
+	const typecheck = () => spawnSync(tsgo, ["-p", out], { encoding: "utf8" });
+	expect(typecheck().status, typecheck().stdout).toBe(0);
+	rmSync(join(out, ".pbirkit"), { recursive: true });
+	expect(typecheck().status).not.toBe(0);
+	tree("-c", config);
+	expect(typecheck().status, typecheck().stdout).toBe(0);
+	writeFileSync(
+		join(out, ".pbirkit", "tsconfig.json"),
+		'{"compilerOptions":{"paths":{"@pbirkit/core/*":["/missing/*"]}}}',
+	);
+	tree("-c", config);
+	expect(typecheck().status, typecheck().stdout).toBe(0);
 	const diff = run(root, ["diff", "-c", config, "--target", project]);
 	expect(diff.status, diff.stderr).toBe(0);
 	expect(diff.stdout).toContain("No differences in 23 files.");
@@ -452,13 +472,17 @@ it("types an LF checkout with BOMs as fully as the CRLF original", () => {
 		crlf.split("\n").filter((line) => line.startsWith("  ")),
 	);
 	expect(stdout).toMatch(
-		/^\d+ files differ only in line endings or a BOM; build writes CRLF like Desktop$/mu,
+		/^\d+ files differ only in line endings or a BOM\. Build writes generated JSON with CRLF and no BOM, and converts copied \.json and \.tmdl files to CRLF\.$/mu,
 	);
 	expect(modules(out)).toEqual(original);
 	expect(tree("--pbip", project)).toBe(tree("-c", config));
-	const diff = run(root, ["diff", "--bytes", "-c", config, "--target", project]);
-	expect(diff.status, diff.stderr).toBe(0);
-	expect(diff.stdout).toMatch(/^No differences in \d+ files\.\n\d+ files differ only in line endings/u);
+	const semantic = run(root, ["diff", "-c", config, "--target", project]);
+	expect(semantic.status, semantic.stderr).toBe(0);
+	expect(semantic.stdout).toMatch(/^No differences in \d+ files\.\n\d+ files differ only in line endings/u);
+	const bytes = run(root, ["diff", "--bytes", "-c", config, "--target", project]);
+	expect(bytes.status, bytes.stderr).toBe(1);
+	expect(bytes.stdout).toContain("changed  Example.Report/definition/pages/first/page.json");
+	expect(bytes.stdout).toMatch(/^0 missing, 0 extra, (\d+) changed\n\1 files differ only in line endings/mu);
 });
 
 it("keeps a visual whose name fails the name rule as unmapped files", () => {
@@ -528,4 +552,71 @@ it("settles a drifted report.json over several rounds and stops at the round lim
 	expect(limited.config.report.definition).not.toHaveProperty("resourcePackages");
 	const stdout = importProject();
 	expect(stdout).not.toContain("Report definition");
+});
+
+const addGroup = () => {
+	mkdirSync(visual("box"));
+	writeFileSync(
+		visual("box", "visual.json"),
+		toJson({
+			$schema:
+				"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.13.0/schema.json",
+			name: "box",
+			position: { x: 0, y: 0, width: 100, height: 100 },
+			visualGroup: { displayName: "Box", groupMode: "ScaleMode" },
+		}),
+	);
+	edit(visual("notes", "visual.json"), (value) =>
+		value.replace('"position"', '"parentGroupName": "box",\r\n  "position"'),
+	);
+};
+
+it.each([
+	["a renamed folder", "box", "other", "Visual or page folder differs from its name"],
+	["a bad name", "bad.group", "bad.group", 'The name "bad.group" must use only letters, digits, "_" or "-"'],
+])("keeps the typed children of a group with %s as unmapped files", (_, name, folder, reason) => {
+	addGroup();
+	const typed = importProject();
+	expect(typed).not.toContain("Visual first/");
+	rmSync(out, { recursive: true });
+	renameSync(visual("box"), visual(folder));
+	edit(visual(folder, "visual.json"), (value) => value.replace('"name": "box"', `"name": "${name}"`));
+	edit(visual("notes", "visual.json"), (value) =>
+		value.replace('"parentGroupName": "box"', `"parentGroupName": "${name}"`),
+	);
+	const stdout = importProject();
+	expect(stdout).toContain(`Visual first/${name}: ${reason}`);
+	expect(stdout).toContain(`Visual first/notes: Its group "${name}" is not placed`);
+	expect(existsSync(join(out, "pages", "first", "visuals", "notes.ts"))).toBe(false);
+	const fromProject = tree("--pbip", project);
+	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
+	expect(fromProject).toBe(tree("-c", config));
+});
+
+it("keeps a page raw when its visualInteractions name a visual that is not placed", () => {
+	edit(definition("pages", "second", "page.json"), (value) => {
+		const parsed: unknown = JSON.parse(value);
+		const entries = Predicate.isReadonlyObject(parsed) ? Object.entries(parsed) : [];
+		return toJson(
+			Object.fromEntries([
+				...entries,
+				["visualInteractions", [{ source: "1-card", target: "1_card", type: "NoFilter" }]],
+			]),
+		);
+	});
+	expect(importProject()).not.toContain("Page second");
+	rmSync(out, { recursive: true });
+	const pageVisual = (...path: ReadonlyArray<string>) => definition("pages", "second", "visuals", ...path);
+	renameSync(pageVisual("1-card"), pageVisual("moved"));
+	const stdout = importProject();
+	expect(stdout).toContain("Visual second/1-card: Visual or page folder differs from its name");
+	expect(stdout).toContain(
+		'Page second: visualInteractions names "1-card", which is not a placed visual on this page',
+	);
+	expect(readFileSync(join(out, "pages", "second", "page.ts"), "utf8")).toContain(
+		'file: new URL("../../assets/report/definition/pages/second/page.json", import.meta.url)',
+	);
+	const fromProject = tree("--pbip", project);
+	expect(fromProject).toContain("page (-, second, second) [raw]");
+	expect(fromProject).toBe(tree("-c", config));
 });

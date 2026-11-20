@@ -7,6 +7,7 @@ import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
+import { LOCAL_TSCONFIG } from "../build/core-types.ts";
 import { fileKey, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
 import type { Project } from "../pbip/project.ts";
@@ -252,11 +253,10 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			? Object.values(value).flatMap((item) => urlsIn(item))
 			: [];
 
-export type TypePaths = Readonly<Record<string, ReadonlyArray<string>>>;
-
-const SUPPORT_FILES = (paths: TypePaths) => ({
+const SUPPORT_FILES = {
 	"package.json": { type: "module" },
 	"tsconfig.json": {
+		extends: `./${LOCAL_TSCONFIG}`,
 		compilerOptions: {
 			target: "ES2024",
 			module: "NodeNext",
@@ -264,16 +264,17 @@ const SUPPORT_FILES = (paths: TypePaths) => ({
 			noEmit: true,
 			allowImportingTsExtensions: true,
 			skipLibCheck: true,
-			...(Object.keys(paths).length === 0 ? {} : { paths }),
 		},
 		include: [CONFIG_FILE],
 	},
-});
+};
 
-export const supportFiles = (paths: TypePaths): ReadonlyArray<TreeFile> =>
-	Object.entries(SUPPORT_FILES(paths)).map(([path, value]) =>
+export const supportFiles = (): ReadonlyArray<TreeFile> => [
+	treeFile(".gitignore", encoder.encode(`${posix.dirname(LOCAL_TSCONFIG)}/\n`)),
+	...Object.entries(SUPPORT_FILES).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
-	);
+	),
+];
 
 export const importFiles = (project: Project, config: Config): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));

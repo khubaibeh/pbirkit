@@ -37,7 +37,7 @@ describe("compareTrees", () => {
 		});
 	});
 
-	it("lists files that differ only in line endings or a BOM apart from real differences", () => {
+	it("lists files that differ only in line endings or a BOM, and counts them as changed in bytes mode", () => {
 		const expected = treeOf([
 			treeFile("model.tmdl", encoder.encode("model Model\r\n\ttable A\r\n")),
 			treeFile("page.json", encoder.encode('{\r\n  "a": 1\r\n}')),
@@ -51,10 +51,20 @@ describe("compareTrees", () => {
 			treeFile("image.png", Uint8Array.from([0, 10])),
 		]);
 
-		expect(compareTrees(expected, actual, "bytes")).toEqual({
+		expect(compareTrees(expected, actual, "text")).toEqual({
 			differences: [
 				{ kind: "changed", path: "image.png", pointers: [], more: 0 },
 				{ kind: "changed", path: "other.txt", pointers: [], more: 0 },
+			],
+			endings: ["model.tmdl", "page.json"],
+			checked: 4,
+		});
+		expect(compareTrees(expected, actual, "bytes")).toEqual({
+			differences: [
+				{ kind: "changed", path: "image.png", pointers: [], more: 0 },
+				{ kind: "changed", path: "model.tmdl", pointers: [], more: 0 },
+				{ kind: "changed", path: "other.txt", pointers: [], more: 0 },
+				{ kind: "changed", path: "page.json", pointers: [], more: 0 },
 			],
 			endings: ["model.tmdl", "page.json"],
 			checked: 4,

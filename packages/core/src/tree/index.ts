@@ -5,8 +5,8 @@ import type { PagesMetadataItem } from "#schemas/pages";
 
 import type { BookmarkGroupNode, BookmarkNode } from "./bookmarks.ts";
 import { bookmarksOf } from "./bookmarks.ts";
-import type { PageNode, VisualNode } from "./pages.ts";
-import { pagesOf } from "./pages.ts";
+import type { PageNode } from "./pages.ts";
+import { flattenVisuals, pagesOf } from "./pages.ts";
 import type { ResourceNode } from "./resources.ts";
 import { resourcesOf } from "./resources.ts";
 import type { IndexedFile, ReportFiles } from "./shared.ts";
@@ -14,6 +14,7 @@ import { parent } from "./shared.ts";
 
 export type { BookmarkGroupNode, BookmarkNode } from "./bookmarks.ts";
 export type { PageNode, VisualNode } from "./pages.ts";
+export { flattenVisuals } from "./pages.ts";
 export type { ResourceData, ResourceNode } from "./resources.ts";
 export type { Content, IndexedFile } from "./shared.ts";
 export { decoded } from "./shared.ts";
@@ -76,9 +77,6 @@ export const indexReport = (input: ReportIndexInput): ReportTree => {
 		resources: resourcesOf(files),
 	};
 };
-
-export const flattenVisuals = (nodes: ReadonlyArray<VisualNode>): ReadonlyArray<VisualNode> =>
-	nodes.flatMap((node) => [node, ...flattenVisuals(node.children)]);
 
 export const ReportSelector = Literals(["page", "visual", "bookmark", "theme"]);
 

@@ -6,7 +6,7 @@ export const endingsLine = (endings: ReadonlyArray<string>): ReadonlyArray<strin
 	endings.length === 0
 		? []
 		: [
-				`${files(endings.length)} ${endings.length === 1 ? "differs" : "differ"} only in line endings or a BOM; build writes CRLF like Desktop`,
+				`${files(endings.length)} ${endings.length === 1 ? "differs" : "differ"} only in line endings or a BOM. Build writes generated JSON with CRLF and no BOM, and converts copied .json and .tmdl files to CRLF.`,
 			];
 
 export const renderComparison = ({ differences, endings, checked }: Comparison): string => {

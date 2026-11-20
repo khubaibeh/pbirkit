@@ -123,25 +123,45 @@ const visualNodes = (entries: ReadonlyArray<VisualEntry>): ReadonlyArray<VisualN
 	};
 	const parents = new Map(entries.map((entry) => [entry, parentOf(entry)]));
 	const listed = new Set<VisualEntry>();
-	const nodeOf = (entry: VisualEntry): VisualNode => {
+	const nodeOf = (entry: VisualEntry, unplacedGroup?: string): VisualNode => {
 		listed.add(entry);
+		const blocked = unplacedGroup !== undefined && entry.placed;
+		const blocker = unplacedGroup ?? (entry.placed ? undefined : entry.name);
 		return {
 			kind: entry.isGroup ? "group" : "visual",
 			name: entry.name,
 			path: entry.path,
-			placed: entry.placed,
-			content: entry.content,
+			placed: entry.placed && unplacedGroup === undefined,
+			content: blocked ? Result.fail(`Its group "${unplacedGroup}" is not placed`) : entry.content,
 			visualType: string(at(at(entry.value, "visual"), "visualType")),
 			title: titleOf(entry.value),
 			hidden: at(entry.value, "isHidden") === true,
 			children: entries
 				.filter((child) => parents.get(child) === entry && !listed.has(child))
-				.map((child) => nodeOf(child)),
+				.map((child) => nodeOf(child, blocker)),
 		};
 	};
 	const roots = entries.filter((entry) => parents.get(entry) === undefined).map((entry) => nodeOf(entry));
 	const cycles = entries.flatMap((entry) => (listed.has(entry) ? [] : [nodeOf(entry)]));
 	return roots.concat(cycles);
+};
+
+export const flattenVisuals = (nodes: ReadonlyArray<VisualNode>): ReadonlyArray<VisualNode> =>
+	nodes.flatMap((node) => [node, ...flattenVisuals(node.children)]);
+
+const strandedInteraction = (value: unknown, visuals: ReadonlyArray<VisualNode>): string | undefined => {
+	const placed = new Set(
+		flattenVisuals(visuals)
+			.filter((visual) => visual.placed)
+			.map((visual) => visual.name),
+	);
+	const names = list(at(value, "visualInteractions")).flatMap((interaction) =>
+		strings([at(interaction, "source"), at(interaction, "target")]),
+	);
+	const stranded = names.find((name) => !placed.has(name));
+	return stranded === undefined
+		? undefined
+		: `visualInteractions names "${stranded}", which is not a placed visual on this page`;
 };
 
 const pageFolders = (files: ReportFiles): ReadonlyArray<PageFolder> => {
@@ -173,6 +193,7 @@ const pageNode = (files: ReportFiles, folder: PageFolder): PageNode => {
 	const exists = files.has(path);
 	const misplaced = folder.folder === name ? nameFailure(name) : "Page folder differs from its name";
 	const base = { name, exists, placed: exists && misplaced === undefined };
+	const visuals = visualNodes(folder.visuals.map((visual) => visualEntry(files, base, visual)));
 	const binding = string(at(at(value, "pageBinding"), "type"));
 	return {
 		name,
@@ -182,11 +203,12 @@ const pageNode = (files: ReportFiles, folder: PageFolder): PageNode => {
 		type: string(at(value, "type")) ?? (binding === "Default" ? undefined : binding),
 		hidden: at(value, "visibility") === "HiddenInViewMode",
 		content: exists
-			? misplaced === undefined
-				? fileContent(files, path, value, readPage)
-				: Result.fail(misplaced)
+			? Option.match(Option.fromNullishOr(misplaced ?? strandedInteraction(value, visuals)), {
+					onNone: () => fileContent(files, path, value, readPage),
+					onSome: (failure) => Result.fail(failure),
+				})
 			: Result.fail("Page file is missing"),
-		visuals: visualNodes(folder.visuals.map((visual) => visualEntry(files, base, visual))),
+		visuals,
 	};
 };
 
