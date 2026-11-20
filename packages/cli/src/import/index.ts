@@ -1,21 +1,22 @@
-import { Console, Effect, FileSystem, Option, Path, Result } from "effect";
+import { Console, Effect, HashMap, Option, Path } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
-import { buildFiles, desktopOwnedPaths } from "@pbirkit/core/build";
-import { diffTrees } from "@pbirkit/core/diff";
-
 import { loadConfig } from "../build/config.ts";
-import { onFileSystem, PathClashError } from "../build/errors.ts";
-import { buildTree } from "../build/outputs.ts";
 import { fromCwd } from "../build/paths.ts";
-import { clearFolder, pathClashes, treeOf, writeTree } from "../build/tree.ts";
-import { fileTreeOf, renderDiff } from "../diff/render.ts";
-import { errorMessage, summary, verificationErrorMessage } from "./messages.ts";
-import { importModel } from "./model.ts";
-import { CONFIG_FILE, ImportOutput } from "./output.ts";
-import { importReport } from "./report.ts";
-import { checkOutput, findProject, readArtifact, readProjectTree } from "./source.ts";
-import type { Project } from "./source.ts";
+import { fileKey } from "../build/tree.ts";
+import { compareProject } from "../diff/compare.ts";
+import { renderComparison } from "../diff/render.ts";
+import { NO_SELECTORS } from "../diff/scope.ts";
+import { errorMessage, exitWith } from "../messages.ts";
+import { ProjectSourceError } from "../pbip/errors.ts";
+import { findProject } from "../pbip/project.ts";
+import type { Project } from "../pbip/project.ts";
+import { indexTree } from "../pbip/tree.ts";
+import { VERSION } from "../version.ts";
+import { settleConfig } from "./draft.ts";
+import { verifiedMessage, writtenMessage } from "./messages.ts";
+import { CONFIG_FILE, importFiles } from "./modules.ts";
+import { checkOutput, writeImport } from "./output.ts";
 
 const flags = {
 	source: Argument.String("source").pipe(
@@ -29,50 +30,34 @@ const flags = {
 	),
 	force: Flag.Boolean("force").pipe(
 		Flag.withDefault(false),
-		Flag.withDescription("Replace generated files and model asset folders in a non-empty output folder"),
+		Flag.withDescription("Replace the files that an earlier import wrote to the output folder"),
 	),
 };
 
-const fail = Effect.sync(() => {
-	process.exitCode = 1;
-});
+const REPORT_FILES = [
+	".platform",
+	"definition.pbir",
+	"definition/report.json",
+	"definition/version.json",
+	"definition/pages/pages.json",
+];
 
-const verify = Effect.fnUntraced(function* (file: string, project: Project) {
-	const config = yield* loadConfig(file);
-	const built = new Map(fileTreeOf(yield* buildTree(buildFiles(config), desktopOwnedPaths(config))));
-	built.delete(".gitignore");
-	const source = fileTreeOf(yield* readProjectTree(project));
-	const differences = diffTrees(built, source, { mode: "semantic", maxPointers: 5 });
-	const differentPaths = new Set(differences.map(({ path }) => path));
-	const verified = [...source.keys()].filter((path) => !differentPaths.has(path)).length;
+const MODEL_FILES = [".platform", "definition.pbism"];
 
-	return { differences, verified };
-});
+const requireFiles = Effect.fnUntraced(function* (project: Project) {
+	const path = yield* Path.Path;
 
-export const projectConfig = Effect.fnUntraced(function* (project: Project) {
-	const output = new ImportOutput();
-	const { report, registration } = yield* importReport(
-		project,
-		yield* readArtifact(project.root, project.report),
-		output,
-	);
-	const model =
-		project.model === undefined
-			? undefined
-			: yield* importModel(project.model, yield* readArtifact(project.root, project.model), output);
-
-	if (model === undefined && project.localReference) {
-		output.fallback(
-			"Model reference",
-			"Kept the reference because the local model could not be found inside the project",
-		);
-	}
-	const config = output.module(
-		CONFIG_FILE,
-		{ name: project.name, pbip: project.pbip, report, ...(model === undefined ? {} : { model }) },
-		registration,
-	);
-	return { output, config };
+	const required = [
+		...REPORT_FILES.map((file) => `${project.report}/${file}`),
+		...(project.model === undefined ? [] : MODEL_FILES.map((file) => `${project.model}/${file}`)),
+	];
+	const missing = required.find((file) => !HashMap.has(project.tree, fileKey(file)));
+	if (missing !== undefined)
+		return yield* new ProjectSourceError({
+			path: path.join(project.root, missing),
+			detail: "the file is missing",
+		});
+	return yield* Effect.void;
 });
 
 const runImport = Effect.fnUntraced(function* ({
@@ -80,44 +65,28 @@ const runImport = Effect.fnUntraced(function* ({
 	out: outFlag,
 	force,
 }: Command.Command.Config.Infer<typeof flags>) {
-	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
+
 	const project = yield* findProject(source);
+	yield* requireFiles(project);
+	const { config, fallbacks } = settleConfig(project, indexTree(project.name, project.report, project.tree));
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	yield* checkOutput(out, project, force);
-	const { output } = yield* projectConfig(project);
+	const files = importFiles(project, config);
+	yield* checkOutput(out, project, files, force);
+	yield* writeImport(out, files, VERSION);
 
-	const clashes = pathClashes(output.files);
-	if (clashes.length > 0) return yield* new PathClashError({ folder: out, pairs: clashes });
-
-	if (force) {
-		for (const folder of output.directories) yield* clearFolder(path.join(out, folder));
+	const configFile = path.join(out, CONFIG_FILE);
+	yield* Console.log(writtenMessage(fromCwd(path, configFile), fallbacks));
+	const loaded = yield* loadConfig(configFile, false);
+	const comparison = yield* compareProject(loaded.config, project.root, "bytes", NO_SELECTORS);
+	if (comparison.differences.length > 0) {
+		yield* Console.log(renderComparison(comparison));
+		process.exitCode = 1;
+		return;
 	}
-	yield* writeTree(out, treeOf(output.files));
-	for (const dir of output.directories) {
-		const target = path.join(out, dir);
-		yield* fs.makeDirectory(target, { recursive: true }).pipe(onFileSystem("create", target));
-	}
-
-	const config = path.join(out, CONFIG_FILE);
-	const result = yield* Effect.result(verify(config, project));
-	yield* Console.log(
-		summary(fromCwd(path, config), Result.isSuccess(result) ? result.success.verified : 0, output.fallbacks),
-	);
-
-	if (Result.isFailure(result)) {
-		yield* Console.error(verificationErrorMessage(result.failure));
-		return yield* fail;
-	}
-
-	if (result.success.differences.length > 0) {
-		yield* Console.log(renderDiff(result.success.differences));
-		return yield* fail;
-	}
-
-	return yield* Effect.void;
+	yield* Console.log(verifiedMessage(comparison.checked, loaded.warnings.length));
 });
 
 export const importCommand = Command.make("import", flags, (input) =>
-	runImport(input).pipe(Effect.catch((error) => Effect.andThen(Console.error(errorMessage(error)), fail))),
+	runImport(input).pipe(Effect.catch((error) => exitWith(2)(errorMessage("import")(error)))),
 ).pipe(Command.withDescription("Convert an existing PBIP project to a pbirkit config"));

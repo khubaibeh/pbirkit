@@ -1,31 +1,14 @@
-import { Match } from "effect";
+import type { Fallback } from "./draft.ts";
 
-import type { BuildError, FileSystemError, PathClashError } from "../build/errors.ts";
-import { errorMessage as buildErrorMessage } from "../build/messages.ts";
-import type { ImportOutputError, ImportSourceError } from "./errors.ts";
-import type { ImportOutput } from "./output.ts";
+const count = (total: number, noun: string): string => `${total} ${noun}${total === 1 ? "" : "s"}`;
 
-export const errorMessage: (
-	error: ImportOutputError | ImportSourceError | FileSystemError | PathClashError,
-) => string = Match.valueTags({
-	ImportSourceError: ({ path, detail }) => `[ERROR] import: cannot import ${path}: ${detail}`,
-	ImportOutputError: ({ path, detail }) => `[ERROR] import: cannot write to ${path}: ${detail}`,
-	FileSystemError: ({ operation, path, detail }) => `[ERROR] import: cannot ${operation} ${path}: ${detail}`,
-	PathClashError: ({ folder, pairs }) =>
-		[
-			`[ERROR] import: ${folder} holds files whose names differ only in letter case:`,
-			...pairs.map((pair) => `  ${pair}`),
-		].join("\n"),
-});
+export const writtenMessage = (config: string, fallbacks: ReadonlyArray<Fallback>): string =>
+	[`import: wrote ${config}`, ...fallbacks.map(({ label, reason }) => `  ${label}: ${reason}`)].join("\n");
 
-export const verificationErrorMessage = (error: BuildError | ImportSourceError): string =>
-	error._tag === "ImportSourceError" || error._tag === "FileSystemError" || error._tag === "PathClashError"
-		? errorMessage(error)
-		: buildErrorMessage(error).replaceAll(/^\[ERROR\] build:/gmu, "[ERROR] import:");
-
-export const summary = (config: string, verified: number, fallbacks: ImportOutput["fallbacks"]): string =>
+export const verifiedMessage = (checked: number, warnings: number): string =>
 	[
-		`import: wrote ${config}`,
-		`import: verified ${verified} ${verified === 1 ? "file" : "files"}`,
-		...fallbacks.map(({ group, reason }) => `  ${group}: ${reason}`),
+		`import: verified ${count(checked, "file")}`,
+		...(warnings === 0
+			? []
+			: [`import: hid ${count(warnings, "check warning")}. Run pbirkit diff --warnings to list them.`]),
 	].join("\n");

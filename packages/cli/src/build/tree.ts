@@ -71,28 +71,33 @@ export const sameFile = (left: Option.Option<TreeFile>, right: Option.Option<Tre
 		onSome: (file) => Option.exists(right, (other) => other.hash === file.hash),
 	});
 
-const readEntries = Effect.fnUntraced(function* (folder: string, owned?: ReadonlyArray<string>) {
+const ownedEntries = Effect.fnUntraced(function* (folder: string, owned: ReadonlyArray<string>) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
-	if (owned === undefined) {
-		return yield* fs.readDirectory(folder, { recursive: true }).pipe(onFileSystem("list", folder));
-	}
 
-	const roots = new Set(owned.map((entry) => fileKey(entry.split("/")[0] ?? entry)));
-	const entries = (yield* fs.readDirectory(folder).pipe(onFileSystem("list", folder))).filter((entry) =>
+	const roots = new Set(owned.map((entry) => fileKey(entry.replace(/\/.*$/u, ""))));
+	const tops = (yield* fs.readDirectory(folder).pipe(onFileSystem("list", folder))).filter((entry) =>
 		roots.has(fileKey(entry)),
 	);
-	const children = yield* Effect.forEach(
-		entries,
+	const nested = yield* Effect.forEach(
+		tops,
 		Effect.fnUntraced(function* (entry) {
-			if (isOwned(owned, entry)) return [entry];
 			const target = path.join(folder, entry);
-			if ((yield* fs.stat(target).pipe(onFileSystem("inspect", target))).type !== "Directory") return [];
-			const nested = yield* fs.readDirectory(target, { recursive: true }).pipe(onFileSystem("list", target));
-			return nested.map((file) => path.join(entry, file));
+			if ((yield* fs.stat(target).pipe(onFileSystem("inspect", target))).type !== "Directory")
+				return isOwned(owned, entry) ? [entry] : [];
+			const files = yield* fs.readDirectory(target, { recursive: true }).pipe(onFileSystem("list", target));
+			return isOwned(owned, `${entry}/`) ? files.map((file) => path.join(entry, file)) : [];
 		}),
 	);
-	return children.flat();
+	return nested.flat();
+});
+
+const readEntries = Effect.fnUntraced(function* (folder: string, owned: ReadonlyArray<string> | undefined) {
+	const fs = yield* FileSystem.FileSystem;
+
+	return owned === undefined
+		? yield* fs.readDirectory(folder, { recursive: true }).pipe(onFileSystem("list", folder))
+		: yield* ownedEntries(folder, owned);
 });
 
 export const readTree = Effect.fnUntraced(function* (folder: string, owned?: ReadonlyArray<string>) {
@@ -108,7 +113,7 @@ export const readTree = Effect.fnUntraced(function* (folder: string, owned?: Rea
 		const relative = toPosix(path, entry);
 		const target = path.join(folder, entry);
 
-		if (!isTracked(relative) || (owned !== undefined && !isOwned(owned, relative))) continue;
+		if (!isTracked(relative)) continue;
 		if ((yield* fs.stat(target).pipe(onFileSystem("inspect", target))).type !== "File") continue;
 
 		files.push(treeFile(relative, yield* fs.readFile(target).pipe(onFileSystem("read", target))));

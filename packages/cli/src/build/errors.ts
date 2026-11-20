@@ -30,6 +30,10 @@ export class ConfigCheckError extends TaggedError<ConfigCheckError>()("ConfigChe
 	issues: Array(String),
 }) {}
 
+export class BuildOutputError extends TaggedError<BuildOutputError>()("BuildOutputError", {
+	issues: Array(String),
+}) {}
+
 export class SourceReadError extends TaggedError<SourceReadError>()("SourceReadError", {
 	source: String,
 	target: String,
@@ -70,6 +74,7 @@ export type BuildError =
 	| ConfigLoadError
 	| ConfigShapeError
 	| ConfigCheckError
+	| BuildOutputError
 	| SourceReadError
 	| OutFolderError
 	| GitRepoError

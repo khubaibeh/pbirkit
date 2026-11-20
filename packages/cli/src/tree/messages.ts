@@ -1,8 +1,6 @@
-import { Match } from "effect";
+import { Result } from "effect";
 
 import type { BookmarkGroupNode, BookmarkNode, PageNode, ReportTree, VisualNode } from "@pbirkit/core/tree";
-
-import type { ConfigLoadError, ConfigShapeError } from "../build/errors.ts";
 
 interface Line {
 	readonly text: string;
@@ -24,28 +22,36 @@ const notes = (...items: ReadonlyArray<string | false | undefined>): string => {
 	return shown.length === 0 ? "" : ` [${shown.join(", ")}]`;
 };
 
+const rawNote = (node: { readonly content: Result.Result<unknown, string> }): string =>
+	Result.isFailure(node.content) ? " [raw]" : "";
+
 const visualLine = (node: VisualNode): Line => ({
-	text: `${entry(node.kind, node.visualType, node.name, node.title)}${notes(node.hidden === true && "hidden")}`,
-	children: (node.children ?? []).map((child) => visualLine(child)),
+	text: `${entry(node.kind, node.visualType, node.name, node.title)}${notes(node.hidden && "hidden")}${rawNote(node)}`,
+	children: node.children.map((child) => visualLine(child)),
 });
 
 const pageLine = (node: PageNode): Line => ({
-	text: `${entry("page", node.type?.toLowerCase(), node.name, node.displayName)}${notes(node.hidden === true && "hidden")}`,
+	text: `${entry("page", node.type?.toLowerCase(), node.name, node.displayName)}${notes(node.hidden && "hidden")}${rawNote(node)}`,
 	children: node.visuals.map((visual) => visualLine(visual)),
 });
 
 const pageNote = (node: BookmarkNode): string =>
-	node.switchesPage
-		? ` -> ${id(node.page)}${notes(!node.pageExists && "no such page")}`
-		: notes(`saved on ${id(node.page)}`, "does not switch page", !node.pageExists && "no such page");
+	node.page === undefined
+		? ""
+		: node.switchesPage
+			? ` -> ${id(node.page)}${notes(!node.pageExists && "no such page")}`
+			: notes(`saved on ${id(node.page)}`, "does not switch page", !node.pageExists && "no such page");
 
 const bookmarkLine = (node: BookmarkNode | BookmarkGroupNode): Line =>
 	node.kind === "group"
 		? {
-				text: entry("group", undefined, node.name, node.displayName),
+				text: `${entry("group", undefined, node.name, node.displayName)}${rawNote(node)}`,
 				children: node.children.map((child) => bookmarkLine(child)),
 			}
-		: { text: `${entry("bookmark", undefined, node.name, node.displayName)}${pageNote(node)}`, children: [] };
+		: {
+				text: `${entry("bookmark", undefined, node.name, node.displayName)}${pageNote(node)}${rawNote(node)}`,
+				children: [],
+			};
 
 const render = (lines: ReadonlyArray<Line>, indent: string): ReadonlyArray<string> =>
 	lines.flatMap((line, index) => {
@@ -57,10 +63,7 @@ const render = (lines: ReadonlyArray<Line>, indent: string): ReadonlyArray<strin
 	});
 
 const visualCount = (nodes: ReadonlyArray<VisualNode>): number =>
-	nodes.reduce(
-		(total, node) => total + (node.kind === "visual" ? 1 : 0) + visualCount(node.children ?? []),
-		0,
-	);
+	nodes.reduce((total, node) => total + (node.kind === "visual" ? 1 : 0) + visualCount(node.children), 0);
 
 const bookmarkCount = (nodes: ReadonlyArray<BookmarkNode | BookmarkGroupNode>): number =>
 	nodes.reduce((total, node) => total + (node.kind === "group" ? node.children.length : 1), 0);
@@ -85,8 +88,3 @@ export const treeMessage = (tree: ReportTree): string => {
 				]),
 	].join("\n");
 };
-
-export const errorMessage: (error: ConfigLoadError | ConfigShapeError) => string = Match.valueTags({
-	ConfigLoadError: ({ file, detail }) => `[ERROR] tree: cannot load ${file}: ${detail}`,
-	ConfigShapeError: ({ file, detail }) => `[ERROR] tree: ${file} is not a valid config\n${detail}`,
-});

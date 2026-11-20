@@ -1,16 +1,15 @@
 import { Console, Effect, Option, Path } from "effect";
 import { Command, Flag } from "effect/cli";
-import { decodeUnknownEffect } from "effect/Schema";
 
-import { Config } from "@pbirkit/core/config";
-import { reportTree } from "@pbirkit/core/tree";
+import { buildFiles, reportFolder } from "@pbirkit/core/build";
 
 import { readConfig } from "../build/config.ts";
-import { ConfigShapeError } from "../build/errors.ts";
-import { projectConfig } from "../import/index.ts";
-import { errorMessage as importErrorMessage } from "../import/messages.ts";
-import { findProject } from "../import/source.ts";
-import { errorMessage, treeMessage } from "./messages.ts";
+import { buildTree } from "../build/outputs.ts";
+import { isOwned } from "../build/tree.ts";
+import { errorMessage, exitWith } from "../messages.ts";
+import { findProject } from "../pbip/project.ts";
+import { indexTree } from "../pbip/tree.ts";
+import { treeMessage } from "./messages.ts";
 
 const HELP = [
 	"List the pages, visuals and bookmarks of the project as a tree.",
@@ -39,6 +38,7 @@ const HELP = [
 	"",
 	"  -> <page id>       the page that the bookmark opens",
 	"  [hidden]           the page or visual is hidden in view mode",
+	"  [raw]              import preserves the item as a raw file",
 	"  [no such page]     the bookmark points at a page that the report does not have",
 	"  [saved on <page id>, does not switch page]",
 	"                     the bookmark keeps the current page",
@@ -55,42 +55,34 @@ const flags = {
 	pbip: Flag.String("pbip").pipe(Flag.optional, Flag.withDescription("PBIP project folder or .pbip file")),
 };
 
-const reportError = (message: string) =>
-	Effect.andThen(
-		Console.error(message),
-		Effect.sync(() => {
-			process.exitCode = 1;
-		}),
-	);
-
-const readProjectConfig = Effect.fnUntraced(function* (source: string) {
+const projectIndex = Effect.fnUntraced(function* (source: string) {
 	const project = yield* findProject(source);
-	const { output, config } = yield* projectConfig(project);
-	return yield* decodeUnknownEffect(Config)(output.resolve(config), { onExcessProperty: "error" }).pipe(
-		Effect.mapError((error) => new ConfigShapeError({ file: source, detail: error.message })),
-	);
+	return indexTree(project.name, project.report, project.tree);
+});
+
+const configIndex = Effect.fnUntraced(function* (file: string) {
+	const config = yield* readConfig(file);
+	const report = reportFolder(config);
+	const files = buildFiles(config).filter((entry) => isOwned([`${report}/`], entry.path));
+	return indexTree(config.name, report, yield* buildTree(files, []));
+});
+
+const readIndex = Effect.fnUntraced(function* (config: Option.Option<string>, pbip: Option.Option<string>) {
+	const path = yield* Path.Path;
+
+	return yield* Option.match(pbip, {
+		onNone: () => configIndex(path.resolve(Option.getOrElse(config, () => "pbirkit.config.ts"))),
+		onSome: projectIndex,
+	});
 });
 
 export const tree = Command.make("tree", flags, ({ config, pbip }) =>
-	Effect.gen(function* () {
-		if (Option.isSome(config) && Option.isSome(pbip)) {
-			return yield* reportError("[ERROR] tree: --config and --pbip are mutually exclusive");
-		}
-		const path = yield* Path.Path;
-		const data = yield* Option.match(pbip, {
-			onNone: () => readConfig(path.resolve(Option.getOrElse(config, () => "pbirkit.config.ts"))),
-			onSome: readProjectConfig,
-		});
-		return yield* Console.log(treeMessage(reportTree(data)));
-	}).pipe(
-		Effect.catch((error) =>
-			reportError(
-				error._tag === "ConfigLoadError" || error._tag === "ConfigShapeError"
-					? errorMessage(error)
-					: importErrorMessage(error),
+	Option.isSome(config) && Option.isSome(pbip)
+		? exitWith(1)("[ERROR] tree: --config and --pbip are mutually exclusive")
+		: readIndex(config, pbip).pipe(
+				Effect.flatMap((index) => Console.log(treeMessage(index))),
+				Effect.catch((error) => exitWith(1)(errorMessage("tree")(error))),
 			),
-		),
-	),
 ).pipe(
 	Command.withDescription(HELP),
 	Command.withShortDescription("List the pages, visuals and bookmarks of the project as a tree"),

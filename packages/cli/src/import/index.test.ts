@@ -1,18 +1,23 @@
 import { spawnSync } from "node:child_process";
 import {
 	copyFileSync,
+	cpSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, it } from "vite-plus/test";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vite-plus/test";
+
+vi.setConfig({ testTimeout: 30_000 });
 
 const main = fileURLToPath(new URL("../main.ts", import.meta.url));
 const core = fileURLToPath(new URL("../../../core", import.meta.url));
@@ -89,130 +94,302 @@ export default defineConfig({
 const run = (cwd: string, command: ReadonlyArray<string>) =>
 	spawnSync(process.execPath, [main, ...command], { cwd, encoding: "utf8" });
 
-it("imports a PBIP build with split modules, model assets and raw report files", () => {
-	const root = mkdtempSync(join(tmpdir(), "pbirkit-import-"));
-	try {
-		const author = join(root, "author");
-		mkdirSync(join(author, "node_modules", "@pbirkit"), { recursive: true });
-		symlinkSync(core, join(author, "node_modules", "@pbirkit", "core"), "junction");
-		mkdirSync(join(author, "model"));
-		writeFileSync(join(author, "model", "model.tmdl"), "model Model\n");
-		writeFileSync(join(author, "model", "obsolete.tmdl"), "");
-		writeFileSync(
-			join(author, "logo.png"),
-			Buffer.from(
-				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axGjS0AAAAASUVORK5CYII=",
-				"base64",
-			),
+const fixture = mkdtempSync(join(tmpdir(), "pbirkit-import-fixture-"));
+let root: string;
+let project: string;
+let out: string;
+let config: string;
+
+beforeAll(() => {
+	mkdirSync(join(fixture, "node_modules", "@pbirkit"), { recursive: true });
+	symlinkSync(core, join(fixture, "node_modules", "@pbirkit", "core"), "junction");
+	mkdirSync(join(fixture, "model"));
+	writeFileSync(join(fixture, "model", "model.tmdl"), "model Model\n");
+	writeFileSync(join(fixture, "model", "obsolete.tmdl"), "");
+	writeFileSync(
+		join(fixture, "logo.png"),
+		Buffer.from(
+			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axGjS0AAAAASUVORK5CYII=",
+			"base64",
+		),
+	);
+	writeFileSync(join(fixture, "extra.txt"), "Unmapped\n");
+	writeFileSync(join(fixture, "pbirkit.config.ts"), sourceConfig);
+	expect(spawnSync("git", ["init", "-q", fixture]).status).toBe(0);
+	const build = run(fixture, ["build"]);
+	expect(build.status, build.stderr).toBe(0);
+});
+
+afterAll(() => {
+	rmSync(fixture, { recursive: true, force: true });
+});
+
+beforeEach(() => {
+	root = mkdtempSync(join(tmpdir(), "pbirkit-import-"));
+	project = join(root, "project");
+	out = join(root, "out");
+	config = join(out, "pbirkit.config.ts");
+	cpSync(join(fixture, "dist"), project, { recursive: true });
+});
+
+afterEach(() => {
+	rmSync(root, { recursive: true, force: true });
+});
+
+const definition = (...path: ReadonlyArray<string>) => join(project, "Example.Report", "definition", ...path);
+const visual = (...path: ReadonlyArray<string>) => definition("pages", "first", "visuals", ...path);
+const edit = (file: string, update: (contents: string) => string) => {
+	writeFileSync(file, update(readFileSync(file, "utf8")));
+};
+
+const importProject = (...flags: ReadonlyArray<string>) => {
+	const result = run(root, ["import", project, "-o", out, ...flags]);
+	expect(result.status, result.stderr + result.stdout).toBe(0);
+	expect(result.stderr).toBe("");
+	expect(result.stdout).toMatch(/import: verified \d+ files/u);
+	return result.stdout;
+};
+
+const tree = (...flags: ReadonlyArray<string>) => {
+	const result = run(root, ["tree", ...flags]);
+	expect(result.status, result.stderr).toBe(0);
+	return result.stdout;
+};
+
+it("imports split modules, model assets and unmapped files without local dependencies", () => {
+	mkdirSync(join(project, "Export"));
+	writeFileSync(join(project, "Export", "unrelated.csv"), "unrelated\n");
+	const stdout = importProject();
+	expect(stdout).toContain("import: verified 23 files");
+	expect(stdout).toContain("extra.txt: Copied 1 unmapped file");
+	const contents = readFileSync(config, "utf8");
+	expect(contents).toContain("pages: [\n\t\t\t_second,\n\t\t\t_first,");
+	expect(contents).toContain("children: [\n\t\t\t\t\t\t_overview,\n\t\t\t\t\t\t_detail,");
+	expect(contents).toContain('kind: "customVisual"');
+	expect(contents).toContain('declare module "@pbirkit/core/register"');
+	expect(contents).toContain('readonly visuals: readonly [{ readonly guid: "FileVisual" }];');
+	expect(contents).toContain('readonly builtinVisuals: readonly ["PublicVisual"];');
+	expect(contents).toContain(
+		'new URL("./assets/report/StaticResources/RegisteredResources/logo.png", import.meta.url)',
+	);
+	const page = readFileSync(join(out, "pages", "second", "page.ts"), "utf8");
+	expect(page).toContain('from "./visuals/1-card.ts"');
+	expect(page).toContain('from "./visuals/1_card.ts"');
+	expect(page).toContain("import _1_card_2 from");
+	expect(readFileSync(join(out, "assets", "model", "definition", "model.tmdl"), "utf8")).toBe(
+		"model Model\r\n",
+	);
+	expect(
+		readFileSync(join(out, "assets", "report", "CustomVisuals", "FileVisual", "extra.txt"), "utf8"),
+	).toBe("Unmapped\n");
+	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
+		type: "module",
+		devDependencies: { "@pbirkit/core": "0.0.0" },
+	});
+	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toContain('"noEmit": true');
+	expect(existsSync(join(out, "node_modules"))).toBe(false);
+	const diff = run(root, ["diff", "-c", config, "--target", project]);
+	expect(diff.status, diff.stderr).toBe(0);
+	expect(diff.stdout).toContain("No differences in 23 files.");
+});
+
+it("shows the same tree from the project folder, its PBIP file and the imported config", () => {
+	importProject();
+	const fromConfig = tree("-c", config);
+	expect(fromConfig).toContain("Example: 2 pages, 3 visuals, 2 bookmarks");
+	expect(tree("--pbip", project)).toBe(fromConfig);
+	expect(tree("--pbip", join(project, "Example.pbip"))).toBe(fromConfig);
+	const conflict = run(root, ["tree", "--pbip", project, "-c", config]);
+	expect(conflict.status).toBe(1);
+	expect(conflict.stderr).toContain("--config and --pbip are mutually exclusive");
+});
+
+it("follows a renamed PBIP file's report artifact and preserves the report display name", () => {
+	renameSync(join(project, "Example.pbip"), join(project, "Renamed.pbip"));
+	importProject();
+	const contents = readFileSync(config, "utf8");
+	expect(contents).toContain('name: "Renamed"');
+	expect(contents).toContain('path: "Example.Report"');
+	expect(contents).toContain('displayName: "Example"');
+	expect(tree("--pbip", project)).toBe(tree("-c", config));
+});
+
+it.each([
+	[
+		"an unknown property",
+		(contents: string) => contents.replace('"name"', '"futureProperty": true, "name"'),
+		"Unsupported visual schema or properties",
+	],
+	[
+		"an unknown schema",
+		(contents: string) => contents.replace("/2.13.0/", "/9.0.0/"),
+		"Unknown visual $schema",
+	],
+])("preserves one raw visual with %s", (_, update, reason) => {
+	const file = visual("notes", "visual.json");
+	edit(file, update);
+	expect(importProject()).toContain(`Visual first/notes: ${reason}`);
+	expect(existsSync(join(out, "pages", "first", "visuals", "notes.ts"))).toBe(false);
+	expect(existsSync(join(out, "pages", "second", "visuals", "1-card.ts"))).toBe(true);
+	const raw = join(
+		out,
+		"assets",
+		"report",
+		"definition",
+		"pages",
+		"first",
+		"visuals",
+		"notes",
+		"visual.json",
+	);
+	expect(readFileSync(raw)).toEqual(readFileSync(file));
+	const fromProject = tree("--pbip", project);
+	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
+	expect(fromProject).toBe(tree("-c", config));
+});
+
+it("indexes a renamed visual folder under the visual's JSON name and keeps its path", () => {
+	renameSync(visual("notes"), visual("other"));
+	expect(importProject()).toContain("Visual first/notes: Visual or page folder differs from its name");
+	const fromProject = tree("--pbip", project);
+	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
+	expect(fromProject).toBe(tree("-c", config));
+	expect(
+		existsSync(
+			join(out, "assets", "report", "definition", "pages", "first", "visuals", "other", "visual.json"),
+		),
+	).toBe(true);
+});
+
+it("keeps pages.json and bookmarks.json typed around a raw page and a raw bookmark", () => {
+	edit(definition("pages", "first", "page.json"), (value) =>
+		value.replace('"name"', '"futureProperty": true, "name"'),
+	);
+	edit(definition("bookmarks", "overview.bookmark.json"), (value) =>
+		value.replace('"name"', '"futureProperty": true, "name"'),
+	);
+	const stdout = importProject();
+	expect(stdout).toContain("Page first: Unsupported page schema or properties");
+	expect(stdout).toContain("Bookmark overview: Unsupported bookmark schema or properties");
+	expect(stdout).not.toContain("metadata");
+	const contents = readFileSync(config, "utf8");
+	expect(contents).toContain("pagesMetadata: {");
+	expect(contents).toContain('name: "overview",\n\t\t\t\t\t\t\tfile: new URL(');
+	const page = readFileSync(join(out, "pages", "first", "page.ts"), "utf8");
+	expect(page).toContain(
+		'file: new URL("../../assets/report/definition/pages/first/page.json", import.meta.url)',
+	);
+	expect(page).toContain('import _notes from "./visuals/notes.ts";');
+	expect(existsSync(join(out, "bookmarks", "detail.ts"))).toBe(true);
+	expect(tree("--pbip", project)).toBe(tree("-c", config));
+});
+
+it("builds the visuals listed in a raw page module", () => {
+	edit(definition("pages", "first", "page.json"), (value) =>
+		value.replace('"name"', '"futureProperty": true, "name"'),
+	);
+	importProject();
+	edit(join(out, "pages", "first", "page.ts"), (value) => value.replace("\t\t_notes,\n", ""));
+	const diff = run(root, ["diff", "-c", config, "--target", project]);
+	expect(diff.status, diff.stderr).toBe(1);
+	expect(diff.stdout).toContain("extra    Example.Report/definition/pages/first/visuals/notes/visual.json");
+});
+
+it("types a Desktop custom theme registered as Image and escapes generated module paths", () => {
+	const brand = "Brand#100%.json";
+	edit(definition("report.json"), (value) =>
+		value.replaceAll("Brand.json", brand).replace('"type": "CustomTheme"', '"type": "Image"'),
+	);
+	const registered = join(project, "Example.Report", "StaticResources", "RegisteredResources");
+	renameSync(join(registered, "Brand.json"), join(registered, brand));
+	importProject();
+	const contents = readFileSync(config, "utf8");
+	expect(contents).toContain('kind: "customTheme"');
+	expect(contents).toContain('itemType: "Image"');
+	expect(contents).toContain('from "./themes/Brand~23100~25.ts"');
+	expect(contents).not.toContain("resourcePackages:");
+});
+
+it("uses --force to replace only the files an earlier import wrote", () => {
+	importProject();
+	writeFileSync(join(out, "pages", "custom.ts"), "");
+	writeFileSync(join(out, "notes.md"), "");
+	const settings = '{"compilerOptions":{"strict":true}}';
+	writeFileSync(join(out, "tsconfig.json"), settings);
+	rmSync(join(project, "Example.SemanticModel", "definition", "obsolete.tmdl"));
+	importProject("--force");
+	expect(existsSync(join(out, "pages", "custom.ts"))).toBe(true);
+	expect(existsSync(join(out, "notes.md"))).toBe(true);
+	expect(existsSync(join(out, "assets", "model", "definition", "obsolete.tmdl"))).toBe(false);
+	expect(existsSync(join(out, "pages", "second", "visuals", "1-card.ts"))).toBe(true);
+	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toBe(settings);
+});
+
+it("rejects ambiguous input and protects a non-empty output without --force", () => {
+	const protectedOut = run(root, ["import", project, "-o", project]);
+	expect(protectedOut.status).toBe(2);
+	expect(protectedOut.stderr).toContain("the folder is not empty");
+	const intoSource = run(root, ["import", project, "-o", join(project, "Example.Report")]);
+	expect(intoSource.status).toBe(2);
+	expect(intoSource.stderr).toContain("the import would write into the source project");
+	copyFileSync(join(project, "Example.pbip"), join(project, "Other.pbip"));
+	const ambiguous = run(project, ["import"]);
+	expect(ambiguous.status).toBe(2);
+	expect(ambiguous.stderr).toContain("name the one to use");
+	const ambiguousTree = run(project, ["tree", "--pbip", "."]);
+	expect(ambiguousTree.status).toBe(1);
+	expect(ambiguousTree.stderr).toBe(ambiguous.stderr.replace("[ERROR] import:", "[ERROR] tree:"));
+});
+
+it.each([
+	[
+		"Report definition",
+		["Example.Report", "definition", "report.json"],
+		'"themeCollection"',
+		'"unsupported": true, "themeCollection"',
+	],
+	["Report version", ["Example.Report", "definition", "version.json"], "/1.0.0/", "/9.0.0/"],
+	["Report platform", ["Example.Report", ".platform"], '"displayName"', '"unsupported": true, "displayName"'],
+	["Report pbir", ["Example.Report", "definition.pbir"], '"version"', '"unsupported": true, "version"'],
+	[
+		"Model pbism",
+		["Example.SemanticModel", "definition.pbism"],
+		'"version"',
+		'"unsupported": true, "version"',
+	],
+	["pbip", ["Example.pbip"], '"version"', '"unsupported": true, "version"'],
+])("keeps %s raw when it has an unknown property or schema", (label, path, from, to) => {
+	const file = join(project, ...path);
+	edit(file, (value) => value.replace(from, to));
+	const stdout = importProject();
+	expect(stdout).toMatch(new RegExp(`^  ${label}: Unsupported .+`, "mu"));
+	const asset =
+		path[0] === "Example.pbip" ? path : [path[0] === "Example.Report" ? "report" : "model", ...path.slice(1)];
+	expect(readFileSync(join(out, "assets", ...asset))).toEqual(readFileSync(file));
+});
+
+it.each(["./../Example.SemanticModel", "..\\\\Example.SemanticModel"])(
+	"keeps definition.pbir raw when it points at the model as %s",
+	(reference) => {
+		edit(join(project, "Example.Report", "definition.pbir"), (value) =>
+			value.replace('"../Example.SemanticModel"', `"${reference}"`),
 		);
-		writeFileSync(join(author, "extra.txt"), "Unmapped\n");
-		writeFileSync(join(author, "pbirkit.config.ts"), sourceConfig);
-		expect(spawnSync("git", ["init", "-q", author]).status).toBe(0);
+		const stdout = importProject();
+		expect(stdout).toContain("Report pbir: The rebuilt JSON differs from the source file");
+		expect(readFileSync(config, "utf8")).toContain('path: "Example.SemanticModel"');
+	},
+);
 
-		const build = run(author, ["build"]);
-		expect(build.status, build.stderr).toBe(0);
-
-		const project = join(author, "dist");
-		mkdirSync(join(project, "Export"));
-		writeFileSync(join(project, "Export", "unrelated.csv"), "unrelated\n");
-		const imported = run(root, ["import", project]);
-		expect(imported.status, imported.stderr).toBe(0);
-		expect(imported.stdout).toContain("import: verified 23 files");
-		expect(imported.stdout).toContain("extra.txt: Copied 1 unmapped file");
-		const out = join(root, "Example.pbirkit");
-
-		const config = readFileSync(join(out, "pbirkit.config.ts"), "utf8");
-		expect(config).toContain("pages: [\n\t\t\t_second,\n\t\t\t_first,");
-		expect(config).toContain("children: [\n\t\t\t\t\t\t_overview,\n\t\t\t\t\t\t_detail,");
-		expect(config).toContain('kind: "customTheme"');
-		expect(config).toContain('kind: "customVisual"');
-		expect(config).toContain('declare module "@pbirkit/core/register"');
-		expect(config).toMatch(/visuals: \[\s*\{\s*guid: "FileVisual"/u);
-		expect(config).toMatch(/builtinVisuals: \[\s*"PublicVisual"/u);
-		expect(config).toContain(
-			'new URL("./assets/report/StaticResources/RegisteredResources/logo.png", import.meta.url)',
-		);
-		const page = readFileSync(join(out, "pages", "second", "page.ts"), "utf8");
-		expect(page).toContain('from "./visuals/1-card.ts"');
-		expect(page).toContain('from "./visuals/1_card.ts"');
-		expect(page).toContain("import _1_card_2 from");
-		expect(readFileSync(join(out, "assets", "model", "definition", "model.tmdl"), "utf8")).toBe(
-			"model Model\r\n",
-		);
-		expect(
-			readFileSync(join(out, "assets", "report", "CustomVisuals", "FileVisual", "extra.txt"), "utf8"),
-		).toBe("Unmapped\n");
-		mkdirSync(join(out, "node_modules", "@pbirkit"), { recursive: true });
-		symlinkSync(core, join(out, "node_modules", "@pbirkit", "core"), "junction");
-		const diff = run(root, ["diff", "-c", join(out, "pbirkit.config.ts"), "--target", project]);
-		expect(diff.status, diff.stderr).toBe(0);
-		expect(diff.stdout).toContain("No differences.");
-
-		const fromConfig = run(root, ["tree", "-c", join(out, "pbirkit.config.ts")]);
-		expect(fromConfig.status, fromConfig.stderr).toBe(0);
-		expect(fromConfig.stdout).toContain("Example: 2 pages, 3 visuals, 2 bookmarks");
-		for (const source of [project, join(project, "Example.pbip")]) {
-			const fromProject = run(root, ["tree", "--pbip", source]);
-			expect(fromProject.status, fromProject.stderr).toBe(0);
-			expect(fromProject.stdout).toBe(fromConfig.stdout);
-		}
-		const conflict = run(root, ["tree", "--pbip", project, "-c", join(out, "pbirkit.config.ts")]);
-		expect(conflict.status).toBe(1);
-		expect(conflict.stderr).toContain("--config and --pbip are mutually exclusive");
-
-		const protectedOut = run(root, ["import", project]);
-		expect(protectedOut.status).toBe(1);
-		expect(protectedOut.stderr).toContain("folder is not empty");
-
-		const original = join(project, "Example.pbip");
-		copyFileSync(original, join(project, "Other.pbip"));
-		const ambiguous = run(project, ["import"]);
-		expect(ambiguous.status).toBe(1);
-		expect(ambiguous.stderr).toContain("Specify the .pbip file");
-		const ambiguousTree = run(project, ["tree", "--pbip", "."]);
-		expect(ambiguousTree.status).toBe(1);
-		expect(ambiguousTree.stderr).toBe(ambiguous.stderr);
-
-		const report = resolve(project, "Example.Report", "definition", "report.json");
-		const reportContents = readFileSync(report, "utf8");
-		writeFileSync(report, reportContents.replace('"type": "Image"', '"id": 5, "type": "Image"'));
-		rmSync(join(project, "Example.SemanticModel", "definition", "obsolete.tmdl"));
-		const visual = join(
-			project,
-			"Example.Report",
-			"definition",
-			"pages",
-			"first",
-			"visuals",
-			"notes",
-			"visual.json",
-		);
-		writeFileSync(visual, readFileSync(visual, "utf8").replace("/2.13.0/", "/9.0.0/"));
-		const forced = run(root, ["import", original, "--force"]);
-		expect(forced.status, forced.stderr).toBe(0);
-		expect(forced.stdout).toContain("Resource packages: Kept the original package list");
-		expect(forced.stdout).toContain("import: verified 22 files");
-		expect(forced.stdout).toContain("definition/pages: Copied 1 unmapped file");
-		expect(readFileSync(join(out, "pbirkit.config.ts"), "utf8")).toContain("resourcePackages: [");
-
-		const platform = join(project, "Example.Report", ".platform");
-		const platformContents = readFileSync(platform, "utf8");
-		writeFileSync(platform, platformContents.replace('"displayName": "Example"', '"displayName": "Renamed"'));
-		const changed = run(root, ["import", original, "--force"]);
-		expect(changed.status).toBe(1);
-		expect(changed.stdout).toContain("/metadata/displayName");
-		expect(readFileSync(join(out, "pbirkit.config.ts"), "utf8")).toContain("resourcePackages: [");
-
-		writeFileSync(
-			report,
-			reportContents.replace('"themeCollection"', '"unsupported": true, "themeCollection"'),
-		);
-		const invalid = run(root, ["import", original, "-o", "invalid"]);
-		expect(invalid.status).toBe(1);
-		expect(invalid.stdout).toContain("import: wrote invalid/pbirkit.config.ts");
-		expect(invalid.stderr).toContain("not a valid config");
-		expect(readFileSync(join(root, "invalid", "pbirkit.config.ts"), "utf8")).toContain("unsupported: true");
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
-}, 30_000);
+it("keeps only an unsupported theme raw and still types its sibling", () => {
+	const registered = join(project, "Example.Report", "StaticResources", "RegisteredResources");
+	const original = join(registered, "Brand.json");
+	edit(original, (contents) =>
+		contents.replace('"name"', '"$schema": "https://example.com/future-theme.json", "name"'),
+	);
+	const stdout = importProject();
+	expect(stdout).toContain("Resource Brand.json: Unknown theme $schema");
+	expect(existsSync(join(out, "themes", "Base.ts"))).toBe(true);
+	expect(existsSync(join(out, "themes", "Brand.ts"))).toBe(false);
+	const raw = join(out, "assets", "report", "StaticResources", "RegisteredResources", "Brand.json");
+	expect(readFileSync(raw)).toEqual(readFileSync(original));
+});

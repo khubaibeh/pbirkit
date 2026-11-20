@@ -3,14 +3,14 @@ import { Command, Flag } from "effect/cli";
 
 import { buildFiles, desktopOwnedPaths, modelCache, modelFolderOf } from "@pbirkit/core/build";
 
+import { errorMessage, exitWith } from "../messages.ts";
 import { applyChanges } from "./apply.ts";
 import { checkSeed, keepCache, restoreCache } from "./cache.ts";
 import { loadConfig } from "./config.ts";
 import { ConflictError } from "./errors.ts";
-import type { BuildError } from "./errors.ts";
 import { requireGitRepo } from "./git.ts";
 import { changedUnder, changesBetween, mergeTrees, pendingPorts } from "./merge.ts";
-import { errorMessage, summary } from "./messages.ts";
+import { summary } from "./messages.ts";
 import { buildTree } from "./outputs.ts";
 import { DEFAULT_OUT, checkOut, fromCwd, projectPaths, snapshotFolder } from "./paths.ts";
 import {
@@ -49,7 +49,7 @@ const runBuild = Effect.fnUntraced(function* ({
 	const path = yield* Path.Path;
 
 	const configFile = path.resolve(configFlag);
-	const config = yield* loadConfig(configFile);
+	const { config } = yield* loadConfig(configFile);
 	const configOut = Option.getOrElse(Option.fromNullishOr(config.out), () => DEFAULT_OUT);
 	const paths = projectPaths(path, configFile, configOut, outFlag);
 	yield* checkOut(paths);
@@ -125,14 +125,6 @@ const runBuild = Effect.fnUntraced(function* ({
 	);
 });
 
-const reportError = (error: BuildError) =>
-	Effect.andThen(
-		Console.error(errorMessage(error)),
-		Effect.sync(() => {
-			process.exitCode = 1;
-		}),
-	);
-
 export const build = Command.make("build", flags, (input) =>
-	runBuild(input).pipe(Effect.catch(reportError)),
+	runBuild(input).pipe(Effect.catch((error) => exitWith(1)(errorMessage("build")(error)))),
 ).pipe(Command.withDescription("Build the PBIP project and merge it with changes made in Desktop"));

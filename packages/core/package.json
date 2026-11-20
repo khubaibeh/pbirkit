@@ -18,7 +18,6 @@
 		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",
 		"./custom-visual": "./src/custom-visual.ts",
-		"./diff": "./src/diff.ts",
 		"./expr": "./src/expr/index.ts",
 		"./filter-configuration/*": "./src/schemas/filter-configuration/*.ts",
 		"./font": "./src/font.ts",
@@ -33,7 +32,7 @@
 		"./schema-url": "./src/schemas/schema-url.ts",
 		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
 		"./theme": "./src/schemas/theme/index.ts",
-		"./tree": "./src/tree.ts",
+		"./tree": "./src/tree/index.ts",
 		"./themes/*": "./src/themes/*.ts",
 		"./visual-type": "./src/visual-type.ts",
 		"./visual/*": "./src/schemas/visual/*.ts"

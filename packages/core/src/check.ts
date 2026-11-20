@@ -1,5 +1,8 @@
 import type { VisualContainerGroupState } from "#schemas/bookmark/shared.ts";
+import { isRaw } from "#schemas/common/raw.ts";
+import type { RawItem } from "#schemas/common/raw.ts";
 
+import { insideProject, withoutDot } from "./build/shared.ts";
 import type { Config } from "./config.ts";
 import { textOf } from "./expr/literal.ts";
 import { at as valueAt } from "./expr/query.ts";
@@ -14,24 +17,19 @@ import {
 	registeredFamilies,
 	unknownFamilies,
 } from "./font.ts";
-import { packageItem } from "./resource.ts";
+import { packageItem, samePackageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
 import { isBuiltinVisual } from "./visual-type.ts";
 
 const NAME = /^[\p{L}\p{Mn}\p{Nd}\p{Pc}-]+$/u;
 const MAX_NAME = 50;
 
-const insideProject = (path: string): boolean =>
-	path
-		.replace(/^\.\//u, "")
-		.replace(/\/$/u, "")
-		.split("/")
-		.every((part) => part !== "" && part !== "." && part !== ".." && !/[\\:]/u.test(part));
-
 type Page = Config["report"]["pages"][number];
 type Visual = Page["visuals"][number];
+type TypedVisual = Exclude<Visual, RawItem>;
 type BookmarkItem = NonNullable<Config["report"]["bookmarks"]>["items"][number];
-type Bookmark = Exclude<BookmarkItem, { readonly children: unknown }>;
+type BookmarkEntry = Exclude<BookmarkItem, { readonly children: unknown }>;
+type Bookmark = Exclude<BookmarkEntry, RawItem>;
 type VisualsByPage = ReadonlyMap<string, ReadonlyMap<string, Visual>>;
 type GroupStates = { readonly [name: string]: VisualContainerGroupState };
 
@@ -56,15 +54,30 @@ const duplicates = (names: ReadonlyArray<string>): ReadonlyArray<string> => [
 	...new Set(names.filter((name, index) => names.indexOf(name) !== index)),
 ];
 
+const typedVisuals = (page: Page): ReadonlyArray<TypedVisual> =>
+	page.visuals.filter((visual): visual is TypedVisual => !isRaw(visual));
+
+const parentOf = (visual: Visual, byName: ReadonlyMap<string, Visual>): Visual | undefined =>
+	isRaw(visual) || visual.parentGroupName === undefined ? undefined : byName.get(visual.parentGroupName);
+
 const inGroupCycle = (start: Visual, byName: ReadonlyMap<string, Visual>): boolean => {
 	const seen = new Set<string>();
-	let current = start.parentGroupName === undefined ? undefined : byName.get(start.parentGroupName);
+	let current = parentOf(start, byName);
 	while (current !== undefined && !seen.has(current.name)) {
 		if (current.name === start.name) return true;
 		seen.add(current.name);
-		current = current.parentGroupName === undefined ? undefined : byName.get(current.parentGroupName);
+		current = parentOf(current, byName);
 	}
 	return false;
+};
+
+const parentIssue = (visual: TypedVisual, byName: ReadonlyMap<string, Visual>): string | undefined => {
+	if (visual.parentGroupName === undefined) return undefined;
+	const parent = byName.get(visual.parentGroupName);
+	if (parent === undefined) return `parentGroupName "${visual.parentGroupName}" is not a visual on this page`;
+	if (isRaw(parent)) return undefined;
+	if (!("visualGroup" in parent)) return `parentGroupName "${visual.parentGroupName}" is not a group`;
+	return inGroupCycle(visual, byName) ? "parent groups form a cycle" : undefined;
 };
 
 const checkPage = (page: Page): ReadonlyArray<string> => {
@@ -76,15 +89,11 @@ const checkPage = (page: Page): ReadonlyArray<string> => {
 	for (const visual of page.visuals) {
 		const at = `${where} visual "${visual.name}"`;
 		issues.push(...nameIssue(at, visual.name));
-		if (visual.parentGroupName === undefined) continue;
-		const parent = byName.get(visual.parentGroupName);
-		if (parent === undefined)
-			issues.push(`${at}: parentGroupName "${visual.parentGroupName}" is not a visual on this page`);
-		else if (!("visualGroup" in parent))
-			issues.push(`${at}: parentGroupName "${visual.parentGroupName}" is not a group`);
-		else if (inGroupCycle(visual, byName)) issues.push(`${at}: parent groups form a cycle`);
+		const parent = isRaw(visual) ? undefined : parentIssue(visual, byName);
+		if (parent !== undefined) issues.push(`${at}: ${parent}`);
 	}
-	for (const [index, interaction] of (page.visualInteractions ?? []).entries())
+	const interactions = isRaw(page) ? [] : (page.visualInteractions ?? []);
+	for (const [index, interaction] of interactions.entries())
 		for (const end of ["source", "target"] as const)
 			if (!byName.has(interaction[end]))
 				issues.push(
@@ -175,7 +184,7 @@ const checkBookmark = (bookmark: Bookmark, visualsByPage: VisualsByPage): Readon
 				groupNames(state.visualContainerGroups)
 					.filter((name) => {
 						const visual = visuals.get(name);
-						return visual === undefined || !("visualGroup" in visual);
+						return visual === undefined || (!isRaw(visual) && !("visualGroup" in visual));
 					})
 					.map((name) => `${where} section "${section}": group "${name}" is not a group on this page`),
 			);
@@ -199,8 +208,9 @@ const resourceLabel = (resource: Resource): string =>
 		? `custom visual "${resource.guid}"`
 		: `${resource.kind} "${resource.name}"`;
 
-const customVisualTypes = (config: Config): ReadonlySet<string> => {
+const customVisualTypes = (config: Config): ReadonlySet<string> | undefined => {
 	const { definition, resources } = config.report;
+	if (definition instanceof URL) return undefined;
 	const listed = "publicCustomVisuals" in definition ? (definition.publicCustomVisuals ?? []) : [];
 	const organization =
 		"organizationCustomVisuals" in definition ? (definition.organizationCustomVisuals ?? []) : [];
@@ -214,9 +224,10 @@ const customVisualTypes = (config: Config): ReadonlySet<string> => {
 
 const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
 	const custom = customVisualTypes(config);
+	if (custom === undefined) return [];
 
 	return config.report.pages.flatMap((page) =>
-		page.visuals.flatMap((visual) => {
+		typedVisuals(page).flatMap((visual) => {
 			const type = "visual" in visual ? visual.visual?.visualType : undefined;
 
 			return type === undefined || isBuiltinVisual(type) || custom.has(type)
@@ -242,10 +253,40 @@ const ownedIssues = (config: Config): ReadonlyArray<string> =>
 				`${owner}: desktopOwned "${path}": path must be a relative path inside the ${owner} folder, with "/" as the separator`,
 		);
 
+const fileOf = (value: unknown): URL | undefined => (value instanceof URL ? value : undefined);
+
+const rawFileSources = (config: Config): ReadonlyArray<readonly [string, URL | undefined]> => {
+	const { model, report } = config;
+	const bookmarks = report.bookmarks?.items ?? [];
+	return [
+		["pbip", fileOf(config.pbip)],
+		["report: platform", fileOf(report.platform)],
+		["report: pbir", fileOf(report.pbir)],
+		["report: definition", fileOf(report.definition)],
+		["report: version", fileOf(report.version)],
+		["report: pagesMetadata", fileOf(report.pagesMetadata)],
+		[
+			"report: bookmarks",
+			report.bookmarks !== undefined && isRaw(report.bookmarks) ? report.bookmarks.file : undefined,
+		],
+		["model: platform", fileOf(model?.platform)],
+		["model: pbism", fileOf(model?.pbism)],
+		...report.pages.flatMap((page) =>
+			[page, ...page.visuals].flatMap((item) =>
+				isRaw(item) ? [[`page "${page.name}" "${item.name}": file`, item.file] as const] : [],
+			),
+		),
+		...bookmarks
+			.flatMap((item) => ("children" in item ? item.children : [item]))
+			.flatMap((item) => (isRaw(item) ? [[`bookmark "${item.name}": file`, item.file] as const] : [])),
+	];
+};
+
 const sourceIssues = (config: Config): ReadonlyArray<string> => {
 	const { model } = config;
 	const raw = [...rawEntries("model", model?.files), ...rawEntries("report", config.report.files)];
 	const sources: ReadonlyArray<readonly [string, URL | undefined]> = [
+		...rawFileSources(config),
 		["model: definition", model?.definition],
 		["model: diagramLayout", model?.diagramLayout],
 		["model: daxQueries", model?.daxQueries],
@@ -272,14 +313,26 @@ const sourceIssues = (config: Config): ReadonlyArray<string> => {
 		);
 };
 
+const packageEntries = (definition: Exclude<Config["report"]["definition"], URL>) =>
+	(definition.resourcePackages ?? []).flatMap((pkg) =>
+		pkg.items.map((item) => ({ package: pkg.name, type: pkg.type, item })),
+	);
+
+const providedByFiles = (
+	files: { readonly [path: string]: URL },
+	entry: ReturnType<typeof packageEntries>[number],
+): boolean => {
+	const paths = Object.keys(files).map((path) => withoutDot(path));
+	return entry.type === "CustomVisual"
+		? paths.some((path) => path.startsWith(`CustomVisuals/${entry.package}/`))
+		: paths.includes(`StaticResources/${entry.package}/${entry.item.path}`);
+};
+
 const checkResources = (config: Config) => {
-	const { definition, resources } = config.report;
+	const { definition, files = {}, resources } = config.report;
 	if (resources === undefined) return { errors: [], warnings: [] };
 	const items = resources.map((resource) => packageItem(resource));
-	const errors = [
-		...("resourcePackages" in definition && definition.resourcePackages !== undefined
-			? ["report: remove definition.resourcePackages, the build writes it from report.resources"]
-			: []),
+	const shapeErrors = [
 		...duplicates(items.map(({ package: name, item }) => `${name}/${item.name}`)).map(
 			(name) => `report: resource "${name}" is listed more than once`,
 		),
@@ -293,31 +346,51 @@ const checkResources = (config: Config) => {
 				: pathIssue(resourceLabel(resource), resource.name),
 		),
 	];
+	if (definition instanceof URL) return { errors: shapeErrors, warnings: [] };
+	const listed = definition.resourcePackages === undefined ? undefined : packageEntries(definition);
+	const known = listed ?? items;
+	const errors = shapeErrors.concat(
+		listed === undefined
+			? []
+			: items
+					.filter((item) => !listed.some((entry) => samePackageItem(entry, item)))
+					.map(
+						({ package: name, item }) =>
+							`report: resource "${name}/${item.name}" does not match definition.resourcePackages`,
+					),
+	);
+	const unprovided = (listed ?? [])
+		.filter(
+			(entry) =>
+				!items.some((item) => samePackageItem(item, entry)) &&
+				!(entry.type === "CustomVisual" && items.some((item) => item.package === entry.package)) &&
+				!providedByFiles(files, entry),
+		)
+		.map(
+			({ package: name, item }) =>
+				`report: definition.resourcePackages lists "${name}/${item.name}", but no resource or report.files entry provides it`,
+		);
 	const { baseTheme, customTheme } = definition.themeCollection;
 	const themes = (
 		[
-			["baseTheme", baseTheme, ["baseTheme"]],
-			["customTheme", customTheme, ["customTheme", "builtInTheme"]],
+			["baseTheme", baseTheme, "baseTheme", ["BaseTheme"]],
+			["customTheme", customTheme, "customTheme or builtInTheme", ["CustomTheme", "Image"]],
 		] as const
-	).flatMap(([slot, theme, kinds]) =>
+	).flatMap(([slot, theme, kinds, types]) =>
 		theme === undefined ||
-		resources.some(
-			(resource) =>
-				resource.kind !== "customVisual" &&
-				kinds.some((kind) => kind === resource.kind) &&
-				resource.name === theme.name,
+		known.some(
+			({ package: name, item }) =>
+				name === theme.type && item.name === theme.name && types.some((type) => type === item.type),
 		)
 			? []
-			: [
-					`report: themeCollection ${slot} "${theme.name}" is not a ${kinds.join(" or ")} in report.resources`,
-				],
+			: [`report: themeCollection ${slot} "${theme.name}" is not a ${kinds} in report.resources`],
 	);
 	const links = config.report.pages.flatMap((page) =>
-		page.visuals.flatMap((visual) =>
+		typedVisuals(page).flatMap((visual) =>
 			nested(visual, "ResourcePackageItem").flatMap((ref) => {
 				const packageName = valueAt(ref, "PackageName");
 				const itemName = valueAt(ref, "ItemName");
-				return items.some(({ package: name, item }) => name === packageName && item.name === itemName)
+				return known.some(({ package: name, item }) => name === packageName && item.name === itemName)
 					? []
 					: [
 							`page "${page.name}" visual "${visual.name}": resource "${String(packageName)}/${String(itemName)}" is not in report.resources`,
@@ -325,7 +398,7 @@ const checkResources = (config: Config) => {
 			}),
 		),
 	);
-	return { errors, warnings: themes.concat(links) };
+	return { errors, warnings: unprovided.concat(themes, links) };
 };
 
 const fontFaces = (value: unknown): ReadonlyArray<string> =>
@@ -402,7 +475,9 @@ const checkFonts = (
 };
 
 const datasetIssues = (config: Config): ReadonlyArray<string> => {
-	const connected = config.report.pbir.datasetReference !== undefined;
+	const { pbir } = config.report;
+	if (pbir instanceof URL) return [];
+	const connected = pbir.datasetReference !== undefined;
 	if (config.model === undefined && !connected)
 		return [
 			"report: set model for a local semantic model, or report.pbir.datasetReference.byConnection for a published one",
@@ -412,22 +487,54 @@ const datasetIssues = (config: Config): ReadonlyArray<string> => {
 	return [];
 };
 
+const platformIssues = (config: Config): ReadonlyArray<string> => {
+	const { model, report } = config;
+	return [
+		...(report.platform instanceof URL || report.logicalId !== undefined
+			? []
+			: ["report: set logicalId, or keep platform as a file"]),
+		...(model === undefined ||
+		model.platform instanceof URL ||
+		(model.name !== undefined && model.logicalId !== undefined)
+			? []
+			: ["model: set name and logicalId, or keep platform as a file"]),
+	];
+};
+
+const ignoredFields = (config: Config): ReadonlyArray<string> => {
+	const { model, report } = config;
+	return [
+		...(report.platform instanceof URL && (report.logicalId !== undefined || report.displayName !== undefined)
+			? ["report: logicalId and displayName have no effect because platform is a file"]
+			: []),
+		...(model?.platform instanceof URL && (model.name !== undefined || model.logicalId !== undefined)
+			? ["model: name and logicalId have no effect because platform is a file"]
+			: []),
+	];
+};
+
+const pageRefsOf = (metadata: Config["report"]["pagesMetadata"]) =>
+	metadata instanceof URL
+		? {}
+		: {
+				activePageName: metadata.activePageName,
+				landingPageName: "landingPageName" in metadata ? metadata.landingPageName : undefined,
+			};
+
 export const checkConfig = (config: Config): ConfigIssues => {
 	const { pages, pagesMetadata } = config.report;
 	const pageNames = pages.map((page) => page.name);
 	const bindings = pages.flatMap((page) =>
 		"pageBinding" in page && page.pageBinding !== undefined ? [page.pageBinding.name] : [],
 	);
-	const pageRefs = {
-		activePageName: pagesMetadata.activePageName,
-		landingPageName: "landingPageName" in pagesMetadata ? pagesMetadata.landingPageName : undefined,
-	};
+	const pageRefs = pageRefsOf(pagesMetadata);
 	const items = config.report.bookmarks?.items ?? [];
-	const bookmarks = items.flatMap((item): ReadonlyArray<Bookmark> =>
+	const entries = items.flatMap((item): ReadonlyArray<BookmarkEntry> =>
 		"children" in item ? item.children : [item],
 	);
+	const bookmarks = entries.filter((entry): entry is Bookmark => !isRaw(entry));
 	const groups = items.flatMap((item) => ("children" in item ? [item] : []));
-	const bookmarkNames = new Set(bookmarks.map((bookmark) => bookmark.name));
+	const bookmarkNames = new Set(entries.map((bookmark) => bookmark.name));
 	const visualsByPage: VisualsByPage = new Map(
 		pages.map((page) => [page.name, new Map(page.visuals.map((visual) => [visual.name, visual]))]),
 	);
@@ -435,6 +542,9 @@ export const checkConfig = (config: Config): ConfigIssues => {
 	const fontIssues = checkFonts(config);
 	const errors = [
 		...pathIssue("config", config.name),
+		...(config.report.path === undefined || insideProject(config.report.path)
+			? []
+			: ['report: path must be a relative path inside the project, with "/" as the separator']),
 		...(config.out === undefined || config.out.trim() !== "" ? [] : ["config: out must not be empty"]),
 		...sourceIssues(config),
 		...ownedIssues(config),
@@ -453,16 +563,18 @@ export const checkConfig = (config: Config): ConfigIssues => {
 					`model: path "${config.model.path}" must be a relative path inside the project, with "/" as the separator`,
 				]),
 		...datasetIssues(config),
+		...platformIssues(config),
 		...pages.flatMap((page) => checkPage(page)),
-		...duplicates([...bookmarks, ...groups].map((item) => item.name)).map(
+		...duplicates([...entries, ...groups].map((item) => item.name)).map(
 			(name) => `report: bookmark name "${name}" is used more than once`,
 		),
-		...bookmarks.flatMap((bookmark) => nameIssue(`bookmark "${bookmark.name}"`, bookmark.name)),
+		...entries.flatMap((bookmark) => nameIssue(`bookmark "${bookmark.name}"`, bookmark.name)),
 		...groups.flatMap((group) => nameIssue(`bookmark group "${group.name}"`, group.name)),
 	];
 	const warnings = [
 		...resourceIssues.warnings,
 		...fontIssues.warnings,
+		...ignoredFields(config),
 		...visualTypeIssues(config),
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
 		...pages.flatMap((page) =>

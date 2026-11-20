@@ -1,6 +1,6 @@
 import type { Pbiviz } from "../custom-visual.ts";
 import { packageItem } from "../resource.ts";
-import type { PackageItem, Resource } from "../resource.ts";
+import type { PackageItem, Resource, ResourceIdentity } from "../resource.ts";
 import { toJson } from "./json.ts";
 import type { BuildFile } from "./shared.ts";
 import { whenSet } from "./shared.ts";
@@ -12,7 +12,7 @@ interface ResourcePackage {
 }
 
 export const resourcePackages = (
-	resources: ReadonlyArray<Parameters<typeof packageItem>[0]>,
+	resources: ReadonlyArray<ResourceIdentity>,
 ): ReadonlyArray<ResourcePackage> => {
 	const packages = new Map<string, ResourcePackage>();
 

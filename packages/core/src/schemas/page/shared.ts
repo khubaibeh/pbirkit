@@ -1,7 +1,8 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Literals, Number, String, Struct, Union, optionalKey } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 import { formattingProperties } from "#schemas/common/formatting.ts";
+import { RawItem } from "#schemas/common/raw.ts";
 import { AnyVisual } from "#schemas/visual";
 
 export const PageDisplayOption = Literals([
@@ -163,6 +164,6 @@ export const PageFields = {
 	howCreated: optionalKey(Literals(["Default", "Copilot"])),
 };
 
-export const PageVisuals = Array(AnyVisual);
+export const PageVisuals = Array(Union([AnyVisual, RawItem]));
 
 export type PageVisuals = typeof PageVisuals.Type;

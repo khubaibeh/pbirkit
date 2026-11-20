@@ -1,7 +1,7 @@
-import { Match, Option } from "effect";
+import { Option } from "effect";
 
 import type { CacheOutcome } from "./cache.ts";
-import type { BuildError, ConflictError, ConflictReason } from "./errors.ts";
+import type { ConflictError, ConflictReason } from "./errors.ts";
 import type { Change, Pending, PendingKind } from "./merge.ts";
 import { MARKER, STATE_FOLDER } from "./paths.ts";
 
@@ -45,33 +45,13 @@ const conflictHint = (out: string, snapshot: Option.Option<string>): ReadonlyArr
 		onSome: (folder) => ["To see what Desktop changed, run:", diffCommand(folder, out), IGNORED_NOTE],
 	});
 
-const conflictMessage = ({ out, snapshot, conflicts }: ConflictError): string =>
+export const conflictMessage = ({ out, snapshot, conflicts }: ConflictError): string =>
 	[
 		`[ERROR] build: ${fileCount(conflicts.length)} in ${out} can't be merged, so the build stopped and wrote nothing.`,
 		...conflicts.map(({ path, reason }) => `  ${REASONS[reason]}: ${path}`),
 		...conflictHint(out, snapshot),
 		"To pick a side for these files, run the build again with --prefer src or --prefer desktop.",
 	].join("\n");
-
-export const errorMessage: (error: BuildError) => string = Match.valueTags({
-	ConfigLoadError: ({ file, detail }) => `[ERROR] build: cannot load ${file}: ${detail}`,
-	ConfigShapeError: ({ file, detail }) => `[ERROR] build: ${file} is not a valid config\n${detail}`,
-	ConfigCheckError: ({ issues }) => issues.join("\n"),
-	SourceReadError: ({ source, target, detail }) =>
-		`[ERROR] build: cannot read ${source} for ${target}: ${detail}`,
-	OutFolderError: ({ out, detail }) => `[ERROR] build: cannot build to ${out}: ${detail}`,
-	GitRepoError: ({ folder }) =>
-		`[ERROR] build: ${folder} is not inside a git repository. Run git init there, then build again.`,
-	FileSystemError: ({ operation, path, detail }) => `[ERROR] build: cannot ${operation} ${path}: ${detail}`,
-	ProjectChangedError: ({ path }) =>
-		`[ERROR] build: ${path} changed while the build ran. Save in Desktop, then build again.`,
-	PathClashError: ({ folder, pairs }) =>
-		[
-			`[ERROR] build: ${folder} holds files whose names differ only in letter case:`,
-			...pairs.map((pair) => `  ${pair}`),
-		].join("\n"),
-	ConflictError: conflictMessage,
-});
 
 export interface Summary {
 	readonly out: string;

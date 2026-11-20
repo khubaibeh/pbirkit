@@ -1,4 +1,4 @@
-import { registerHooks } from "node:module";
+import type { ResolveHookSync } from "node:module";
 import { pathToFileURL } from "node:url";
 
 import { Console, Effect, Predicate } from "effect";
@@ -9,36 +9,24 @@ import { Config } from "@pbirkit/core/config";
 
 import { ConfigCheckError, ConfigLoadError, ConfigShapeError } from "./errors.ts";
 
+const isCore = (specifier: string): boolean =>
+	specifier === "@pbirkit/core" || specifier.startsWith("@pbirkit/core/");
+
+export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextResolve) => {
+	try {
+		return nextResolve(specifier, context);
+	} catch (cause) {
+		if (!isCore(specifier) || !Predicate.hasProperty(cause, "code") || cause.code !== "ERR_MODULE_NOT_FOUND")
+			throw cause;
+		return nextResolve(specifier, { ...context, parentURL: import.meta.url });
+	}
+};
+
 const importDefault = Effect.fnUntraced(function* (file: string) {
-	const module: unknown = yield* Effect.acquireUseRelease(
-		Effect.sync(() =>
-			registerHooks({
-				resolve(specifier, context, nextResolve) {
-					try {
-						return nextResolve(specifier, context);
-					} catch (cause) {
-						if (
-							(specifier === "@pbirkit/core" || specifier.startsWith("@pbirkit/core/")) &&
-							Predicate.hasProperty(cause, "code") &&
-							cause.code === "ERR_MODULE_NOT_FOUND"
-						) {
-							return nextResolve(specifier, { ...context, parentURL: import.meta.url });
-						}
-						throw cause;
-					}
-				},
-			}),
-		),
-		() =>
-			Effect.tryPromise({
-				try: () => import(pathToFileURL(file).href),
-				catch: (cause) => new ConfigLoadError({ file, detail: String(cause) }),
-			}),
-		(hooks) =>
-			Effect.sync(() => {
-				hooks.deregister();
-			}),
-	);
+	const module: unknown = yield* Effect.tryPromise({
+		try: () => import(pathToFileURL(file).href),
+		catch: (cause) => new ConfigLoadError({ file, detail: String(cause) }),
+	});
 
 	if (!Predicate.hasProperty(module, "default")) {
 		return yield* new ConfigShapeError({ file, detail: "it has no default export" });
@@ -62,13 +50,13 @@ export const readConfig = Effect.fnUntraced(function* (file: string) {
 	return yield* asConfig(file, yield* importDefault(file));
 });
 
-export const loadConfig = Effect.fnUntraced(function* (file: string) {
+export const loadConfig = Effect.fnUntraced(function* (file: string, showWarnings: boolean = true) {
 	const config = yield* readConfig(file);
 	const { errors, warnings } = checkConfig(config);
 
-	if (warnings.length > 0) yield* Console.error(warnings.join("\n"));
+	if (showWarnings && warnings.length > 0) yield* Console.error(warnings.join("\n"));
 
 	if (errors.length > 0) return yield* new ConfigCheckError({ issues: errors });
 
-	return config;
+	return { config, warnings };
 });
