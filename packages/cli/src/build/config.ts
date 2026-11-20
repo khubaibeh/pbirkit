@@ -32,8 +32,12 @@ const asConfig = Effect.fnUntraced(function* (file: string, input: unknown) {
 	return input;
 });
 
+export const readConfig = Effect.fnUntraced(function* (file: string) {
+	return yield* asConfig(file, yield* importDefault(file));
+});
+
 export const loadConfig = Effect.fnUntraced(function* (file: string) {
-	const config = yield* asConfig(file, yield* importDefault(file));
+	const config = yield* readConfig(file);
 	const { errors, warnings } = checkConfig(config);
 
 	if (warnings.length > 0) yield* Console.error(warnings.join("\n"));

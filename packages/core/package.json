@@ -32,6 +32,7 @@
 		"./schema-url": "./src/schemas/schema-url.ts",
 		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
 		"./theme": "./src/schemas/theme/index.ts",
+		"./tree": "./src/tree.ts",
 		"./themes/*": "./src/themes/*.ts",
 		"./visual-type": "./src/visual-type.ts",
 		"./visual/*": "./src/schemas/visual/*.ts"

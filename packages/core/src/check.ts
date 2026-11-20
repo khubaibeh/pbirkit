@@ -1,6 +1,7 @@
 import type { VisualContainerGroupState } from "#schemas/bookmark/shared.ts";
 
 import type { Config } from "./config.ts";
+import { textOf } from "./expr/literal.ts";
 import { at as valueAt } from "./expr/query.ts";
 import {
 	MAX_FONT_SIZE,
@@ -92,12 +93,7 @@ const checkPage = (page: Page): ReadonlyArray<string> => {
 	return issues;
 };
 
-const textLiteral = (value: unknown): string | undefined => {
-	const text = valueAt(valueAt(valueAt(value, "expr"), "Literal"), "Value");
-	return typeof text === "string" && /^'.*'$/su.test(text)
-		? text.slice(1, -1).replaceAll("''", "'")
-		: undefined;
-};
+const textLiteral = (value: unknown): string | undefined => textOf(valueAt(value, "expr"));
 
 const visualLinks = (visual: Visual) => {
 	const entries = valueAt(valueAt(valueAt(visual, "visual"), "visualContainerObjects"), "visualLink");

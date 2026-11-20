@@ -1,3 +1,5 @@
+import { at } from "./query.ts";
+
 export interface LiteralExpression<V extends string = string> {
 	readonly Literal: { readonly Value: V };
 }
@@ -6,6 +8,13 @@ export const literal = <const V extends string>(Value: V): LiteralExpression<V> 
 
 export const text = (value: string): LiteralExpression<`'${string}'`> =>
 	literal(`'${value.replaceAll("'", "''")}'`);
+
+export const textOf = (expression: unknown): string | undefined => {
+	const value = at(at(expression, "Literal"), "Value");
+	return typeof value === "string" && /^'.*'$/su.test(value)
+		? value.slice(1, -1).replaceAll("''", "'")
+		: undefined;
+};
 
 export const double = (value: number): LiteralExpression<`${number}D`> => {
 	if (!Number.isFinite(value)) throw new TypeError(`[ERROR] double: ${value} is not a finite number`);
