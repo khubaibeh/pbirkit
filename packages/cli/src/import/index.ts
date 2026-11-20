@@ -31,6 +31,10 @@ const flags = {
 		Flag.withDefault(false),
 		Flag.withDescription("Replace the files that an earlier import wrote to the output folder"),
 	),
+	idiomatic: Flag.Boolean("idiomatic").pipe(
+		Flag.withDefault(false),
+		Flag.withDescription("Write pbirkit helper calls such as col and solid where they rebuild the same JSON"),
+	),
 };
 
 const REPORT_FILES = [
@@ -63,6 +67,7 @@ const runImport = Effect.fnUntraced(function* ({
 	source,
 	out: outFlag,
 	force,
+	idiomatic,
 }: Command.Command.Config.Infer<typeof flags>) {
 	const path = yield* Path.Path;
 
@@ -70,7 +75,7 @@ const runImport = Effect.fnUntraced(function* ({
 	yield* requireFiles(project);
 	const { config, fallbacks } = settleConfig(project, indexTree(project.name, project.report, project.tree));
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	const files = importFiles(project, config);
+	const files = importFiles(project, config, idiomatic);
 	yield* checkOutput(out, project, files, force);
 	yield* writeImport(out, files, supportFiles());
 

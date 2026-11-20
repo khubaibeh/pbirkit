@@ -356,6 +356,63 @@ it.each(["./../Example.SemanticModel", "..\\\\Example.SemanticModel"])(
 	},
 );
 
+const literal = (Value: string) => ({ expr: { Literal: { Value } } });
+
+it("writes helper calls only where they rebuild the same JSON and type check", () => {
+	const sales = { SourceRef: { Entity: "Sales" } };
+	edit(visual("notes", "visual.json"), (value) => {
+		const parsed: unknown = JSON.parse(value);
+		return toJson({
+			...(Predicate.isReadonlyObject(parsed) ? parsed : {}),
+			visual: {
+				visualType: "textbox",
+				objects: {
+					general: [
+						{
+							properties: {
+								paragraphs: [{ textRuns: [{ value: "Hi", textStyle: { fontSize: "10.5pt" } }] }],
+							},
+						},
+					],
+					values: [
+						{
+							properties: {
+								show: literal("true"),
+								width: literal("1.0D"),
+								fontSize: literal("10.5D"),
+								fontFamily: literal("'Segoe UI, sans-serif'"),
+							},
+						},
+						{
+							properties: {
+								amount: { expr: { Column: { Expression: sales, Property: "Amount" } } },
+								region: { expr: { Column: { Property: "Region", Expression: sales } } },
+							},
+						},
+					],
+				},
+			},
+		});
+	});
+	importProject("--idiomatic");
+	const notes = readFileSync(join(out, "pages", "first", "visuals", "notes.ts"), "utf8");
+	expect(notes).toContain('import { col, double, entity, entry, literal, text } from "@pbirkit/core/expr";');
+	expect(notes).toContain('general: [\n\t\t\t\t{ properties: { paragraphs: [{ textRuns: [{ value: "Hi"');
+	expect(notes).toContain(
+		'show: true,\n\t\t\t\t\twidth: literal("1.0D"),\n\t\t\t\t\tfontSize: double(10.5),\n\t\t\t\t\tfontFamily: text("Segoe UI, sans-serif"),',
+	);
+	expect(notes).toContain('amount: col("Sales", "Amount"),');
+	expect(notes).toContain('region: { Column: { Property: "Region", Expression: entity("Sales") } },');
+	expect(spawnSync(tsgo, ["-p", out], { encoding: "utf8" }).stdout).toBe("");
+	const bytes = run(root, ["diff", "--bytes", "-c", config, "--target", project]);
+	expect(bytes.status, bytes.stdout).toBe(0);
+	rmSync(out, { recursive: true });
+	importProject();
+	expect(readFileSync(join(out, "pages", "first", "visuals", "notes.ts"), "utf8")).not.toContain(
+		"@pbirkit/core/expr",
+	);
+});
+
 const DESKTOP_JSON = /\.(?:json|pbip|pbir|pbism|platform|tmdl)$/u;
 
 const textFiles = (folder: string): ReadonlyArray<string> =>

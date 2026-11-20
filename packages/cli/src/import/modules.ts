@@ -1,7 +1,7 @@
 import { posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { HashMap } from "effect";
+import { Array as Arr, HashMap, Option } from "effect";
 
 import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
@@ -11,6 +11,7 @@ import { LOCAL_TSCONFIG } from "../build/core-types.ts";
 import { fileKey, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
 import type { Project } from "../pbip/project.ts";
+import { LINE_WIDTH, ModuleReference, Node, helperNames, property, toNode } from "./nodes.ts";
 
 export const CONFIG_FILE = "pbirkit.config.ts";
 
@@ -23,20 +24,17 @@ export interface ImportFiles {
 	readonly folders: ReadonlyArray<string>;
 }
 
-class ModuleReference {
-	readonly file: string;
-
-	constructor(file: string) {
-		this.file = file;
-	}
-}
-
 interface Module {
 	readonly file: string;
 	readonly value: unknown;
 }
 
 const encoder = new TextEncoder();
+
+const block = (depth: number, open: string, items: ReadonlyArray<string>, close: string) =>
+	items.length === 0
+		? `${open}${close}`
+		: `${open}\n${items.map((entry) => `${"\t".repeat(depth + 1)}${entry},\n`).join("")}${"\t".repeat(depth)}${close}`;
 
 export const moduleFileName = (name: string): string =>
 	encodeURIComponent(name).replaceAll("~", "%7E").replaceAll("%", "~");
@@ -51,9 +49,6 @@ const relativeTo = (file: string, target: string): string => {
 	const path = posix.relative(posix.dirname(file), target);
 	return path.startsWith("../") ? path : `./${path}`;
 };
-
-const property = (key: string): string =>
-	key === "__proto__" ? '["__proto__"]' : /^[A-Za-z_$][\w$]*$/u.test(key) ? key : JSON.stringify(key);
 
 const identifierOf = (file: string): string => {
 	const name = posix.basename(file, ".ts");
@@ -91,7 +86,7 @@ export const renderModule = (
 	file: string,
 	value: unknown,
 	assetOf: (url: URL) => string,
-	header = "",
+	{ header = "", idiomatic = false }: { readonly header?: string; readonly idiomatic?: boolean } = {},
 ): string => {
 	const imports = new Map<string, string>();
 	const names = new Set<string>();
@@ -106,34 +101,58 @@ export const renderModule = (
 		return name;
 	};
 
-	const render = (item: unknown, depth: number): string => {
-		if (item instanceof ModuleReference) return importName(item.file);
-		if (item instanceof URL)
-			return `new URL(${JSON.stringify(`${urlPath(relativeTo(file, assetOf(item)))}${isFolder(item) ? "/" : ""}`)}, import.meta.url)`;
-		const indent = "\t".repeat(depth);
-		const block = (open: string, items: ReadonlyArray<string>, close: string) =>
-			items.length === 0
-				? `${open}${close}`
-				: `${open}\n${items.map((entry) => `${indent}\t${entry},\n`).join("")}${indent}${close}`;
-		if (Array.isArray(item))
-			return block(
-				"[",
-				item.map((entry: unknown) => render(entry, depth + 1)),
-				"]",
-			);
-		if (typeof item === "object" && item !== null)
-			return block(
-				"{",
-				Object.entries(item).map(([key, entry]) => `${property(key)}: ${render(entry, depth + 1)}`),
-				"}",
-			);
-		return JSON.stringify(item);
-	};
+	const hugged = (name: string, args: ReadonlyArray<Node>, depth: number): Option.Option<string> =>
+		Option.all({
+			head: Option.all(Arr.dropRight(args, 1).map(({ line }) => line)),
+			last: Option.filter(Arr.last(args), (node) => Node.$is("List")(node) || Node.$is("Fields")(node)),
+		}).pipe(
+			Option.map(({ head, last }) => ({ open: `${name}(${head.map((part) => `${part}, `).join("")}`, last })),
+			Option.filter(({ open }) => open.length + 1 <= LINE_WIDTH),
+			Option.map(({ open, last }) => `${open}${expanded(last, depth)})`),
+		);
 
+	const render = (node: Node, depth: number): string =>
+		Option.getOrElse(node.line, () => expanded(node, depth));
+
+	const expanded = (node: Node, depth: number): string =>
+		Node.$match(node, {
+			Scalar: ({ text }) => text,
+			Module: ({ file: target }) => importName(target),
+			Url: ({ url }) =>
+				`new URL(${JSON.stringify(`${urlPath(relativeTo(file, assetOf(url)))}${isFolder(url) ? "/" : ""}`)}, import.meta.url)`,
+			Constant: ({ name }) => name,
+			Call: ({ name, args }) =>
+				Option.getOrElse(hugged(name, args, depth), () =>
+					block(
+						depth,
+						`${name}(`,
+						args.map((arg) => render(arg, depth + 1)),
+						")",
+					),
+				),
+			List: ({ items }) =>
+				block(
+					depth,
+					"[",
+					items.map((item) => render(item, depth + 1)),
+					"]",
+				),
+			Fields: ({ entries }) =>
+				block(
+					depth,
+					"{",
+					entries.map(([key, item]) => `${property(key)}: ${render(item, depth + 1)}`),
+					"}",
+				),
+		});
+
+	const tree = toNode(value, idiomatic);
+	const used = [...new Set(helperNames(tree))].toSorted();
 	const isConfig = file === CONFIG_FILE;
-	const body = render(value, 0);
+	const body = render(tree, 0);
 	const lines = [
 		...(isConfig ? ['import { defineConfig } from "@pbirkit/core/config";'] : []),
+		...(used.length === 0 ? [] : [`import { ${used.join(", ")} } from "@pbirkit/core/expr";`]),
 		...Array.from(
 			imports,
 			([target, name]) => `import ${name} from ${JSON.stringify(urlPath(relativeTo(file, target)))};`,
@@ -276,12 +295,17 @@ export const supportFiles = (): ReadonlyArray<TreeFile> => [
 	),
 ];
 
-export const importFiles = (project: Project, config: Config): ImportFiles => {
+export const importFiles = (project: Project, config: Config, idiomatic: boolean): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));
 	const { modules, root } = projectModules(config);
 	const rendered = [
-		...modules.map(({ file, value }) => treeFile(file, encoder.encode(renderModule(file, value, assetOf)))),
-		treeFile(CONFIG_FILE, encoder.encode(renderModule(CONFIG_FILE, root, assetOf, registerBlock(config)))),
+		...modules.map(({ file, value }) =>
+			treeFile(file, encoder.encode(renderModule(file, value, assetOf, { idiomatic }))),
+		),
+		treeFile(
+			CONFIG_FILE,
+			encoder.encode(renderModule(CONFIG_FILE, root, assetOf, { header: registerBlock(config), idiomatic })),
+		),
 	];
 	const sources = Array.from(HashMap.values(project.tree));
 	const urls = urlsIn(config);
