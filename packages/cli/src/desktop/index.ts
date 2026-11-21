@@ -46,7 +46,7 @@ const loadProject = Effect.fnUntraced(function* (configFile: string) {
 	const path = yield* Path.Path;
 
 	const file = path.resolve(configFile);
-	const config = yield* loadConfig(file);
+	const { config } = yield* loadConfig(file);
 	const paths = projectPaths(path, file, config.out ?? DEFAULT_OUT, Option.none());
 	const pbip = path.join(paths.out, `${config.name}.pbip`);
 

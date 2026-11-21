@@ -1,6 +1,6 @@
 import { declare } from "effect/Schema";
 
-import type { Register } from "./register.ts";
+import type { Register, RegisterEntries } from "./register.ts";
 
 export const FONT_FACES = [
 	"Arial",
@@ -75,7 +75,11 @@ type RegisteredOf<R> = R extends { readonly fonts: ReadonlyArray<infer F extends
 	? FamilyName<Families<F>>
 	: never;
 
-type KnownFamily<R> = BuiltinFamily | (typeof FALLBACK_FONTS)[number] | WebFont | RegisteredOf<R>;
+type KnownFamily<R> =
+	| BuiltinFamily
+	| (typeof FALLBACK_FONTS)[number]
+	| WebFont
+	| RegisteredOf<RegisterEntries<R>>;
 
 export type FontFaceOf<R> = BuiltinFontFace | FontStack<KnownFamily<R> | Lowercase<KnownFamily<R>>>;
 

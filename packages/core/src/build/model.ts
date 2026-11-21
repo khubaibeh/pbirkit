@@ -2,7 +2,7 @@ import { Option } from "effect";
 
 import type { Config } from "../config.ts";
 import type { BuildFile } from "./shared.ts";
-import { jsonFile, platform, rawFiles, whenSet, withoutDot } from "./shared.ts";
+import { jsonFile, jsonOrSource, platform, rawFiles, whenSet, withoutDot } from "./shared.ts";
 
 type Model = NonNullable<Config["model"]>;
 
@@ -25,8 +25,13 @@ export const modelFiles = (model: Model): ReadonlyArray<BuildFile> => {
 	const folder = modelFolder(model);
 
 	return [
-		jsonFile(`${folder}/.platform`, platform("SemanticModel", model.name, model.logicalId, model.platform)),
-		jsonFile(`${folder}/definition.pbism`, model.pbism),
+		jsonOrSource(
+			`${folder}/.platform`,
+			model.platform instanceof URL
+				? model.platform
+				: platform("SemanticModel", model.name, model.logicalId, model.platform),
+		),
+		jsonOrSource(`${folder}/definition.pbism`, model.pbism),
 		...whenSet(model.modelReference, (reference) => [jsonFile(`${folder}/modelReference.json`, reference)]),
 		...whenSet(model.editorSettings, (settings) => [
 			jsonFile(`${folder}/.pbi/editorSettings.json`, settings),

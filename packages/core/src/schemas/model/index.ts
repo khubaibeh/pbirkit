@@ -1,4 +1,4 @@
-import { Array, Record, String, Struct, URL as UrlSchema, optionalKey } from "effect/Schema";
+import { Array, Record, String, Struct, URL as UrlSchema, Union, optionalKey } from "effect/Schema";
 
 import { EditorSettings } from "#schemas/editor-settings/1.0.0.ts";
 import { ModelReference } from "#schemas/model-reference/2.0.0.ts";
@@ -6,11 +6,11 @@ import { Pbism } from "#schemas/pbism/1.0.0.ts";
 import { PlatformItem } from "#schemas/platform";
 
 export const Model = Struct({
-	name: String,
+	name: optionalKey(String),
 	path: String,
-	logicalId: String,
-	platform: PlatformItem,
-	pbism: Pbism,
+	logicalId: optionalKey(String),
+	platform: Union([PlatformItem, UrlSchema]),
+	pbism: Union([Pbism, UrlSchema]),
 	definition: UrlSchema,
 	editorSettings: optionalKey(EditorSettings),
 	diagramLayout: optionalKey(UrlSchema),

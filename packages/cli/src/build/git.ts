@@ -15,5 +15,5 @@ const hasGit = (folder: string): Effect.Effect<boolean, never, FileSystem.FileSy
 	});
 
 export const requireGitRepo = Effect.fnUntraced(function* (root: string) {
-	if (!(yield* hasGit(root))) yield* new GitRepoError({ folder: root });
+	if (!(yield* hasGit(root))) return yield* new GitRepoError({ folder: root });
 });

@@ -22,6 +22,12 @@ export const isOwned = (owned: ReadonlyArray<string>, path: string): boolean =>
 		entry.endsWith("/") ? fileKey(path).startsWith(fileKey(entry)) : fileKey(path) === fileKey(entry),
 	);
 
+export const projectEntries = (pbip: string, report: string, model?: string): ReadonlyArray<string> => [
+	pbip,
+	`${report}/`,
+	...(model === undefined ? [] : [`${model}/`]),
+];
+
 export const parentKeys = (path: string): ReadonlyArray<string> => {
 	const parts = fileKey(path).split("/");
 
@@ -29,6 +35,22 @@ export const parentKeys = (path: string): ReadonlyArray<string> => {
 };
 
 export const hash = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+
+const BOM = [0xef, 0xbb, 0xbf];
+
+const LF = 10;
+
+const CR = 13;
+
+const textBody = (bytes: Uint8Array): Uint8Array => {
+	const start = BOM.every((byte, index) => bytes[index] === byte) ? BOM.length : 0;
+	return bytes.subarray(start).filter((byte, index, body) => byte !== CR || body[index + 1] !== LF);
+};
+
+export const sameText = (left: TreeFile, right: TreeFile): boolean =>
+	!left.bytes.includes(0) &&
+	!right.bytes.includes(0) &&
+	hash(textBody(left.bytes)) === hash(textBody(right.bytes));
 
 export const treeFile = (path: string, bytes: Uint8Array): TreeFile => ({ path, bytes, hash: hash(bytes) });
 
@@ -65,13 +87,42 @@ export const sameFile = (left: Option.Option<TreeFile>, right: Option.Option<Tre
 		onSome: (file) => Option.exists(right, (other) => other.hash === file.hash),
 	});
 
-export const readTree = Effect.fnUntraced(function* (folder: string) {
+const ownedEntries = Effect.fnUntraced(function* (folder: string, owned: ReadonlyArray<string>) {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+
+	const roots = new Set(owned.map((entry) => fileKey(entry.replace(/\/.*$/u, ""))));
+	const tops = (yield* fs.readDirectory(folder).pipe(onFileSystem("list", folder))).filter((entry) =>
+		roots.has(fileKey(entry)),
+	);
+	const nested = yield* Effect.forEach(
+		tops,
+		Effect.fnUntraced(function* (entry) {
+			const target = path.join(folder, entry);
+			if ((yield* fs.stat(target).pipe(onFileSystem("inspect", target))).type !== "Directory")
+				return isOwned(owned, entry) ? [entry] : [];
+			const files = yield* fs.readDirectory(target, { recursive: true }).pipe(onFileSystem("list", target));
+			return isOwned(owned, `${entry}/`) ? files.map((file) => path.join(entry, file)) : [];
+		}),
+	);
+	return nested.flat();
+});
+
+const readEntries = Effect.fnUntraced(function* (folder: string, owned: ReadonlyArray<string> | undefined) {
+	const fs = yield* FileSystem.FileSystem;
+
+	return owned === undefined
+		? yield* fs.readDirectory(folder, { recursive: true }).pipe(onFileSystem("list", folder))
+		: yield* ownedEntries(folder, owned);
+});
+
+export const readTree = Effect.fnUntraced(function* (folder: string, owned?: ReadonlyArray<string>) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
 
 	if (!(yield* fs.exists(folder).pipe(onFileSystem("check", folder)))) return Option.none<Tree>();
 
-	const entries = yield* fs.readDirectory(folder, { recursive: true }).pipe(onFileSystem("list", folder));
+	const entries = yield* readEntries(folder, owned);
 	const files: Array<TreeFile> = [];
 
 	for (const entry of entries) {
@@ -85,7 +136,7 @@ export const readTree = Effect.fnUntraced(function* (folder: string) {
 	}
 
 	const clashes = pathClashes(files);
-	if (clashes.length > 0) yield* new PathClashError({ folder, pairs: clashes });
+	if (clashes.length > 0) return yield* new PathClashError({ folder, pairs: clashes });
 
 	return Option.some(treeOf(files));
 });

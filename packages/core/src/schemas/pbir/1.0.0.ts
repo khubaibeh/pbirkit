@@ -1,4 +1,4 @@
-import { Literal, NullOr, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Finite, Literal, NullOr, optionalKey, String, Struct } from "effect/Schema";
 
 import { SchemaUrl } from "#schemas/schema-url.ts";
 
@@ -8,7 +8,7 @@ export * from "./shared.ts";
 
 export const ByConnection = Struct({
 	connectionString: NullOr(String),
-	pbiServiceModelId: NullOr(Number),
+	pbiServiceModelId: NullOr(Finite),
 	pbiModelVirtualServerName: NullOr(String),
 	pbiModelDatabaseName: NullOr(String),
 	name: NullOr(String),

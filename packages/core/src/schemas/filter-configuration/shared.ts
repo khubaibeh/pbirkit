@@ -1,4 +1,4 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literals, optionalKey, String, Struct } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 import { formattingObjects, formattingProperties } from "#schemas/common/formatting.ts";
@@ -38,7 +38,7 @@ export type FilterContainerFormattingObjectsProperties =
 export const FilterContainerFields = {
 	name: String,
 	displayName: optionalKey(String),
-	ordinal: optionalKey(Number),
+	ordinal: optionalKey(Finite),
 	restatement: optionalKey(String),
 	howCreated: optionalKey(FilterHowCreated),
 	isHiddenInViewMode: optionalKey(Boolean),

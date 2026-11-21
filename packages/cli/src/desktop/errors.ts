@@ -7,10 +7,13 @@ import type {
 	FileSystemError,
 } from "../build/errors.ts";
 
-export class DesktopError extends TaggedError<DesktopError>()("DesktopError", {
-	code: String,
-	detail: String,
-}) {}
+export class DesktopError extends TaggedError<DesktopError, { readonly brand: unique symbol }>()(
+	"DesktopError",
+	{
+		code: String,
+		detail: String,
+	},
+) {}
 
 export type DesktopCommandError =
 	| ConfigLoadError

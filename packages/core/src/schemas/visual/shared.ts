@@ -1,16 +1,16 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literals, optionalKey, String, Struct } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 import { formattingObjects, formattingProperties } from "#schemas/common/formatting.ts";
 import { Background, LockAspect } from "#schemas/visual-configuration/formatting.ts";
 
 export const PositionFields = {
-	x: Number,
-	y: Number,
-	z: optionalKey(Number),
-	width: Number,
-	height: Number,
-	tabOrder: optionalKey(Number),
+	x: Finite,
+	y: Finite,
+	z: optionalKey(Finite),
+	width: Finite,
+	height: Finite,
+	tabOrder: optionalKey(Finite),
 };
 
 export const HowCreatedValues = [

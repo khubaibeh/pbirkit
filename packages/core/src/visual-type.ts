@@ -1,6 +1,6 @@
 import { declare } from "effect/Schema";
 
-import type { Register } from "./register.ts";
+import type { Register, RegisterEntries } from "./register.ts";
 
 export const BUILTIN_VISUALS = [
 	"actionButton",
@@ -66,7 +66,10 @@ type ExtraVisualOf<R> = R extends { readonly builtinVisuals: ReadonlyArray<infer
 	? V
 	: never;
 
-export type VisualTypeOf<R> = BuiltinVisual | CustomVisualOf<R> | ExtraVisualOf<R>;
+export type VisualTypeOf<R> =
+	| BuiltinVisual
+	| CustomVisualOf<RegisterEntries<R>>
+	| ExtraVisualOf<RegisterEntries<R>>;
 
 export type VisualType = VisualTypeOf<Register>;
 

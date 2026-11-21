@@ -1,4 +1,4 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literals, optionalKey, String, Struct } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 export const SortDirection = Literals(["Ascending", "Descending"]);
@@ -31,8 +31,8 @@ export const roleProjection = <E extends Constraint>(Expression: E) =>
 
 export const roleFieldParameterFields = <E extends Constraint>(Expression: E) => ({
 	parameterExpr: Expression,
-	index: Number,
-	length: optionalKey(Number),
+	index: Finite,
+	length: optionalKey(Finite),
 });
 
 export const projectionStateFields = <E extends Constraint>(Expression: E) => ({

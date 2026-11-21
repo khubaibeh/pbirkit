@@ -25,22 +25,23 @@ const ensureUnchanged = Effect.fnUntraced(function* (target: string, expected: O
 	const before = Option.map(expected, (file) => file.hash);
 
 	if (Option.isNone(now) ? Option.isSome(before) : !Option.contains(before, now.value)) {
-		yield* new ProjectChangedError({ path: target });
+		return yield* new ProjectChangedError({ path: target });
 	}
 });
 
 const removeIfEmpty = (folder: string) =>
 	Effect.tryPromise({
 		try: () => rmdir(folder),
-		catch: (cause) => cause,
+		catch: (cause) => ({
+			code: Predicate.hasProperty(cause, "code") ? String(cause.code) : "",
+			error: new FileSystemError({ operation: "remove", path: folder, detail: String(cause) }),
+		}),
 	}).pipe(
 		Effect.catchIf(
-			(cause) => Predicate.hasProperty(cause, "code") && NOT_EMPTY.has(String(cause.code)),
+			({ code }) => NOT_EMPTY.has(code),
 			() => Effect.void,
 		),
-		Effect.mapError(
-			(cause) => new FileSystemError({ operation: "remove", path: folder, detail: String(cause) }),
-		),
+		Effect.mapError(({ error }) => error),
 	);
 
 const removeEmptyFolders = Effect.fnUntraced(function* (out: string, removed: ReadonlyArray<string>) {

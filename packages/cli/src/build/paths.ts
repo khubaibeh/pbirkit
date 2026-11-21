@@ -80,10 +80,10 @@ export const checkOut = Effect.fnUntraced(function* (paths: ProjectPaths) {
 	const path = yield* Path.Path;
 
 	if (isInside(path, paths.out, paths.root)) {
-		yield* new OutFolderError({ out: paths.out, detail: "it must not hold the config folder" });
+		return yield* new OutFolderError({ out: paths.out, detail: "it must not hold the config folder" });
 	}
 	if (isInside(path, paths.state, paths.out)) {
-		yield* new OutFolderError({ out: paths.out, detail: `it must not be inside ${STATE_FOLDER}` });
+		return yield* new OutFolderError({ out: paths.out, detail: `it must not be inside ${STATE_FOLDER}` });
 	}
 });
 

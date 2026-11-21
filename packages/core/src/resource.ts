@@ -1,4 +1,4 @@
-import { Literal, String, Struct, URL as UrlSchema, Union } from "effect/Schema";
+import { Literal, String, Struct, URL as UrlSchema, Union, optionalKey } from "effect/Schema";
 
 import { Theme } from "#schemas/theme";
 
@@ -8,7 +8,12 @@ export const BaseThemeResource = Struct({ kind: Literal("baseTheme"), name: Stri
 
 export type BaseThemeResource = typeof BaseThemeResource.Type;
 
-export const CustomThemeResource = Struct({ kind: Literal("customTheme"), name: String, theme: Theme });
+export const CustomThemeResource = Struct({
+	kind: Literal("customTheme"),
+	name: String,
+	theme: Theme,
+	itemType: optionalKey(Literal("Image")),
+});
 
 export type CustomThemeResource = typeof CustomThemeResource.Type;
 
@@ -51,7 +56,14 @@ const STATIC_ITEMS = {
 	image: { package: "RegisteredResources", type: "Image", path: (name: string) => name },
 } as const;
 
-export const packageItem = (resource: Resource): PackageItem => {
+export type ResourceIdentity =
+	| Pick<CustomVisualResource, "kind" | "guid">
+	| Pick<CustomThemeResource, "kind" | "name" | "itemType">
+	| Pick<BaseThemeResource, "kind" | "name">
+	| Pick<BuiltInThemeResource, "kind" | "name">
+	| Pick<ImageResource, "kind" | "name">;
+
+export const packageItem = (resource: ResourceIdentity): PackageItem => {
 	if (resource.kind === "customVisual") {
 		const name = `${resource.guid}.pbiviz.json`;
 		return {
@@ -61,8 +73,25 @@ export const packageItem = (resource: Resource): PackageItem => {
 		};
 	}
 	const { package: name, type, path } = STATIC_ITEMS[resource.kind];
-	return { package: name, type: name, item: { name: resource.name, path: path(resource.name), type } };
+	return {
+		package: name,
+		type: name,
+		item: {
+			name: resource.name,
+			path: path(resource.name),
+			type: resource.kind === "customTheme" ? (resource.itemType ?? type) : type,
+		},
+	};
 };
+
+export const samePackageItem = (
+	left: Pick<PackageItem, "package" | "item">,
+	right: Pick<PackageItem, "package" | "item">,
+): boolean =>
+	left.package === right.package &&
+	left.item.name === right.item.name &&
+	left.item.path === right.item.path &&
+	left.item.type === right.item.type;
 
 export const baseTheme = <const N extends string>(resource: { readonly name: N; readonly theme: Theme }) => ({
 	kind: "baseTheme" as const,
@@ -72,6 +101,7 @@ export const baseTheme = <const N extends string>(resource: { readonly name: N; 
 export const customTheme = <const N extends string>(resource: {
 	readonly name: N;
 	readonly theme: Theme;
+	readonly itemType?: "Image";
 }) => ({
 	kind: "customTheme" as const,
 	...resource,

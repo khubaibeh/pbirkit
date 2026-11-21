@@ -1,6 +1,7 @@
 import { Option } from "effect";
 
-import type { Config } from "../config.ts";
+import type { PlatformItem } from "#schemas/platform";
+
 import { toJson } from "./json.ts";
 
 export type BuildFile =
@@ -10,7 +11,15 @@ export type BuildFile =
 
 export const jsonFile = (path: string, value: unknown): BuildFile => ({ path, content: toJson(value) });
 
+export const jsonOrSource = (path: string, value: unknown): BuildFile =>
+	value instanceof URL ? { path, source: value } : jsonFile(path, value);
+
 export const withoutDot = (path: string): string => path.replace(/^\.\//u, "").replace(/\/+$/u, "");
+
+export const insideProject = (path: string): boolean =>
+	withoutDot(path)
+		.split("/")
+		.every((part) => part !== "" && part !== "." && part !== ".." && !/[\\:]/u.test(part));
 
 export const rawFiles = (folder: string, files: { readonly [path: string]: URL }): ReadonlyArray<BuildFile> =>
 	Object.entries(files).map(([path, url]) => {
@@ -26,9 +35,9 @@ export const whenSet = <A, B>(
 
 export const platform = (
 	type: "Report" | "SemanticModel",
-	displayName: string,
-	logicalId: string,
-	item: Config["report"]["platform"],
+	displayName: string | undefined,
+	logicalId: string | undefined,
+	item: PlatformItem,
 ) => {
 	const { $schema, version, ...metadata } = item;
 

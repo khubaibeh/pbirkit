@@ -1,4 +1,4 @@
-import { Array, Boolean, Literal, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literal, Literals, optionalKey, String, Struct } from "effect/Schema";
 
 import { SchemaUrl } from "#schemas/schema-url.ts";
 
@@ -24,7 +24,7 @@ export type PrimitiveTypeName = typeof PrimitiveTypeName.Type;
 
 export const ReportExtensionMeasureTemplate = Struct({
 	daxTemplateName: String,
-	version: Number,
+	version: Finite,
 });
 
 export type ReportExtensionMeasureTemplate = typeof ReportExtensionMeasureTemplate.Type;

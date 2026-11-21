@@ -12,7 +12,7 @@ import type { DesktopBridgeSession, DesktopInstanceState } from "@microsoft/powe
 import { Effect, FileSystem, Path } from "effect";
 import type { Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { decodeUnknownEffect, fromJsonString, String as SchemaString, Struct } from "effect/Schema";
+import { decodeEffect, fromJsonString, String as SchemaString, Struct } from "effect/Schema";
 
 import { DesktopError } from "./errors.ts";
 
@@ -129,7 +129,7 @@ const bundledVersion = Effect.fnUntraced(function* (bundled: string) {
 	const unreadable = (detail: string) =>
 		new DesktopError({ code: "MS_CLI_UNREADABLE", detail: `cannot read ${file}: ${detail}` });
 	const text = yield* fs.readFileString(file).pipe(Effect.mapError((error) => unreadable(error.message)));
-	const { version } = yield* decodeUnknownEffect(MsCliPackage)(text).pipe(
+	const { version } = yield* decodeEffect(MsCliPackage)(text).pipe(
 		Effect.mapError((error) => unreadable(error.message)),
 	);
 

@@ -5,7 +5,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import type { BuildFile } from "@pbirkit/core/build";
 
-import { ConfigCheckError, SourceReadError } from "./errors.ts";
+import { BuildOutputError, SourceReadError } from "./errors.ts";
 import { toPosix } from "./paths.ts";
 import type { TreeFile } from "./tree.ts";
 import { fileKey, isOwned, isTracked, parentKeys, pathClashes, treeFile, treeOf } from "./tree.ts";
@@ -122,18 +122,18 @@ const folderClashes = (files: ReadonlyArray<TreeFile>): ReadonlyArray<string> =>
 
 	return [...paths]
 		.filter(([key]) => parents.has(key))
-		.map(([, path]) => `[ERROR] build: ${path} would be written as a file and as a folder`);
+		.map(([, path]) => `${path} would be written as a file and as a folder`);
 };
 
 const buildIssues = (files: ReadonlyArray<TreeFile>, owned: ReadonlyArray<string>): ReadonlyArray<string> => [
-	...pathClashes(files).map((pair) => `[ERROR] build: ${pair} would be written to the same file`),
+	...pathClashes(files).map((pair) => `${pair} would be written to the same file`),
 	...folderClashes(files),
 	...files
 		.filter((file) => !isTracked(file.path))
-		.map((file) => `[ERROR] build: ${file.path} is a file only Desktop writes, so remove it from the source`),
+		.map((file) => `${file.path} is a file only Desktop writes, so remove it from the source`),
 	...files
 		.filter((file) => isOwned(owned, file.path))
-		.map((file) => `[ERROR] build: ${file.path} is listed in desktopOwned, so remove it from the source`),
+		.map((file) => `${file.path} is listed in desktopOwned, so remove it from the source`),
 ];
 
 export const buildTree = Effect.fnUntraced(function* (
@@ -143,7 +143,7 @@ export const buildTree = Effect.fnUntraced(function* (
 	const built = (yield* Effect.forEach(files, readBuildFile)).flat();
 
 	const issues = buildIssues(built, owned);
-	if (issues.length > 0) return yield* new ConfigCheckError({ issues });
+	if (issues.length > 0) return yield* new BuildOutputError({ issues });
 
 	return treeOf(built);
 });

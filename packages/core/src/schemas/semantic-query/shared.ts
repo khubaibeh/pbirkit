@@ -1,15 +1,15 @@
 import {
 	Array,
 	Boolean,
+	Finite,
 	Literal,
 	Literals,
-	Number,
+	optionalKey,
 	Record,
 	String,
 	Struct,
 	Union,
 	Unknown,
-	optionalKey,
 } from "effect/Schema";
 import type { Codec, Constraint, Top } from "effect/Schema";
 
@@ -91,7 +91,7 @@ export type QueryTransformOutputRoleRefExpression = typeof QueryTransformOutputR
 
 export const QueryResourcePackageItem = Struct({
 	PackageName: String,
-	PackageType: Number,
+	PackageType: Finite,
 	ItemName: String,
 });
 
@@ -110,8 +110,8 @@ export const QuerySelectRefExpression = Struct({ ExpressionName: String });
 export type QuerySelectRefExpression = typeof QuerySelectRefExpression.Type;
 
 export const QueryThemeDataColorExpression = Struct({
-	ColorId: Number,
-	Percent: Number,
+	ColorId: Finite,
+	Percent: Finite,
 });
 
 export type QueryThemeDataColorExpression = typeof QueryThemeDataColorExpression.Type;
@@ -179,7 +179,7 @@ export const queryDefinitions = <E extends Constraint, D extends Constraint>(Exp
 		VisualShape: optionalKey(Array(Axis)),
 		GroupBy: optionalKey(Array(Expression)),
 		Transform: optionalKey(Array(QueryTransform)),
-		Top: optionalKey(Number),
+		Top: optionalKey(Finite),
 	});
 
 	const FilterDefinition = Struct({
@@ -213,7 +213,7 @@ export const queryExpressionKinds = <E extends Constraint, F extends Constraint,
 		UnrecognizedIdentifiers: optionalKey(Boolean),
 	});
 	const NativeFields = {
-		DataType: Number,
+		DataType: Finite,
 		Expression: String,
 		ExpressionContentCache: optionalKey(ContentCache),
 		ProposedName: optionalKey(String),
@@ -227,12 +227,12 @@ export const queryExpressionKinds = <E extends Constraint, F extends Constraint,
 		Min: Extremum,
 		Max: Extremum,
 		Aggregation: Struct({ Function: QueryAggregateFunction, Expression }),
-		Percentile: Struct({ Expression, K: Number, Exclusive: optionalKey(Boolean) }),
+		Percentile: Struct({ Expression, K: Finite, Exclusive: optionalKey(Boolean) }),
 		Hierarchy: Struct({ Expression, Hierarchy: String }),
 		HierarchyLevel: Struct({ Expression, Level: String }),
 		PropertyVariationSource: Struct({ Expression, Name: String, Property: String }),
 		Subquery: Struct({ Query: QueryDefinition }),
-		Discretize: Struct({ Expression, Count: Number }),
+		Discretize: Struct({ Expression, Count: Finite }),
 		And: Binary,
 		Between: Struct({ Expression, LowerBound: Expression, UpperBound: Expression }),
 		In: Struct({
@@ -248,12 +248,12 @@ export const queryExpressionKinds = <E extends Constraint, F extends Constraint,
 		Exists: Unary,
 		Literal: QueryLiteralExpression,
 		DateSpan: Struct({ TimeUnit, Expression }),
-		DateAdd: Struct({ Amount: Number, TimeUnit, Expression }),
+		DateAdd: Struct({ Amount: Finite, TimeUnit, Expression }),
 		Now: QueryNowExpression,
 		DefaultValue: QueryDefaultValueExpression,
 		AnyValue: QueryAnyValueExpression,
 		Arithmetic: Struct({ Left: Expression, Right: Expression, Operator: ArithmeticOperatorKind }),
-		Floor: Struct({ Expression, Size: Number, TimeUnit: optionalKey(TimeUnit) }),
+		Floor: Struct({ Expression, Size: Finite, TimeUnit: optionalKey(TimeUnit) }),
 		ScopedEval: Struct({ Expression, Scope: Array(Expression) }),
 		FilteredEval: Struct({ Expression, Filters: Array(QueryFilter) }),
 		TransformTableRef: QueryTransformTableRefExpression,

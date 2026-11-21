@@ -10,6 +10,8 @@ export { formatNumber, toJson } from "./json.ts";
 export { modelCache } from "./model.ts";
 export type { ModelCache } from "./model.ts";
 export { reportFolder } from "./report.ts";
+export { resourcePackages } from "./resources.ts";
+export { insideProject } from "./shared.ts";
 export type { BuildFile } from "./shared.ts";
 
 const GITIGNORE: BuildFile = {

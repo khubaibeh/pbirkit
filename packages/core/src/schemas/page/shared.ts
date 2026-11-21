@@ -1,7 +1,8 @@
-import { Array, Boolean, Literals, Number, String, Struct, optionalKey } from "effect/Schema";
+import { Array, Boolean, Finite, Literals, optionalKey, String, Struct, Union } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 import { formattingProperties } from "#schemas/common/formatting.ts";
+import { RawItem } from "#schemas/common/raw.ts";
 import { AnyVisual } from "#schemas/visual";
 
 export const PageDisplayOption = Literals([
@@ -124,7 +125,7 @@ export const VisualInteraction = Struct({
 export type VisualInteraction = typeof VisualInteraction.Type;
 
 export const QuickExploreLayout = Struct({
-	version: Number,
+	version: Finite,
 	dataTableName: optionalKey(String),
 });
 
@@ -155,14 +156,14 @@ export const PageFields = {
 	name: String,
 	displayName: String,
 	displayOption: PageDisplayOption,
-	height: optionalKey(Number),
-	width: optionalKey(Number),
+	height: optionalKey(Finite),
+	width: optionalKey(Finite),
 	visibility: optionalKey(Literals(["AlwaysVisible", "HiddenInViewMode"])),
 	visualInteractions: optionalKey(Array(VisualInteraction)),
 	annotations: optionalKey(Array(Annotation)),
 	howCreated: optionalKey(Literals(["Default", "Copilot"])),
 };
 
-export const PageVisuals = Array(AnyVisual);
+export const PageVisuals = Array(Union([AnyVisual, RawItem]));
 
 export type PageVisuals = typeof PageVisuals.Type;

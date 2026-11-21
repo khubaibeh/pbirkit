@@ -1,4 +1,4 @@
-import { Array, Literals, Number, Record, String, Struct, Unknown, optionalKey } from "effect/Schema";
+import { Array, Finite, Literals, optionalKey, Record, String, Struct, Unknown } from "effect/Schema";
 import type { Constraint } from "effect/Schema";
 
 export const HighlightMatching = Literals([0, 1, 2]);
@@ -32,7 +32,7 @@ export const SelectorFields = {
 	metadata: optionalKey(String),
 	id: optionalKey(String),
 	highlightMatching: optionalKey(HighlightMatching),
-	order: optionalKey(Number),
+	order: optionalKey(Finite),
 };
 
 export const dataViewObjectDefinitions = <S extends Constraint>(Selector: S) =>
