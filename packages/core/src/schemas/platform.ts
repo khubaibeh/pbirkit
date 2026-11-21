@@ -1,9 +1,9 @@
 import { Struct, Union } from "effect/Schema";
 import { omit } from "effect/Struct";
 
-import { PlatformMetadata as MetadataV2_0, Platform as PlatformV2_0 } from "./2.0.0.ts";
-import { PlatformMetadata as MetadataV2_1, Platform as PlatformV2_1 } from "./2.1.0.ts";
-import { PlatformConfig } from "./shared.ts";
+import { PlatformMetadata as MetadataV2_0, Platform as PlatformV2_0 } from "./platform/2.0.0.ts";
+import { PlatformMetadata as MetadataV2_1, Platform as PlatformV2_1 } from "./platform/2.1.0.ts";
+import { PlatformConfig } from "./platform/shared.ts";
 
 export const PlatformItem = Union([
 	Struct({

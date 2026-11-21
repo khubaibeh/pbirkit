@@ -19,7 +19,7 @@ npm i -D pbirkit typescript
 npx pbirkit --help
 ```
 
-One package holds the `pbirkit` command and every module that a report imports, such as `pbirkit/config` and `pbirkit/visual/2.11.0`. See [docs/setup.md](docs/setup.md) for the details.
+One package holds the `pbirkit` command and every module that a report imports, such as `pbirkit/config` and `pbirkit/schemas/visual/2.11.0`. See [docs/setup.md](docs/setup.md) for the details.
 
 ## What it does
 
@@ -50,7 +50,7 @@ TS source ──pbirkit build──▶ dist/ (PBIP) ──open──▶ Power BI
 ```ts
 // pbirkit.config.ts
 import { defineConfig } from "pbirkit/config";
-import { SchemaUrl } from "pbirkit/schema-url";
+import { SchemaUrl } from "pbirkit/schemas/schema-url";
 
 import pages from "#/pages/index.ts";
 
@@ -81,11 +81,11 @@ Most projects start from `pbirkit import` and not from a blank file. See [docs/i
 | Import from                                                 | What it holds                                                   |
 | ----------------------------------------------------------- | --------------------------------------------------------------- |
 | `pbirkit/config`                                            | `defineConfig` and the config schema                            |
-| `pbirkit/visual/<v>`, `pbirkit/page/<v>`, ...               | `define*` helpers for each schema version                       |
+| `pbirkit/schemas/<kind>/<v>`                                | `define*` helpers for each schema version                       |
 | `pbirkit/expr`                                              | expression helpers: `col`, `measure`, `solid`, `filterState`... |
 | `pbirkit/resource`, `pbirkit/custom-visual`, `pbirkit/font` | images, custom visuals and fonts                                |
-| `pbirkit/theme`, `pbirkit/themes/<name>`                    | `defineTheme` and typed Desktop default themes                  |
-| `pbirkit/schema-url`                                        | every `$schema` URL                                             |
+| `pbirkit/schemas/theme`, `pbirkit/themes/<name>`            | `defineTheme` and typed Desktop default themes                  |
+| `pbirkit/schemas/schema-url`                                | every `$schema` URL                                             |
 | `pbirkit/register`                                          | `Register`, for project-wide custom visuals and fonts           |
 | `pbirkit/check`, `pbirkit/build`, `pbirkit/tree`            | `checkConfig`, the in-memory build, the report tree             |
 

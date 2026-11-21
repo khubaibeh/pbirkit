@@ -9,33 +9,21 @@
 		"#core/*.ts": "./src/*.ts",
 		"#core/*": "./src/*/index.ts",
 		"#schemas/*.ts": "./src/schemas/*.ts",
-		"#schemas/*": "./src/schemas/*/index.ts"
+		"#schemas/*": "./src/schemas/*.ts"
 	},
 	"exports": {
-		"./bookmark/*": "./src/schemas/bookmark/*.ts",
-		"./bookmarks-metadata": "./src/schemas/bookmarks-metadata/index.ts",
 		"./build": "./src/build/index.ts",
 		"./check": "./src/check.ts",
 		"./config": "./src/config.ts",
 		"./custom-visual": "./src/custom-visual.ts",
 		"./expr": "./src/expr/index.ts",
-		"./filter-configuration/*": "./src/schemas/filter-configuration/*.ts",
 		"./font": "./src/font.ts",
-		"./formatting-object-definitions/*": "./src/schemas/formatting-object-definitions/*.ts",
-		"./model": "./src/schemas/model/index.ts",
-		"./page/*": "./src/schemas/page/*.ts",
-		"./report": "./src/schemas/report/index.ts",
-		"./report-extension/*": "./src/schemas/report-extension/*.ts",
-		"./report/*": "./src/schemas/report/*.ts",
 		"./register": "./src/register.ts",
 		"./resource": "./src/resource.ts",
-		"./schema-url": "./src/schemas/schema-url.ts",
-		"./semantic-query/*": "./src/schemas/semantic-query/*.ts",
-		"./theme": "./src/schemas/theme/index.ts",
-		"./tree": "./src/tree/index.ts",
+		"./schemas/*": "./src/schemas/*.ts",
 		"./themes/*": "./src/themes/*.ts",
-		"./visual-type": "./src/visual-type.ts",
-		"./visual/*": "./src/schemas/visual/*.ts"
+		"./tree": "./src/tree/index.ts",
+		"./visual-type": "./src/visual-type.ts"
 	},
 	"scripts": {
 		"typecheck": "tsgo --noEmit"

@@ -18,7 +18,7 @@ Typed Desktop default themes live in `pbirkit/themes/*`, for example `CY26SU07` 
 
 ## Theme rules
 
-`defineTheme` (from `pbirkit/theme`) types the top level of a theme and all 64 options of Desktop's Customize theme dialog. `visualStyles` per visual type stays loose.
+`defineTheme` (from `pbirkit/schemas/theme`) types the top level of a theme and all 64 options of Desktop's Customize theme dialog. `visualStyles` per visual type stays loose.
 
 - Colors: `#` plus exactly 6 hex digits.
 - Fonts: one of 26 built-in names, a Desktop font stack, or a custom family that you registered.

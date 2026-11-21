@@ -11,7 +11,7 @@ vi.setConfig({ testTimeout: 30_000 });
 const main = fileURLToPath(new URL("../main.ts", import.meta.url));
 
 const sourceConfig = `import { defineConfig } from "@pbirkit/core/config";
-import { SchemaUrl } from "@pbirkit/core/schema-url";
+import { SchemaUrl } from "@pbirkit/core/schemas/schema-url";
 
 const reportVersionAtImport = { visual: "2.13.0", page: "2.1.0", report: "3.3.0" };
 

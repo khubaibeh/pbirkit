@@ -7,7 +7,7 @@ import { Literal, String as StringSchema, Struct, decodeUnknownOption } from "ef
 import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
 import { at, imageRef } from "@pbirkit/core/expr";
-import { SchemaUrl } from "@pbirkit/core/schema-url";
+import { SchemaUrl } from "@pbirkit/core/schemas/schema-url";
 import type { ReportTree } from "@pbirkit/core/tree";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
@@ -50,7 +50,7 @@ const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
 	[Layout.pages, "pages"],
 	[Layout.bookmarks, "bookmarks"],
 ]);
-const SCHEMA_URL = "@pbirkit/core/schema-url";
+const SCHEMA_URL = "@pbirkit/core/schemas/schema-url";
 const PACKAGE_EXPORTS: ReadonlyMap<string, string> = new Map([[SCHEMA_URL, "SchemaUrl"]]);
 const SCHEMA_PATHS: ReadonlyMap<string, ReadonlyArray<string>> = new Map(
 	Object.entries(SchemaUrl).flatMap(([kind, versions]) =>
@@ -187,7 +187,10 @@ const definerOf = (value: unknown): { readonly definer: Definer; readonly value:
 	const name = DEFINERS.get(kind);
 	if (name === undefined) return undefined;
 
-	return { definer: { name, from: `@pbirkit/core/${kind}/${version}` }, value: Object.fromEntries(rest) };
+	return {
+		definer: { name, from: `@pbirkit/core/schemas/${kind}/${version}` },
+		value: Object.fromEntries(rest),
+	};
 };
 
 export const renderModule = (

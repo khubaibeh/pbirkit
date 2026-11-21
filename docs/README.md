@@ -25,6 +25,6 @@ Start here. Find your task in the table, then open that page. Each page starts w
 
 - TS is the source of truth for the report. `dist/` is build output plus Desktop edits.
 - The model (TMDL) stays as plain files. pbirkit copies it and does not check field names against it.
-- Every PBIR file has a `$schema` URL. In TS you import the module of that exact version, for example `pbirkit/visual/2.11.0`.
+- Every PBIR file has a `$schema` URL. In TS you import the module of that exact version, for example `pbirkit/schemas/visual/2.11.0`.
 - Run the command as `npx pbirkit` in a project that installs it.
 - `pbirkit <command> --help` gives the exact flags. If a page here disagrees with the help, the help wins.

@@ -25,7 +25,7 @@ pbirkit is one npm package, `pbirkit`. It holds the `pbirkit` command and every 
    ```sh
    npx pbirkit --version
    ```
-3. Import modules from `pbirkit/*`, for example `pbirkit/config`, `pbirkit/expr` and `pbirkit/visual/2.11.0`.
+3. Import modules from `pbirkit/*`, for example `pbirkit/config`, `pbirkit/expr` and `pbirkit/schemas/visual/2.11.0`.
 
 To try pbirkit without an install, run `npx --package pbirkit pbirkit import ...`. The typecheck still works, because the command points `.pbirkit/tsconfig.json` at the copy that npx downloaded.
 

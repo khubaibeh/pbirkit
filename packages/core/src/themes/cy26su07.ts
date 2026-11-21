@@ -1,5 +1,5 @@
 import { baseTheme, themeRef } from "../resource.ts";
-import { defineTheme } from "../schemas/theme/index.ts";
+import { defineTheme } from "../schemas/theme.ts";
 
 export const cy26su07 = baseTheme({
 	name: "CY26SU07",

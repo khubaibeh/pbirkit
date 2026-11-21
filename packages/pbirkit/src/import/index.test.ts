@@ -33,7 +33,7 @@ const core = fileURLToPath(new URL("../../../core", import.meta.url));
 const tsgo = fileURLToPath(new URL("../../../../node_modules/.bin/tsgo", import.meta.url));
 
 const sourceConfig = `import { defineConfig } from "@pbirkit/core/config";
-import { SchemaUrl } from "@pbirkit/core/schema-url";
+import { SchemaUrl } from "@pbirkit/core/schemas/schema-url";
 
 const platform = { $schema: SchemaUrl.platform["2.1.0"], version: "2.0" } as const;
 const visual = (name: string, x: number, visualType = "textbox") => ({
@@ -195,7 +195,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	const page = readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8");
 	expect(page).toContain('import _1Card from "./visuals/1-card.ts";');
 	expect(page).toContain('import _1Card2 from "./visuals/1-card-2.ts";');
-	expect(page).toContain('import { definePage } from "@pbirkit/core/page/2.1.0";');
+	expect(page).toContain('import { definePage } from "@pbirkit/core/schemas/page/2.1.0";');
 	expect(page).toContain("export default definePage({");
 	expect(page).not.toContain("$schema");
 	expect(contents).toContain('$schema: SchemaUrl.report["3.3.0"],');

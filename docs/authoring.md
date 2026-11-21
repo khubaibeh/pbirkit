@@ -7,15 +7,15 @@ Read this when you write or change pages, visuals, bookmarks or themes in TS.
 Each PBIR file kind has one module per Microsoft schema version. Import the one that matches the file's `$schema`:
 
 ```ts
-import { defineBookmark } from "pbirkit/bookmark/2.0.0";
-import { definePage } from "pbirkit/page/2.0.0";
-import { defineReport } from "pbirkit/report/3.3.0";
-import { defineVisual } from "pbirkit/visual/2.11.0";
+import { defineBookmark } from "pbirkit/schemas/bookmark/2.0.0";
+import { definePage } from "pbirkit/schemas/page/2.0.0";
+import { defineReport } from "pbirkit/schemas/report/3.3.0";
+import { defineVisual } from "pbirkit/schemas/visual/2.11.0";
 ```
 
 The `define*` helper fills in `$schema`, and it rejects keys that the schema does not allow. Different files in one report can use different versions. When Desktop saves a file, it can raise that file's version (for example visual 2.5.0 to 2.11.0). Port that version raise with the rest of the change.
 
-`SchemaUrl` from `pbirkit/schema-url` holds every URL, for example `SchemaUrl.report["3.3.0"]`.
+`SchemaUrl` from `pbirkit/schemas/schema-url` holds every URL, for example `SchemaUrl.report["3.3.0"]`.
 
 | Kind               | Versions       |
 | ------------------ | -------------- |
@@ -29,7 +29,7 @@ The `define*` helper fills in `$schema`, and it rejects keys that the schema doe
 
 ```ts
 import { measure, obj, project, role } from "pbirkit/expr";
-import { defineVisual } from "pbirkit/visual/2.11.0";
+import { defineVisual } from "pbirkit/schemas/visual/2.11.0";
 
 export default defineVisual({
 	name: "revenue-card",
@@ -52,7 +52,7 @@ export default defineVisual({
 ## A page
 
 ```ts
-import { definePage } from "pbirkit/page/2.0.0";
+import { definePage } from "pbirkit/schemas/page/2.0.0";
 
 import revenue from "./visuals/revenue-card.ts";
 

@@ -2,9 +2,9 @@ import { Array, Record, String, Struct, Union, decodeUnknownSync, optionalKey } 
 
 import { FontFace, FontSize } from "#core/font.ts";
 
-import { ThemeColor, VisualStyles } from "./styles.ts";
+import { ThemeColor, VisualStyles } from "./theme/styles.ts";
 
-export * from "./styles.ts";
+export * from "./theme/styles.ts";
 
 export const TextClass = Struct({
 	fontFace: optionalKey(FontFace),
