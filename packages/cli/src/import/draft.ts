@@ -16,6 +16,7 @@ import type { BookmarkNode, Content, PageNode, ReportTree } from "@pbirkit/core/
 import { fileKey, isOwned, projectEntries, sameText, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
 import { jsonDifferences, parseJson } from "../diff/compare.ts";
+import { Layout } from "../layout.ts";
 import type { Project } from "../pbip/project.ts";
 import { fileJson } from "../pbip/tree.ts";
 
@@ -311,7 +312,7 @@ const draftModel = (context: Context, folder: string): ModelConfig => {
 	const unappliedChanges = source(".pbi/unappliedChanges.json");
 	const daxQueries = sourceFolder("DAXQueries");
 	const tmdlScripts = sourceFolder("TMDLScripts");
-	context.fallback("Model definition", "Kept the semantic model definition in assets/model");
+	context.fallback("Model definition", `Kept the semantic model definition in ${Layout.model}`);
 
 	return {
 		...(platform instanceof URL

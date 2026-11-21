@@ -219,10 +219,29 @@ const filterOf = (
 };
 
 const SortClause = Struct({ field: Expression, direction: Literals(["Ascending", "Descending"]) });
-
 const Operands = Struct({ Left: Expression, Right: Expression });
-
 const EntitySource = Struct({ Name: StringSchema, Entity: StringSchema, Type: Literal(0) });
+const InCondition = Struct({
+	In: Struct({ Expressions: Tuple([Expression]), Values: ArraySchema(Tuple([Expression])) }),
+});
+
+const unaliased = (value: unknown, source: string, entity: string): unknown => {
+	if (same(value, expr.alias(source))) return expr.entity(entity);
+	if (Arr.isArray(value)) return value.map((item) => unaliased(item, source, entity));
+
+	return isPlainObject(value) ? Record.map(value, (item) => unaliased(item, source, entity)) : value;
+};
+
+const valueList = (
+	name: "inValues" | "notIn",
+	[{ Name, Entity }]: readonly [typeof EntitySource.Type],
+	{ In: { Expressions, Values } }: typeof InCondition.Type,
+): Option.Option<HelperMatch> =>
+	helper(name, [
+		unaliased(Expressions[0], Name, Entity),
+		Values.map(([value]) => plainValue(value, () => true)),
+		...(Name === expr.defaultAlias(Entity) ? [] : [Name]),
+	]);
 
 const RULES: ReadonlyMap<string, ReadonlyArray<Rule>> = new Map(
 	Object.entries({
@@ -370,6 +389,22 @@ const RULES: ReadonlyMap<string, ReadonlyArray<Rule>> = new Map(
 			rule(
 				Struct({
 					Version: Literal(2),
+					From: Tuple([EntitySource]),
+					Where: Tuple([Struct({ Condition: InCondition })]),
+				}),
+				({ From, Where: [{ Condition }] }) => valueList("inValues", From, Condition),
+			),
+			rule(
+				Struct({
+					Version: Literal(2),
+					From: Tuple([EntitySource]),
+					Where: Tuple([Struct({ Condition: Struct({ Not: Struct({ Expression: InCondition }) }) })]),
+				}),
+				({ From, Where: [{ Condition }] }) => valueList("notIn", From, Condition.Not.Expression),
+			),
+			rule(
+				Struct({
+					Version: Literal(2),
 					From: ArraySchema(EntitySource),
 					Where: ArraySchema(Struct({ Condition: Expression })),
 				}),
@@ -437,21 +472,24 @@ const annotated = ({ Annotations: annotations, ...expression }: Raw): Option.Opt
 
 const SingleEntry = decodeUnknownOption(Tuple([Entry]), EXACT);
 
-const matchOf = (value: unknown): Option.Option<HelperMatch> => {
+export const helperMatch = (value: unknown): Option.Option<HelperMatch> => {
+	const fits = (found: Option.Option<HelperMatch>) => Option.filter(found, (match) => builds(match, value));
+
 	if (Arr.isArray(value))
-		return Option.flatMap(SingleEntry(value), ([entry]) =>
-			Option.flatMap(entryArgs(entry), (args) => helper("obj", args)),
+		return fits(
+			Option.flatMap(SingleEntry(value), ([entry]) =>
+				Option.flatMap(entryArgs(entry), (args) => helper("obj", args)),
+			),
 		);
 	if (!isPlainObject(value)) return Option.none();
+
 	const rules = Arr.head(Object.keys(value)).pipe(
 		Option.flatMap((key) => Option.fromUndefinedOr(RULES.get(key))),
 		Option.getOrElse((): ReadonlyArray<Rule> => []),
 	);
+
 	return Option.orElse(
-		Arr.findFirst(rules, (match) => match(value)),
-		() => annotated(value),
+		Arr.findFirst(rules, (match) => fits(match(value))),
+		() => fits(annotated(value)),
 	);
 };
-
-export const helperMatch = (value: unknown): Option.Option<HelperMatch> =>
-	Option.filter(matchOf(value), (found) => builds(found, value));

@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
 
-import { renderModule } from "./modules.ts";
+import { renderModule, swapsOf } from "./modules.ts";
+import { colorName, colorRoles, keyOf, nameScope, wordsOf } from "./names.ts";
 
 const VISUAL_JSON = `{
   "name": "sales",
@@ -269,7 +270,7 @@ const VISUAL_JSON = `{
   }
 }`;
 
-const VISUAL_TS = `import { alias, categorical, col, defaultSort, desc, double, filterDef, from, gt, isIn, literal, long, measure, nil, obj, project, role, solid, text, theme, when, wildcard } from "@pbirkit/core/expr";
+const VISUAL_TS = `import { categorical, col, defaultSort, desc, double, gt, inValues, literal, long, measure, nil, obj, project, role, solid, text, theme, when, wildcard } from "@pbirkit/core/expr";
 
 export default {
 	name: "sales",
@@ -298,7 +299,7 @@ export default {
 	filterConfig: {
 		filters: [
 			categorical("f1", col("Sales", "Year"), {
-				filter: filterDef([from("s", "Sales")], isIn([col(alias("s"), "Year")], [[long(2024)], [nil]])),
+				filter: inValues(col("Sales", "Year"), [long(2024), nil]),
 				howCreated: "User",
 			}),
 		],
@@ -334,4 +335,155 @@ export default {
 	zero: -0,
 } as const;
 `);
+});
+
+const literalProperty = (Value: string) => ({ expr: { Literal: { Value } } });
+
+it("swaps ids, colours and images for members of shared modules", () => {
+	const ids = {
+		value: { pages: { overview: "a3f9c1d2e4b5f6a7b8c9" } },
+		paths: new Map([["a3f9c1d2e4b5f6a7b8c9", ["pages", "overview"]]]),
+	};
+	const roles = colorRoles([{ foreground: "#252423", dataColors: ["#118DFF"] }]);
+	const swaps = swapsOf(ids, new Map([["logo.png", "logo"]]), (color) => colorName(roles, color), true);
+	const value = {
+		name: "a3f9c1d2e4b5f6a7b8c9",
+		fill: { solid: { color: literalProperty("'#118DFF'") } },
+		line: { solid: { color: literalProperty("'#ABCDEF'") } },
+		label: literalProperty("'#118DFF'"),
+		sections: { a3f9c1d2e4b5f6a7b8c9: { visible: true } },
+		image: {
+			expr: {
+				ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "logo.png" },
+			},
+		},
+		other: {
+			expr: {
+				ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
+			},
+		},
+		reordered: {
+			expr: {
+				ResourcePackageItem: { ItemName: "logo.png", PackageName: "RegisteredResources", PackageType: 1 },
+			},
+		},
+		filter: {
+			Version: 2,
+			From: [{ Name: "x", Entity: "Sales", Type: 0 }],
+			Where: [
+				{
+					Condition: {
+						Not: {
+							Expression: {
+								In: {
+									Expressions: [
+										{ Column: { Expression: { SourceRef: { Source: "x" } }, Property: "Region" } },
+									],
+									Values: [[literalProperty("'East'").expr]],
+								},
+							},
+						},
+					},
+				},
+			],
+		},
+	};
+	expect(renderModule("src/pages/p/index.ts", value, () => "", { idiomatic: true, swaps }))
+		.toBe(`import { col, imageRef, notIn, solid, v } from "@pbirkit/core/expr";
+import ids from "#/ids.ts";
+import palette from "#/palette.ts";
+import resources from "#/resources.ts";
+
+export default {
+	name: ids.pages.overview,
+	fill: solid(palette.data1),
+	line: solid(palette.hexABCDEF),
+	label: v("#118DFF"),
+	sections: { [ids.pages.overview]: { visible: true } },
+	image: v(imageRef(resources.logo)),
+	other: v({
+		ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
+	}),
+	reordered: v({
+		ResourcePackageItem: { ItemName: "logo.png", PackageName: "RegisteredResources", PackageType: 1 },
+	}),
+	filter: notIn(col("Sales", "Region"), ["East"], "x"),
+} as const;
+`);
+});
+
+it("points bookmark ids at page and visual modules and qualifies clashing imports", () => {
+	const page = "a3f9c1d2e4b5f6a7b8c9";
+	const card = "b4f9c1d2e4b5f6a7b8c9";
+	const other = "c5f9c1d2e4b5f6a7b8c9";
+	const ids = {
+		value: {},
+		paths: new Map([
+			[page, ["pages", "overview"]],
+			[card, ["visuals", "overview", "card"]],
+			[other, ["visuals", "detail", "card"]],
+		]),
+	};
+	const targets = new Map([
+		[page, "src/pages/overview/index.ts"],
+		[card, "src/pages/overview/visuals/card.ts"],
+		[other, "src/pages/detail/visuals/card.ts"],
+	]);
+	const swaps = swapsOf(ids, new Map(), (color) => color, true, targets);
+	const value = {
+		activeSection: page,
+		sections: { [page]: { visualContainers: { [card]: {}, [other]: {} } } },
+	};
+
+	expect(renderModule("src/bookmarks/b.ts", value, () => "", { idiomatic: true, swaps }))
+		.toBe(`import _overview from "#/pages/overview/index.ts";
+import _card from "#/pages/overview/visuals/card.ts";
+import _detailCard from "#/pages/detail/visuals/card.ts";
+
+export default {
+	activeSection: _overview.name,
+	sections: { [_overview.name]: { visualContainers: { [_card.name]: {}, [_detailCard.name]: {} } } },
+} as const;
+`);
+});
+
+it("keeps a relative URL for static paths that Node cannot resolve through an alias", () => {
+	const value = {
+		logo: new URL("file:///p/logo%20one.png"),
+		blocked: new URL("file:///p/NODE_MODULES/a.png"),
+		folder: new URL("file:///p/CustomVisuals/"),
+	};
+	const assets = new Map([
+		["/p/logo%20one.png", "static/logo one.png"],
+		["/p/NODE_MODULES/a.png", "static/NODE_MODULES/a.png"],
+		["/p/CustomVisuals/", "static/CustomVisuals"],
+	]);
+
+	expect(renderModule("src/resources.ts", value, (url) => assets.get(url.pathname) ?? ""))
+		.toBe(`export default {
+	logo: new URL(import.meta.resolve("#static/logo%20one.png")),
+	blocked: new URL("../static/NODE_MODULES/a.png", import.meta.url),
+	folder: new URL(\`\${import.meta.resolve("#static/CustomVisuals")}/\`),
+} as const;
+`);
+});
+
+it("names ids and colours as dotted keys without clashes", () => {
+	expect(keyOf(wordsOf("2.1 - Executive Summary"))).toBe("_21ExecutiveSummary");
+	expect(keyOf(wordsOf("KPI card"))).toBe("kpiCard");
+	expect(keyOf(wordsOf("Café milestoneTable"))).toBe("cafeMilestoneTable");
+
+	const scope = nameScope(["index"]);
+	expect(scope(wordsOf("Index"))).toEqual({ file: "index-2", key: "index2" });
+	expect(scope(wordsOf("KPI card"))).toEqual({ file: "kpi-card", key: "kpiCard" });
+	expect(scope(wordsOf("kpi-Card"))).toEqual({ file: "kpi-card-2", key: "kpiCard2" });
+	expect(scope(["card"], true)).toEqual({ file: "card-1", key: "card1" });
+	expect(scope(["a".repeat(70)]).file).toHaveLength(64);
+	expect(scope(wordsOf(`${"word ".repeat(20)}end`)).file).toBe(
+		Array.from({ length: 13 }, () => "word").join("-"),
+	);
+
+	const roles = colorRoles([{ foreground: "#000000" }, { foreground: "#111111", dataColors: ["#000000"] }]);
+	expect([...roles]).toEqual([["#000000", "foreground"]]);
+	expect(colorName(roles, "#111111")).toBe("hex111111");
 });

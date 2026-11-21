@@ -7,6 +7,7 @@ import { fileKey } from "../build/tree.ts";
 import { compareProject } from "../diff/compare.ts";
 import { renderComparison } from "../diff/render.ts";
 import { NO_SELECTORS } from "../diff/scope.ts";
+import { Layout } from "../layout.ts";
 import { errorMessage, exitWith } from "../messages.ts";
 import { ProjectSourceError } from "../pbip/errors.ts";
 import { findProject } from "../pbip/project.ts";
@@ -14,7 +15,7 @@ import type { Project } from "../pbip/project.ts";
 import { indexTree } from "../pbip/tree.ts";
 import { settleConfig } from "./draft.ts";
 import { diffCommand, verifiedMessage, writtenMessage } from "./messages.ts";
-import { CONFIG_FILE, importFiles, supportFiles } from "./modules.ts";
+import { importFiles, supportFiles } from "./modules.ts";
 import { checkOutput, writeImport } from "./output.ts";
 
 const flags = {
@@ -73,14 +74,22 @@ const runImport = Effect.fnUntraced(function* ({
 
 	const project = yield* findProject(source);
 	yield* requireFiles(project);
-	const { config, fallbacks } = settleConfig(project, indexTree(project.name, project.report, project.tree));
+	const index = indexTree(project.name, project.report, project.tree);
+	const { config, fallbacks } = settleConfig(project, index);
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	const files = importFiles(project, config, idiomatic);
+	const files = importFiles(project, index, config, fallbacks, idiomatic);
 	yield* checkOutput(out, project, files, force);
 	yield* writeImport(out, files, supportFiles());
 
-	const configFile = path.join(out, CONFIG_FILE);
-	yield* Console.log(writtenMessage(fromCwd(path, configFile), config, fallbacks));
+	const configFile = path.join(out, Layout.config);
+	yield* Console.log(
+		writtenMessage(
+			fromCwd(path, configFile),
+			fromCwd(path, path.join(out, Layout.report)),
+			config,
+			fallbacks,
+		),
+	);
 	const loaded = yield* loadConfig(configFile, false);
 	const comparison = yield* compareProject(loaded.config, project.root, "text", NO_SELECTORS);
 	if (comparison.differences.length > 0) {

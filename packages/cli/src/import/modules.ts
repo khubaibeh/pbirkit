@@ -1,23 +1,74 @@
 import { posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Array as Arr, HashMap, Option } from "effect";
+import { Array as Arr, HashMap, Option, Predicate } from "effect";
+import { Literal, String as StringSchema, Struct, decodeUnknownOption } from "effect/Schema";
 
 import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
+import { at, imageRef } from "@pbirkit/core/expr";
+import { SchemaUrl } from "@pbirkit/core/schema-url";
+import type { ReportTree } from "@pbirkit/core/tree";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
-import { LOCAL_TSCONFIG } from "../build/core-types.ts";
 import { fileKey, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { Layout } from "../layout.ts";
 import type { Project } from "../pbip/project.ts";
-import { LINE_WIDTH, ModuleReference, Node, helperNames, property, toNode } from "./nodes.ts";
+import { fileJson } from "../pbip/tree.ts";
+import type { Fallback } from "./draft.ts";
+import {
+	colorName,
+	colorRoles,
+	fileOf,
+	idsOf,
+	isColor,
+	keyOf,
+	nameScope,
+	namesOf,
+	wordsOf,
+} from "./names.ts";
+import type { Ids, Names } from "./names.ts";
+import {
+	HelperCall,
+	LINE_WIDTH,
+	ModuleMember,
+	ModuleReference,
+	NO_SWAPS,
+	Node,
+	helperNames,
+	memberPath,
+	toNode,
+} from "./nodes.ts";
+import type { Swaps } from "./nodes.ts";
+import { importReport } from "./report.ts";
 
-export const CONFIG_FILE = "pbirkit.config.ts";
+const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
+	[Layout.ids, "ids"],
+	[Layout.palette, "palette"],
+	[Layout.resources, "resources"],
+	[Layout.pages, "pages"],
+	[Layout.bookmarks, "bookmarks"],
+]);
+const SCHEMA_URL = "@pbirkit/core/schema-url";
+const PACKAGE_EXPORTS: ReadonlyMap<string, string> = new Map([[SCHEMA_URL, "SchemaUrl"]]);
+const SCHEMA_PATHS: ReadonlyMap<string, ReadonlyArray<string>> = new Map(
+	Object.entries(SchemaUrl).flatMap(([kind, versions]) =>
+		Object.entries(versions).map(([version, url]) => [url, [kind, version]] as const),
+	),
+);
+const DEFINERS: ReadonlyMap<string, string> = new Map([
+	["visual", "defineVisual"],
+	["page", "definePage"],
+	["bookmark", "defineBookmark"],
+]);
+const CONFIG_DEFINER = { name: "defineConfig", from: "@pbirkit/core/config" };
+const encoder = new TextEncoder();
 
 type Report = Config["report"];
 type Page = Report["pages"][number];
 type Resource = NonNullable<Report["resources"]>[number];
+type Visual = Page["visuals"][number];
 
 export interface ImportFiles {
 	readonly files: ReadonlyArray<TreeFile>;
@@ -27,17 +78,18 @@ export interface ImportFiles {
 interface Module {
 	readonly file: string;
 	readonly value: unknown;
+	readonly swaps: boolean;
+	readonly links: boolean;
 }
 
-const encoder = new TextEncoder();
+export type Located = ReadonlyMap<unknown, string>;
+
+type ModuleSwaps = Omit<Swaps, "nameOf">;
 
 const block = (depth: number, open: string, items: ReadonlyArray<string>, close: string) =>
 	items.length === 0
 		? `${open}${close}`
 		: `${open}\n${items.map((entry) => `${"\t".repeat(depth + 1)}${entry},\n`).join("")}${"\t".repeat(depth)}${close}`;
-
-export const moduleFileName = (name: string): string =>
-	encodeURIComponent(name).replaceAll("~", "%7E").replaceAll("%", "~");
 
 const urlPath = (path: string): string =>
 	path
@@ -50,20 +102,40 @@ const relativeTo = (file: string, target: string): string => {
 	return path.startsWith("../") ? path : `./${path}`;
 };
 
-const identifierOf = (file: string): string => {
-	const name = posix.basename(file, ".ts");
-	return `_${(name === "page" ? posix.basename(posix.dirname(file)) : name).replaceAll(/[^\w$]/gu, "_")}`;
+const isSource = (path: string): boolean => !posix.relative(Layout.sources, path).startsWith("../");
+
+const specifierOf = (file: string, target: string): string => {
+	const path = relativeTo(file, target);
+	const aliased = isSource(target) && (!isSource(file) || path.startsWith("../"));
+
+	return aliased ? `${Layout.alias}${urlPath(posix.relative(Layout.sources, target))}` : urlPath(path);
 };
 
-const uniquePaths = () => {
-	const used = new Set<string>();
-	return (base: string, extension: string): string => {
-		let candidate = `${base}${extension}`;
-		for (let suffix = 2; used.has(fileKey(candidate)); suffix += 1)
-			candidate = `${base}_${suffix}${extension}`;
-		used.add(fileKey(candidate));
-		return candidate;
-	};
+const identifierOf = (file: string): string => {
+	const shared = SHARED_MODULES.get(file) ?? PACKAGE_EXPORTS.get(file);
+	if (shared !== undefined) return shared;
+
+	const name = posix.basename(file, ".ts");
+	const key = keyOf(wordsOf(name === Layout.indexName ? posix.basename(posix.dirname(file)) : name));
+
+	return key.startsWith("_") ? key : `_${key === "" ? "module" : key}`;
+};
+
+const qualifiedIdentifierOf = (file: string): string => {
+	const parts = posix
+		.relative(Layout.sources, file)
+		.replace(/\.ts$/u, "")
+		.split("/")
+		.slice(1)
+		.filter((part) => part !== Layout.visualsFolder && part !== Layout.indexName);
+	const key = keyOf(parts.flatMap((part) => wordsOf(part)));
+
+	return key.startsWith("_") ? key : `_${key === "" ? "module" : key}`;
+};
+
+const fileName = (text: string, fallback: string): string => {
+	const words = wordsOf(text);
+	return fileOf(words.length === 0 ? [fallback] : words);
 };
 
 const assetPath = (project: Project, path: string): string => {
@@ -72,9 +144,10 @@ const assetPath = (project: Project, path: string): string => {
 			? path.slice(folder.length + 1)
 			: undefined;
 	const report = under(project.report);
-	if (report !== undefined) return `assets/report/${report}`;
+	if (report !== undefined) return Layout.staticFile(report);
+
 	const model = under(project.model);
-	return model === undefined ? `assets/${path}` : `assets/model/${model}`;
+	return model === undefined ? Layout.staticFile(path) : Layout.modelFile(model);
 };
 
 const projectPath = (project: Project, url: URL): string =>
@@ -82,18 +155,58 @@ const projectPath = (project: Project, url: URL): string =>
 
 const isFolder = (url: URL): boolean => url.pathname.endsWith("/");
 
+const isResolvable = (part: string): boolean =>
+	part !== "" &&
+	part !== "." &&
+	part !== ".." &&
+	part.toLowerCase() !== "node_modules" &&
+	!part.includes("\\");
+
+const urlText = (file: string, asset: string, folder: boolean): string => {
+	const inside = posix.relative(Layout.staticFolder, asset);
+	const aliased = !inside.startsWith("../") && inside.split("/").every((part) => isResolvable(part));
+	if (!aliased)
+		return `new URL(${JSON.stringify(`${urlPath(relativeTo(file, asset))}${folder ? "/" : ""}`)}, import.meta.url)`;
+
+	const resolved = `import.meta.resolve(${JSON.stringify(`${Layout.staticAlias}${urlPath(inside)}`)})`;
+	return folder ? `new URL(\`\${${resolved}}/\`)` : `new URL(${resolved})`;
+};
+
+interface Definer {
+	readonly name: string;
+	readonly from: string;
+}
+
+const definerOf = (value: unknown): { readonly definer: Definer; readonly value: unknown } | undefined => {
+	if (!Predicate.isReadonlyObject(value) || Array.isArray(value)) return undefined;
+
+	const [first, ...rest] = Object.entries(value);
+	const schema =
+		first?.[0] === "$schema" && typeof first[1] === "string" ? SCHEMA_PATHS.get(first[1]) : undefined;
+	const [kind = "", version = ""] = schema ?? [];
+	const name = DEFINERS.get(kind);
+	if (name === undefined) return undefined;
+
+	return { definer: { name, from: `@pbirkit/core/${kind}/${version}` }, value: Object.fromEntries(rest) };
+};
+
 export const renderModule = (
 	file: string,
 	value: unknown,
 	assetOf: (url: URL) => string,
-	{ header = "", idiomatic = false }: { readonly header?: string; readonly idiomatic?: boolean } = {},
+	{
+		header = "",
+		idiomatic = false,
+		swaps = NO_SWAPS,
+	}: { readonly header?: string; readonly idiomatic?: boolean; readonly swaps?: ModuleSwaps } = {},
 ): string => {
 	const imports = new Map<string, string>();
 	const names = new Set<string>();
 	const importName = (target: string): string => {
 		const known = imports.get(target);
 		if (known !== undefined) return known;
-		const base = identifierOf(target);
+		const short = identifierOf(target);
+		const base = names.has(short) ? qualifiedIdentifierOf(target) : short;
 		let name = base;
 		for (let suffix = 2; names.has(name); suffix += 1) name = `${base}_${suffix}`;
 		names.add(name);
@@ -118,8 +231,8 @@ export const renderModule = (
 		Node.$match(node, {
 			Scalar: ({ text }) => text,
 			Module: ({ file: target }) => importName(target),
-			Url: ({ url }) =>
-				`new URL(${JSON.stringify(`${urlPath(relativeTo(file, assetOf(url)))}${isFolder(url) ? "/" : ""}`)}, import.meta.url)`,
+			Member: ({ file: target, path }) => `${importName(target)}${memberPath(path)}`,
+			Url: ({ url }) => urlText(file, assetOf(url), isFolder(url)),
 			Constant: ({ name }) => name,
 			Call: ({ name, args }) =>
 				Option.getOrElse(hugged(name, args, depth), () =>
@@ -141,27 +254,30 @@ export const renderModule = (
 				block(
 					depth,
 					"{",
-					entries.map(([key, item]) => `${property(key)}: ${render(item, depth + 1)}`),
+					entries.map(([key, item]) => `${key}: ${render(item, depth + 1)}`),
 					"}",
 				),
 		});
 
-	const tree = toNode(value, idiomatic);
+	const defined = file === Layout.config ? { definer: CONFIG_DEFINER, value } : definerOf(value);
+	const tree = toNode(defined?.value ?? value, idiomatic, { ...swaps, nameOf: importName });
 	const used = [...new Set(helperNames(tree))].toSorted();
-	const isConfig = file === CONFIG_FILE;
 	const body = render(tree, 0);
 	const lines = [
-		...(isConfig ? ['import { defineConfig } from "@pbirkit/core/config";'] : []),
+		...(defined === undefined ? [] : [`import { ${defined.definer.name} } from "${defined.definer.from}";`]),
 		...(used.length === 0 ? [] : [`import { ${used.join(", ")} } from "@pbirkit/core/expr";`]),
-		...Array.from(
-			imports,
-			([target, name]) => `import ${name} from ${JSON.stringify(urlPath(relativeTo(file, target)))};`,
+		...Array.from(imports, ([target, name]) =>
+			PACKAGE_EXPORTS.has(target)
+				? `import { ${name} } from ${JSON.stringify(target)};`
+				: `import ${name} from ${JSON.stringify(specifierOf(file, target))};`,
 		),
 	];
 	return [
 		...(lines.length === 0 ? [] : [...lines, ""]),
 		...(header === "" ? [] : [header, ""]),
-		isConfig ? `export default defineConfig(${body});` : `export default ${body} as const;`,
+		defined === undefined
+			? `export default ${body} as const;`
+			: `export default ${defined.definer.name}(${body});`,
 		"",
 	].join("\n");
 };
@@ -212,57 +328,243 @@ const registerBlock = (config: Config): string => {
 			].join("\n");
 };
 
+const groupTree = (visuals: ReadonlyArray<Visual>) => {
+	const names = new Set(visuals.map((visual) => visual.name));
+	const groups = new Set(visuals.flatMap((visual) => ("visualGroup" in visual ? [visual.name] : [])));
+	const parents = new Map(
+		visuals.flatMap((visual) => {
+			const parent = "parentGroupName" in visual ? visual.parentGroupName : undefined;
+			return typeof parent === "string" ? [[visual.name, parent] as const] : [];
+		}),
+	);
+
+	const reaches = (from: string, target: string) => {
+		const seen = new Set<string>();
+
+		for (
+			let step: string | undefined = from;
+			step !== undefined && !seen.has(step);
+			step = parents.get(step)
+		) {
+			if (step === target) return true;
+			seen.add(step);
+		}
+
+		return false;
+	};
+
+	const parentOf = (name: string): string | undefined => {
+		const parent = parents.get(name);
+		return parent !== undefined && groups.has(parent) && !reaches(parent, name) ? parent : undefined;
+	};
+
+	const chainOf = (name: string): ReadonlyArray<string> => {
+		const chain: Array<string> = [];
+		for (let parent = parentOf(name); parent !== undefined; parent = parentOf(parent)) chain.unshift(parent);
+
+		return chain;
+	};
+
+	const withChildren = new Set(visuals.flatMap((visual) => parentOf(visual.name) ?? []));
+
+	return { names, parentOf, chainOf, hasChildren: (name: string) => withChildren.has(name) };
+};
+
 const projectModules = (
 	config: Config,
-): { readonly modules: ReadonlyArray<Module>; readonly root: unknown } => {
+	names: Names,
+): {
+	readonly modules: ReadonlyArray<Module>;
+	readonly root: unknown;
+	readonly images: ReadonlyMap<string, string>;
+	readonly located: Located;
+	readonly targets: ReadonlyMap<string, string>;
+} => {
 	const modules: Array<Module> = [];
-	const unique = uniquePaths();
-	const add = (file: string, value: unknown) => {
-		modules.push({ file, value });
+	const targets = new Map<string, string>();
+	const images = new Map<string, string>();
+	const imageResources: Record<string, unknown> = {};
+	const located = new Map<unknown, string>();
+	const pageFiles = new Map<string, string>();
+	const themeName = nameScope();
+	const imageName = nameScope();
+	const add = (file: string, value: unknown, swaps = true, links = false) => {
+		modules.push({ file, value, swaps, links });
+		located.set(value, file);
 		return new ModuleReference(file);
 	};
 
 	const pageModule = (page: Page) => {
-		const folder = unique(`pages/${moduleFileName(page.name)}`, "");
-		const visuals = page.visuals.map((visual) =>
-			isRaw(visual) ? visual : add(unique(`${folder}/visuals/${moduleFileName(visual.name)}`, ".ts"), visual),
-		);
-		return add(`${folder}/page.ts`, { ...page, visuals });
+		const folder = names.pages.get(page.name)?.file ?? fileName(page.name, "page");
+		const own = names.visuals.get(page.name);
+		const tree = groupTree(page.visuals.filter((visual) => !isRaw(visual)));
+		const baseName = (name: string) => own?.get(name)?.file ?? fileName(name, "visual");
+		const visualFile = (name: string) => {
+			const chain = tree.chainOf(name);
+			const folders = chain.slice(0, Layout.groupDepth).map((group) => baseName(group));
+			const foldered = tree.hasChildren(name) && chain.length < Layout.groupDepth;
+
+			return Layout.visual(folder, [...folders, baseName(name), ...(foldered ? [Layout.indexName] : [])]);
+		};
+		const modulesOf = tree.names;
+		const memberOf = (name: unknown) =>
+			typeof name === "string" && modulesOf.has(name) ? new ModuleMember(visualFile(name), ["name"]) : name;
+
+		const withParent = (visual: Visual) => {
+			const parent = tree.parentOf(visual.name);
+			if (parent === undefined) return visual;
+
+			return { ...visual, parentGroupName: new ModuleMember(visualFile(parent), ["name"]) };
+		};
+
+		const visuals = page.visuals.map((visual) => {
+			if (isRaw(visual)) return visual;
+
+			const file = visualFile(visual.name);
+			located.set(visual, file);
+			targets.set(visual.name, file);
+			return add(file, withParent(visual));
+		});
+
+		const interactions = "visualInteractions" in page ? page.visualInteractions : undefined;
+		const linked =
+			interactions === undefined
+				? {}
+				: {
+						visualInteractions: interactions.map((entry) =>
+							Object.fromEntries(
+								Object.entries(entry).map(([key, value]) => [
+									key,
+									key === "source" || key === "target" ? memberOf(value) : value,
+								]),
+							),
+						),
+					};
+
+		const file = Layout.page(folder);
+		located.set(page, file);
+		pageFiles.set(page.name, file);
+		targets.set(page.name, file);
+		return add(file, { ...page, visuals, ...linked });
 	};
 
 	const bookmark = <A extends { readonly name: string }>(item: A) =>
-		isRaw(item) ? item : add(unique(`bookmarks/${moduleFileName(item.name)}`, ".ts"), item);
+		isRaw(item)
+			? item
+			: add(
+					Layout.bookmark(names.bookmarks.get(item.name)?.file ?? fileName(item.name, "bookmark")),
+					item,
+					true,
+					true,
+				);
 
-	const themeModule = (resource: Resource): unknown =>
-		"theme" in resource
-			? {
-					...resource,
-					theme: add(
-						unique(`themes/${moduleFileName(posix.basename(resource.name, ".json"))}`, ".ts"),
-						resource.theme,
-					),
-				}
-			: resource;
+	const resourceModule = (resource: Resource): unknown => {
+		if ("theme" in resource) {
+			const file = Layout.theme(themeName(wordsOf(posix.basename(resource.name, ".json"))).file);
+			return { ...resource, theme: add(file, resource.theme, false) };
+		}
+		if (resource.kind !== "image") return resource;
 
-	const { bookmarks, pages, resources } = config.report;
+		const words = wordsOf(posix.basename(resource.name, posix.extname(resource.name)));
+		const { key } = imageName(words.length > 0 ? words : ["image"]);
+		images.set(resource.name, key);
+		imageResources[key] = resource;
+		return new ModuleMember(Layout.resources, [key]);
+	};
+
+	const { bookmarks, pages, pagesMetadata, resources } = config.report;
+	const pageList = add(
+		Layout.pages,
+		pages.map((page) => pageModule(page)),
+	);
+	const metadata = pagesMetadata instanceof URL ? undefined : pagesMetadata;
+	const active = at(metadata, "activePageName");
+	const activeFile = typeof active === "string" ? pageFiles.get(active) : undefined;
+	const bookmarkItems = bookmarks?.items.map((item) =>
+		"children" in item
+			? { name: item.name, displayName: item.displayName, children: item.children.map(bookmark) }
+			: bookmark(item),
+	);
 	const report = {
 		...config.report,
-		pages: pages.map((page) => pageModule(page)),
-		...(bookmarks === undefined
+		pages: pageList,
+		...(activeFile === undefined
 			? {}
-			: {
-					bookmarks: {
-						...bookmarks,
-						items: bookmarks.items.map((item) =>
-							"children" in item
-								? { name: item.name, displayName: item.displayName, children: item.children.map(bookmark) }
-								: bookmark(item),
-						),
-					},
-				}),
-		...(resources === undefined ? {} : { resources: resources.map((resource) => themeModule(resource)) }),
+			: { pagesMetadata: { ...metadata, activePageName: new ModuleMember(activeFile, ["name"]) } }),
+		...(bookmarks === undefined || bookmarkItems === undefined
+			? {}
+			: { bookmarks: { ...bookmarks, items: add(Layout.bookmarks, bookmarkItems) } }),
+		...(resources === undefined ? {} : { resources: resources.map((resource) => resourceModule(resource)) }),
 	};
-	return { modules, root: { ...config, report } };
+	if (Object.keys(imageResources).length > 0) add(Layout.resources, imageResources, false);
+
+	return { modules, root: { ...config, report }, images, located, targets };
+};
+
+const ImageItem = decodeUnknownOption(
+	Struct({
+		ResourcePackageItem: Struct({
+			PackageName: Literal("RegisteredResources"),
+			PackageType: Literal(1),
+			ItemName: StringSchema,
+		}),
+	}),
+	{ onExcessProperty: "error" },
+);
+
+const schemaMember = (value: string) =>
+	Option.map(Option.fromUndefinedOr(SCHEMA_PATHS.get(value)), (path) => new ModuleMember(SCHEMA_URL, path));
+
+export const swapsOf = (
+	ids: Ids,
+	images: ReadonlyMap<string, string>,
+	colors: (color: string) => string,
+	idiomatic: boolean,
+	targets: ReadonlyMap<string, string> = new Map(),
+): ModuleSwaps => {
+	const idMember = (value: string) =>
+		Option.map(Option.fromUndefinedOr(ids.paths.get(value)), (path) => {
+			const target = targets.get(value);
+			return target === undefined ? new ModuleMember(Layout.ids, path) : new ModuleMember(target, ["name"]);
+		});
+
+	const imageCall = (value: unknown) =>
+		ImageItem(value).pipe(
+			Option.map(({ ResourcePackageItem }) => ResourcePackageItem.ItemName),
+			Option.filter((name) => JSON.stringify(imageRef({ kind: "image", name })) === JSON.stringify(value)),
+			Option.flatMap((name) => Option.fromUndefinedOr(images.get(name))),
+			Option.map((key) => new HelperCall("imageRef", [new ModuleMember(Layout.resources, [key])])),
+		);
+
+	return {
+		swapKey: idMember,
+		swap: (value, helper) => {
+			if (typeof value !== "string") return idiomatic ? imageCall(value) : Option.none();
+
+			const member = Option.orElse(idMember(value), () => schemaMember(value));
+			if (Option.isSome(member) || !idiomatic || helper !== "solid" || !isColor(value)) return member;
+
+			return Option.some(new ModuleMember(Layout.palette, [colors(value)]));
+		},
+	};
+};
+
+const themesOf = (config: Config): ReadonlyArray<unknown> => {
+	const resources = config.report.resources ?? [];
+
+	return ["customTheme", "builtInTheme", "baseTheme"].flatMap((kind) =>
+		resources.flatMap((resource) => (resource.kind === kind && "theme" in resource ? [resource.theme] : [])),
+	);
+};
+
+const paletteOf = (roles: ReadonlyMap<string, string>, used: ReadonlySet<string>) => {
+	const named = [...roles].filter(([color]) => used.has(color));
+	const unnamed = [...used].filter((color) => !roles.has(color)).toSorted();
+
+	return Object.fromEntries([
+		...named.map(([color, name]) => [name, color] as const),
+		...unnamed.map((color) => [colorName(roles, color), color] as const),
+	]);
 };
 
 const urlsIn = (value: unknown): ReadonlyArray<URL> =>
@@ -273,9 +575,9 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			: [];
 
 const SUPPORT_FILES = {
-	"package.json": { type: "module" },
-	"tsconfig.json": {
-		extends: `./${LOCAL_TSCONFIG}`,
+	[Layout.packageJson]: { type: "module", imports: Layout.aliases },
+	[Layout.tsconfig]: {
+		extends: `./${Layout.localTsconfig}`,
 		compilerOptions: {
 			target: "ES2024",
 			module: "NodeNext",
@@ -284,29 +586,51 @@ const SUPPORT_FILES = {
 			allowImportingTsExtensions: true,
 			skipLibCheck: true,
 		},
-		include: [CONFIG_FILE],
+		include: [Layout.config, Layout.sources],
 	},
 };
 
 export const supportFiles = (): ReadonlyArray<TreeFile> => [
-	treeFile(".gitignore", encoder.encode(`${posix.dirname(LOCAL_TSCONFIG)}/\n`)),
+	treeFile(Layout.gitignore, encoder.encode(`${Layout.localFolder}/\n`)),
 	...Object.entries(SUPPORT_FILES).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
 	),
 ];
 
-export const importFiles = (project: Project, config: Config, idiomatic: boolean): ImportFiles => {
+export const importFiles = (
+	project: Project,
+	index: ReportTree,
+	config: Config,
+	fallbacks: ReadonlyArray<Fallback>,
+	idiomatic: boolean,
+): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));
-	const { modules, root } = projectModules(config);
+	const names = namesOf(index, (path) => fileJson(project.tree, path));
+	const { modules, root, images, located, targets } = projectModules(config, names);
+	const ids = idsOf(index, names);
+	const roles = colorRoles(themesOf(config));
+	const used = new Set<string>();
+	const colorOf = (color: string) => {
+		used.add(color);
+		return colorName(roles, color);
+	};
+	const swaps = swapsOf(ids, images, colorOf, idiomatic);
+	const linkSwaps = swapsOf(ids, images, colorOf, idiomatic, targets);
+	const render = (file: string, value: unknown, options: Parameters<typeof renderModule>[3] = {}) =>
+		treeFile(file, encoder.encode(renderModule(file, value, assetOf, { idiomatic, ...options })));
+
 	const rendered = [
-		...modules.map(({ file, value }) =>
-			treeFile(file, encoder.encode(renderModule(file, value, assetOf, { idiomatic }))),
+		...modules.map((module) =>
+			render(module.file, module.value, module.swaps ? { swaps: module.links ? linkSwaps : swaps } : {}),
 		),
-		treeFile(
-			CONFIG_FILE,
-			encoder.encode(renderModule(CONFIG_FILE, root, assetOf, { header: registerBlock(config), idiomatic })),
-		),
+		render(Layout.config, root, { header: registerBlock(config), swaps }),
 	];
+	const shared = [
+		...(ids.paths.size === 0 ? [] : [render(Layout.ids, ids.value)]),
+		...(used.size === 0 ? [] : [render(Layout.palette, paletteOf(roles, used))]),
+		treeFile(Layout.report, encoder.encode(importReport({ config, index, fallbacks, ids, located }))),
+	];
+
 	const sources = Array.from(HashMap.values(project.tree));
 	const urls = urlsIn(config);
 	const assets = urls.flatMap((url) => {
@@ -320,8 +644,9 @@ export const importFiles = (project: Project, config: Config, idiomatic: boolean
 			hash: file.hash,
 		}));
 	});
+
 	return {
-		files: [...rendered, ...assets],
+		files: [...rendered, ...shared, ...assets],
 		folders: urls.filter((url) => isFolder(url)).map((url) => assetPath(project, projectPath(project, url))),
 	};
 };
