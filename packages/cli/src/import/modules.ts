@@ -358,7 +358,16 @@ const groupTree = (visuals: ReadonlyArray<Visual>) => {
 		return parent !== undefined && groups.has(parent) && !reaches(parent, name) ? parent : undefined;
 	};
 
-	return { names, parentOf };
+	const chainOf = (name: string): ReadonlyArray<string> => {
+		const chain: Array<string> = [];
+		for (let parent = parentOf(name); parent !== undefined; parent = parentOf(parent)) chain.unshift(parent);
+
+		return chain;
+	};
+
+	const withChildren = new Set(visuals.flatMap((visual) => parentOf(visual.name) ?? []));
+
+	return { names, parentOf, chainOf, hasChildren: (name: string) => withChildren.has(name) };
 };
 
 const projectModules = (
@@ -389,8 +398,14 @@ const projectModules = (
 		const folder = names.pages.get(page.name)?.file ?? fileName(page.name, "page");
 		const own = names.visuals.get(page.name);
 		const tree = groupTree(page.visuals.filter((visual) => !isRaw(visual)));
-		const visualFile = (name: string) =>
-			Layout.visual(folder, own?.get(name)?.file ?? fileName(name, "visual"));
+		const baseName = (name: string) => own?.get(name)?.file ?? fileName(name, "visual");
+		const visualFile = (name: string) => {
+			const chain = tree.chainOf(name);
+			const folders = chain.slice(0, Layout.groupDepth).map((group) => baseName(group));
+			const foldered = tree.hasChildren(name) && chain.length < Layout.groupDepth;
+
+			return Layout.visual(folder, [...folders, baseName(name), ...(foldered ? [Layout.indexName] : [])]);
+		};
 		const modulesOf = tree.names;
 		const memberOf = (name: unknown) =>
 			typeof name === "string" && modulesOf.has(name) ? new ModuleMember(visualFile(name), ["name"]) : name;

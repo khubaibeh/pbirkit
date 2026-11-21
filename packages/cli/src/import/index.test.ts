@@ -527,6 +527,37 @@ const addGroup = () => {
 	);
 };
 
+it("nests grouped visuals in folders at most two groups deep", () => {
+	const group = (name: string, parent?: string) => {
+		mkdirSync(visual(name));
+		writeFileSync(
+			visual(name, "visual.json"),
+			toJson({
+				$schema:
+					"https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.13.0/schema.json",
+				name,
+				position: { x: 0, y: 0, width: 100, height: 100 },
+				visualGroup: { displayName: name, groupMode: "ScaleMode" },
+				...(parent === undefined ? {} : { parentGroupName: parent }),
+			}),
+		);
+	};
+	group("outer");
+	group("middle", "outer");
+	group("inner", "middle");
+	edit(visual("notes", "visual.json"), (value) =>
+		value.replace('"position"', '"parentGroupName": "inner",\r\n  "position"'),
+	);
+	importProject();
+	const visuals = join(out, "src", "pages", "first", "visuals");
+	expect(existsSync(join(visuals, "outer", "index.ts"))).toBe(true);
+	expect(existsSync(join(visuals, "outer", "middle", "index.ts"))).toBe(true);
+	expect(existsSync(join(visuals, "outer", "middle", "inner.ts"))).toBe(true);
+	expect(readFileSync(join(visuals, "outer", "middle", "notes.ts"), "utf8")).toContain(
+		'import _inner from "./inner.ts";',
+	);
+});
+
 it("keeps the id for a group that names itself as its parent", () => {
 	addGroup();
 	edit(visual("box", "visual.json"), (value) =>
@@ -535,7 +566,7 @@ it("keeps the id for a group that names itself as its parent", () => {
 	const result = run(root, ["import", project, "-o", out]);
 	expect(result.status).toBe(2);
 	expect(result.stderr).toContain("parent groups form a cycle");
-	const box = readFileSync(join(out, "src", "pages", "first", "visuals", "box.ts"), "utf8");
+	const box = readFileSync(join(out, "src", "pages", "first", "visuals", "box", "index.ts"), "utf8");
 	expect(box).not.toContain("import _box");
 	expect(spawnSync(tsgo, ["-p", out], { encoding: "utf8" }).stdout).toBe("");
 });
@@ -547,8 +578,8 @@ it.each([
 	addGroup();
 	const typed = importProject();
 	expect(typed).not.toContain("Visual first/");
-	const notes = readFileSync(join(out, "src", "pages", "first", "visuals", "notes.ts"), "utf8");
-	expect(notes).toContain('import _box from "./box.ts";');
+	const notes = readFileSync(join(out, "src", "pages", "first", "visuals", "box", "notes.ts"), "utf8");
+	expect(notes).toContain('import _box from "./index.ts";');
 	expect(notes).toContain("parentGroupName: _box.name,");
 	rmSync(out, { recursive: true });
 	renameSync(visual("box"), visual(folder));

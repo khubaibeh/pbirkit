@@ -34,8 +34,10 @@ export const Layout = {
 	bookmarks: `${BOOKMARKS}/${INDEX}`,
 	indexName: posix.basename(INDEX, ".ts"),
 	visualsFolder: VISUALS,
+	groupDepth: 2,
 	page: (page: string): string => `${PAGES}/${page}/${INDEX}`,
-	visual: (page: string, visual: string): string => `${PAGES}/${page}/${VISUALS}/${visual}.ts`,
+	visual: (page: string, parts: ReadonlyArray<string>): string =>
+		`${PAGES}/${page}/${VISUALS}/${parts.join("/")}.ts`,
 	bookmark: (bookmark: string): string => `${BOOKMARKS}/${bookmark}.ts`,
 	theme: (theme: string): string => `${SOURCES}/themes/${theme}.ts`,
 	staticFile: (path: string): string => `${STATIC}/${path}`,

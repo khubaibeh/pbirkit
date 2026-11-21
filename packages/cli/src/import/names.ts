@@ -127,7 +127,7 @@ export const namesOf = (index: ReportTree, json: (path: string) => unknown): Nam
 		if (pages.has(page.name)) continue;
 		pages.set(page.name, named(pageScope, [wordsOf(page.displayName), wordsOf(page.name)], ["page"]));
 
-		const visualScope = nameScope();
+		const visualScope = nameScope([Layout.indexName]);
 		const own = new Map<string, ItemName>();
 		for (const visual of flattenVisuals(page.visuals)) {
 			if (own.has(visual.name)) continue;
