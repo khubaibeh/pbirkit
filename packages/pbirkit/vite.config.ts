@@ -46,6 +46,7 @@ export default defineConfig({
 		copy: [
 			{ from: "../core/src", to: "dist", rename: "core" },
 			{ from: "../../docs", to: "." },
+			{ from: "../../THIRD_PARTY_NOTICES.md", to: "." },
 		],
 		hooks: {
 			"build:done": () => {

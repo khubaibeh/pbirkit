@@ -14,7 +14,8 @@
 	"files": [
 		"dist",
 		"!dist/**/*.test.ts",
-		"docs"
+		"docs",
+		"THIRD_PARTY_NOTICES.md"
 	],
 	"type": "module",
 	"imports": {
@@ -64,10 +65,6 @@
 		"./schemas/common/*": null,
 		"./schemas/theme/*": null,
 		"./schemas/visual-configuration/*": null,
-		"./themes/*": {
-			"types": "./dist/core/themes/*.ts",
-			"default": "./dist/themes/*.js"
-		},
 		"./tree": {
 			"types": "./dist/core/tree/index.ts",
 			"default": "./dist/tree.js"

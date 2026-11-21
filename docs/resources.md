@@ -14,7 +14,7 @@ List resources in `report.resources`. The list order sets the order of `resource
 | image          | `image({ name, file: new URL(...) })`                         | copied as bytes                                                      |
 | custom visual  | `customVisual({ guid, source })` from `pbirkit/custom-visual` | `source` is `appSource`, `file` (with a `.pbiviz`) or `organization` |
 
-Typed Desktop default themes live in `pbirkit/themes/*`, for example `CY26SU07` and the accessible default.
+pbirkit does not ship Desktop's own themes. To get one as TS, run `pbirkit import` on a project that uses it.
 
 ## Theme rules
 

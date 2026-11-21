@@ -84,7 +84,7 @@ Most projects start from `pbirkit import` and not from a blank file. See [docs/i
 | `pbirkit/schemas/<kind>/<v>`                                | `define*` helpers for each schema version                       |
 | `pbirkit/expr`                                              | expression helpers: `col`, `measure`, `solid`, `filterState`... |
 | `pbirkit/resource`, `pbirkit/custom-visual`, `pbirkit/font` | images, custom visuals and fonts                                |
-| `pbirkit/schemas/theme`, `pbirkit/themes/<name>`            | `defineTheme` and typed Desktop default themes                  |
+| `pbirkit/schemas/theme`                                     | `defineTheme` and the theme schema                              |
 | `pbirkit/schemas/schema-url`                                | every `$schema` URL                                             |
 | `pbirkit/register`                                          | `Register`, for project-wide custom visuals and fonts           |
 | `pbirkit/check`, `pbirkit/build`, `pbirkit/tree`            | `checkConfig`, the in-memory build, the report tree             |
@@ -96,3 +96,8 @@ Most projects start from `pbirkit import` and not from a blank file. See [docs/i
 - Windows with Power BI Desktop, for the `desktop` commands and for a look at the report
 
 See [docs/setup.md](docs/setup.md).
+
+## Credits
+
+- The schemas follow Microsoft's [Power BI JSON schemas](https://github.com/microsoft/json-schemas), under the MIT license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- pbirkit has no tie to Microsoft, and Microsoft does not endorse it. Power BI is a trademark of Microsoft.

@@ -25,7 +25,6 @@
 		"./schemas/common/*": null,
 		"./schemas/theme/*": null,
 		"./schemas/visual-configuration/*": null,
-		"./themes/*": "./src/themes/*.ts",
 		"./tree": "./src/tree/index.ts",
 		"./visual-type": "./src/visual-type.ts"
 	},
