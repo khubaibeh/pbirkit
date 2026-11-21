@@ -224,7 +224,13 @@ importers:
         specifier: 'catalog:'
         version: 1.6.0(@types/node@26.6.6)(@typescript/native-preview@7.0.0-dev.20260707.2)(@vitest/ui@5.1.0)
 
-  packages/cli:
+  packages/core:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+
+  packages/pbirkit:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
@@ -244,12 +250,6 @@ importers:
       node-diff3:
         specifier: 'catalog:'
         version: 3.2.1
-
-  packages/core:
-    dependencies:
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.4
 
 packages:
 

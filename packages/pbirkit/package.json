@@ -1,5 +1,5 @@
 {
-	"name": "@pbirkit/cli",
+	"name": "pbirkit",
 	"version": "0.0.0",
 	"private": true,
 	"description": "Command line tools for pbirkit.",
