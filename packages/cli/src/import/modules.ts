@@ -10,13 +10,24 @@ import { imageRef } from "@pbirkit/core/expr";
 import type { ReportTree } from "@pbirkit/core/tree";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
-import { LOCAL_TSCONFIG } from "../build/core-types.ts";
 import { fileKey, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { Layout } from "../layout.ts";
 import type { Project } from "../pbip/project.ts";
+import { fileJson } from "../pbip/tree.ts";
 import type { Fallback } from "./draft.ts";
-import { IDS_FILE, PALETTE_FILE, colorName, colorRoles, idsOf, isColor } from "./names.ts";
-import type { Ids } from "./names.ts";
+import {
+	colorName,
+	colorRoles,
+	fileOf,
+	idsOf,
+	isColor,
+	keyOf,
+	nameScope,
+	namesOf,
+	wordsOf,
+} from "./names.ts";
+import type { Ids, Names } from "./names.ts";
 import {
 	HelperCall,
 	LINE_WIDTH,
@@ -29,10 +40,14 @@ import {
 	toNode,
 } from "./nodes.ts";
 import type { Swaps } from "./nodes.ts";
-import { REPORT_FILE, importReport } from "./report.ts";
+import { importReport } from "./report.ts";
 
-export const CONFIG_FILE = "pbirkit.config.ts";
-const SHARED_MODULES = new Set([IDS_FILE, PALETTE_FILE]);
+const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
+	[Layout.ids, "ids"],
+	[Layout.palette, "palette"],
+	[Layout.pages, "pages"],
+	[Layout.bookmarks, "bookmarks"],
+]);
 const encoder = new TextEncoder();
 
 type Report = Config["report"];
@@ -59,9 +74,6 @@ const block = (depth: number, open: string, items: ReadonlyArray<string>, close:
 		? `${open}${close}`
 		: `${open}\n${items.map((entry) => `${"\t".repeat(depth + 1)}${entry},\n`).join("")}${"\t".repeat(depth)}${close}`;
 
-export const moduleFileName = (name: string): string =>
-	encodeURIComponent(name).replaceAll("~", "%7E").replaceAll("%", "~");
-
 const urlPath = (path: string): string =>
 	path
 		.split("/")
@@ -74,20 +86,18 @@ const relativeTo = (file: string, target: string): string => {
 };
 
 const identifierOf = (file: string): string => {
-	if (SHARED_MODULES.has(file)) return posix.basename(file, ".ts");
+	const shared = SHARED_MODULES.get(file);
+	if (shared !== undefined) return shared;
+
 	const name = posix.basename(file, ".ts");
-	return `_${(name === "page" ? posix.basename(posix.dirname(file)) : name).replaceAll(/[^\w$]/gu, "_")}`;
+	const key = keyOf(wordsOf(name === Layout.indexName ? posix.basename(posix.dirname(file)) : name));
+
+	return key.startsWith("_") ? key : `_${key === "" ? "module" : key}`;
 };
 
-const uniquePaths = () => {
-	const used = new Set<string>();
-	return (base: string, extension: string): string => {
-		let candidate = `${base}${extension}`;
-		for (let suffix = 2; used.has(fileKey(candidate)); suffix += 1)
-			candidate = `${base}_${suffix}${extension}`;
-		used.add(fileKey(candidate));
-		return candidate;
-	};
+const fileName = (text: string, fallback: string): string => {
+	const words = wordsOf(text);
+	return fileOf(words.length === 0 ? [fallback] : words);
 };
 
 const assetPath = (project: Project, path: string): string => {
@@ -96,9 +106,10 @@ const assetPath = (project: Project, path: string): string => {
 			? path.slice(folder.length + 1)
 			: undefined;
 	const report = under(project.report);
-	if (report !== undefined) return `assets/report/${report}`;
+	if (report !== undefined) return Layout.staticFile(report);
+
 	const model = under(project.model);
-	return model === undefined ? `assets/${path}` : `assets/model/${model}`;
+	return model === undefined ? Layout.staticFile(path) : Layout.modelFile(model);
 };
 
 const projectPath = (project: Project, url: URL): string =>
@@ -177,7 +188,7 @@ export const renderModule = (
 
 	const tree = toNode(value, idiomatic, { ...swaps, nameOf: importName });
 	const used = [...new Set(helperNames(tree))].toSorted();
-	const isConfig = file === CONFIG_FILE;
+	const isConfig = file === Layout.config;
 	const body = render(tree, 0);
 	const lines = [
 		...(isConfig ? ['import { defineConfig } from "@pbirkit/core/config";'] : []),
@@ -243,6 +254,7 @@ const registerBlock = (config: Config): string => {
 
 const projectModules = (
 	config: Config,
+	names: Names,
 ): {
 	readonly modules: ReadonlyArray<Module>;
 	readonly root: unknown;
@@ -252,7 +264,8 @@ const projectModules = (
 	const modules: Array<Module> = [];
 	const images = new Map<string, string>();
 	const located = new Map<unknown, string>();
-	const unique = uniquePaths();
+	const themeName = nameScope();
+	const imageName = nameScope();
 	const add = (file: string, value: unknown, swaps = true) => {
 		modules.push({ file, value, swaps });
 		located.set(value, file);
@@ -260,52 +273,61 @@ const projectModules = (
 	};
 
 	const pageModule = (page: Page) => {
-		const folder = unique(`pages/${moduleFileName(page.name)}`, "");
-		const visuals = page.visuals.map((visual) =>
-			isRaw(visual) ? visual : add(unique(`${folder}/visuals/${moduleFileName(visual.name)}`, ".ts"), visual),
-		);
-		located.set(page, `${folder}/page.ts`);
-		return add(`${folder}/page.ts`, { ...page, visuals });
+		const folder = names.pages.get(page.name)?.file ?? fileName(page.name, "page");
+		const own = names.visuals.get(page.name);
+		const visualFile = (name: string) =>
+			Layout.visual(folder, own?.get(name)?.file ?? fileName(name, "visual"));
+
+		const visuals = page.visuals.map((visual) => {
+			if (isRaw(visual)) return visual;
+
+			const file = visualFile(visual.name);
+			located.set(visual, file);
+			return add(file, visual);
+		});
+
+		const file = Layout.page(folder);
+		located.set(page, file);
+		return add(file, { ...page, visuals });
 	};
 
 	const bookmark = <A extends { readonly name: string }>(item: A) =>
-		isRaw(item) ? item : add(unique(`bookmarks/${moduleFileName(item.name)}`, ".ts"), item);
+		isRaw(item)
+			? item
+			: add(Layout.bookmark(names.bookmarks.get(item.name)?.file ?? fileName(item.name, "bookmark")), item);
 
 	const resourceModule = (resource: Resource): unknown => {
-		if ("theme" in resource)
-			return {
-				...resource,
-				theme: add(
-					unique(`themes/${moduleFileName(posix.basename(resource.name, ".json"))}`, ".ts"),
-					resource.theme,
-					false,
-				),
-			};
+		if ("theme" in resource) {
+			const file = Layout.theme(themeName(wordsOf(posix.basename(resource.name, ".json"))).file);
+			return { ...resource, theme: add(file, resource.theme, false) };
+		}
 		if (resource.kind !== "image") return resource;
 
-		const file = unique(`images/${moduleFileName(resource.name)}`, ".ts");
+		const words = wordsOf(posix.basename(resource.name, posix.extname(resource.name)));
+		const file = Layout.image(imageName(words.length > 0 ? words : ["image"]).file);
 		images.set(resource.name, file);
 		return add(file, resource, false);
 	};
 
 	const { bookmarks, pages, resources } = config.report;
+	const pageList = add(
+		Layout.pages,
+		pages.map((page) => pageModule(page)),
+	);
+	const bookmarkItems = bookmarks?.items.map((item) =>
+		"children" in item
+			? { name: item.name, displayName: item.displayName, children: item.children.map(bookmark) }
+			: bookmark(item),
+	);
 	const report = {
 		...config.report,
-		pages: pages.map((page) => pageModule(page)),
-		...(bookmarks === undefined
+		pages: pageList,
+		...(bookmarks === undefined || bookmarkItems === undefined
 			? {}
-			: {
-					bookmarks: {
-						...bookmarks,
-						items: bookmarks.items.map((item) =>
-							"children" in item
-								? { name: item.name, displayName: item.displayName, children: item.children.map(bookmark) }
-								: bookmark(item),
-						),
-					},
-				}),
+			: { bookmarks: { ...bookmarks, items: add(Layout.bookmarks, bookmarkItems) } }),
 		...(resources === undefined ? {} : { resources: resources.map((resource) => resourceModule(resource)) }),
 	};
+
 	return { modules, root: { ...config, report }, images, located };
 };
 
@@ -327,7 +349,7 @@ export const swapsOf = (
 	idiomatic: boolean,
 ): ModuleSwaps => {
 	const idMember = (value: string) =>
-		Option.map(Option.fromUndefinedOr(ids.paths.get(value)), (path) => new ModuleMember(IDS_FILE, path));
+		Option.map(Option.fromUndefinedOr(ids.paths.get(value)), (path) => new ModuleMember(Layout.ids, path));
 
 	const imageCall = (value: unknown) =>
 		ImageItem(value).pipe(
@@ -345,7 +367,7 @@ export const swapsOf = (
 			const member = idMember(value);
 			if (Option.isSome(member) || !idiomatic || helper !== "solid" || !isColor(value)) return member;
 
-			return Option.some(new ModuleMember(PALETTE_FILE, [colors(value)]));
+			return Option.some(new ModuleMember(Layout.palette, [colors(value)]));
 		},
 	};
 };
@@ -376,9 +398,9 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			: [];
 
 const SUPPORT_FILES = {
-	"package.json": { type: "module" },
-	"tsconfig.json": {
-		extends: `./${LOCAL_TSCONFIG}`,
+	[Layout.packageJson]: { type: "module" },
+	[Layout.tsconfig]: {
+		extends: `./${Layout.localTsconfig}`,
 		compilerOptions: {
 			target: "ES2024",
 			module: "NodeNext",
@@ -387,12 +409,12 @@ const SUPPORT_FILES = {
 			allowImportingTsExtensions: true,
 			skipLibCheck: true,
 		},
-		include: [CONFIG_FILE],
+		include: [Layout.config, Layout.sources],
 	},
 };
 
 export const supportFiles = (): ReadonlyArray<TreeFile> => [
-	treeFile(".gitignore", encoder.encode(`${posix.dirname(LOCAL_TSCONFIG)}/\n`)),
+	treeFile(Layout.gitignore, encoder.encode(`${Layout.localFolder}/\n`)),
 	...Object.entries(SUPPORT_FILES).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
 	),
@@ -406,8 +428,9 @@ export const importFiles = (
 	idiomatic: boolean,
 ): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));
-	const { modules, root, images, located } = projectModules(config);
-	const ids = idsOf(index);
+	const names = namesOf(index, (path) => fileJson(project.tree, path));
+	const { modules, root, images, located } = projectModules(config, names);
+	const ids = idsOf(index, names);
 	const roles = colorRoles(themesOf(config));
 	const used = new Set<string>();
 	const colorOf = (color: string) => {
@@ -420,12 +443,12 @@ export const importFiles = (
 
 	const rendered = [
 		...modules.map((module) => render(module.file, module.value, module.swaps ? { swaps } : {})),
-		render(CONFIG_FILE, root, { header: registerBlock(config), swaps }),
+		render(Layout.config, root, { header: registerBlock(config), swaps }),
 	];
 	const shared = [
-		...(ids.paths.size === 0 ? [] : [render(IDS_FILE, ids.value)]),
-		...(used.size === 0 ? [] : [render(PALETTE_FILE, paletteOf(roles, used))]),
-		treeFile(REPORT_FILE, encoder.encode(importReport({ config, index, fallbacks, ids, located }))),
+		...(ids.paths.size === 0 ? [] : [render(Layout.ids, ids.value)]),
+		...(used.size === 0 ? [] : [render(Layout.palette, paletteOf(roles, used))]),
+		treeFile(Layout.report, encoder.encode(importReport({ config, index, fallbacks, ids, located }))),
 	];
 
 	const sources = Array.from(HashMap.values(project.tree));

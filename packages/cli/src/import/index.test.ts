@@ -173,29 +173,31 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(stdout).toContain("import: verified 23 files");
 	expect(stdout).toContain("extra.txt: Copied 1 unmapped file");
 	const contents = readFileSync(config, "utf8");
-	expect(contents).toContain("pages: [\n\t\t\t_second,\n\t\t\t_first,");
-	expect(contents).toContain("children: [\n\t\t\t\t\t\t_overview,\n\t\t\t\t\t\t_detail,");
+	expect(contents).toContain('import pages from "./src/pages/index.ts";');
+	expect(readFileSync(join(out, "src", "pages", "index.ts"), "utf8")).toContain(
+		"export default [\n\t_second,\n\t_first,\n] as const;",
+	);
+	expect(readFileSync(join(out, "src", "bookmarks", "index.ts"), "utf8")).toContain(
+		"children: [\n\t\t\t_overview,\n\t\t\t_detail,\n\t\t],",
+	);
 	expect(contents).toContain('kind: "customVisual"');
 	expect(contents).toContain('declare module "@pbirkit/core/register"');
 	expect(contents).toContain('readonly "import:Example": {');
 	expect(contents).toContain('readonly visuals: readonly [{ readonly guid: "FileVisual" }];');
 	expect(contents).toContain('readonly builtinVisuals: readonly ["PublicVisual"];');
-	expect(contents).toContain('import _logo_png from "./images/logo.png.ts";');
-	expect(readFileSync(join(out, "images", "logo.png.ts"), "utf8")).toContain(
-		'new URL("../assets/report/StaticResources/RegisteredResources/logo.png", import.meta.url)',
+	expect(contents).toContain('import _logo from "./src/images/logo.ts";');
+	expect(readFileSync(join(out, "src", "images", "logo.ts"), "utf8")).toContain(
+		'new URL("../../static/StaticResources/RegisteredResources/logo.png", import.meta.url)',
 	);
 	expect(stdout).toContain(`import: listed the work left for agents in ${join("out", "IMPORT.md")}`);
 	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toContain("# Import report for Example");
-	const page = readFileSync(join(out, "pages", "second", "page.ts"), "utf8");
-	expect(page).toContain('from "./visuals/1-card.ts"');
-	expect(page).toContain('from "./visuals/1_card.ts"');
-	expect(page).toContain("import _1_card_2 from");
-	expect(readFileSync(join(out, "assets", "model", "definition", "model.tmdl"), "utf8")).toBe(
-		"model Model\r\n",
+	const page = readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8");
+	expect(page).toContain('import _1Card from "./visuals/1-card.ts";');
+	expect(page).toContain('import _1Card2 from "./visuals/1-card-2.ts";');
+	expect(readFileSync(join(out, "model", "definition", "model.tmdl"), "utf8")).toBe("model Model\r\n");
+	expect(readFileSync(join(out, "static", "CustomVisuals", "FileVisual", "extra.txt"), "utf8")).toBe(
+		"Unmapped\n",
 	);
-	expect(
-		readFileSync(join(out, "assets", "report", "CustomVisuals", "FileVisual", "extra.txt"), "utf8"),
-	).toBe("Unmapped\n");
 	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({ type: "module" });
 	const settings = readFileSync(join(out, "tsconfig.json"), "utf8");
 	expect(settings).toContain('"extends": "./.pbirkit/tsconfig.json"');
@@ -261,9 +263,7 @@ it("indexes a renamed visual folder under the visual's JSON name and keeps its p
 	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
 	expect(fromProject).toBe(tree("-c", config));
 	expect(
-		existsSync(
-			join(out, "assets", "report", "definition", "pages", "first", "visuals", "other", "visual.json"),
-		),
+		existsSync(join(out, "static", "definition", "pages", "first", "visuals", "other", "visual.json")),
 	).toBe(true);
 });
 
@@ -280,13 +280,15 @@ it("keeps pages.json and bookmarks.json typed around a raw page and a raw bookma
 	expect(stdout).not.toContain("metadata");
 	const contents = readFileSync(config, "utf8");
 	expect(contents).toContain("pagesMetadata: {");
-	expect(contents).toContain('name: "overview",\n\t\t\t\t\t\t\tfile: new URL(');
-	const page = readFileSync(join(out, "pages", "first", "page.ts"), "utf8");
+	expect(readFileSync(join(out, "src", "bookmarks", "index.ts"), "utf8")).toContain(
+		'name: "overview",\n\t\t\t\tfile: new URL(',
+	);
+	const page = readFileSync(join(out, "src", "pages", "first", "index.ts"), "utf8");
 	expect(page).toContain(
-		'file: new URL("../../assets/report/definition/pages/first/page.json", import.meta.url)',
+		'file: new URL("../../../static/definition/pages/first/page.json", import.meta.url)',
 	);
 	expect(page).toContain('import _notes from "./visuals/notes.ts";');
-	expect(existsSync(join(out, "bookmarks", "detail.ts"))).toBe(true);
+	expect(existsSync(join(out, "src", "bookmarks", "detail.ts"))).toBe(true);
 	expect(tree("--pbip", project)).toBe(tree("-c", config));
 });
 
@@ -295,7 +297,7 @@ it("builds the visuals listed in a raw page module", () => {
 		value.replace('"name"', '"futureProperty": true, "name"'),
 	);
 	importProject();
-	edit(join(out, "pages", "first", "page.ts"), (value) => value.replace("\t\t_notes,\n", ""));
+	edit(join(out, "src", "pages", "first", "index.ts"), (value) => value.replace("\t\t_notes,\n", ""));
 	const diff = run(root, ["diff", "-c", config, "--target", project]);
 	expect(diff.status, diff.stderr).toBe(1);
 	expect(diff.stdout).toContain("extra    Example.Report/definition/pages/first/visuals/notes/visual.json");
@@ -312,22 +314,22 @@ it("types a Desktop custom theme registered as Image and escapes generated modul
 	const contents = readFileSync(config, "utf8");
 	expect(contents).toContain('kind: "customTheme"');
 	expect(contents).toContain('itemType: "Image"');
-	expect(contents).toContain('from "./themes/Brand~23100~25.ts"');
+	expect(contents).toContain('from "./src/themes/brand-100.ts"');
 	expect(contents).not.toContain("resourcePackages:");
 });
 
 it("uses --force to replace only the files an earlier import wrote", () => {
 	importProject();
-	writeFileSync(join(out, "pages", "custom.ts"), "");
+	writeFileSync(join(out, "src", "pages", "custom.ts"), "");
 	writeFileSync(join(out, "notes.md"), "");
 	const settings = '{"compilerOptions":{"strict":true}}';
 	writeFileSync(join(out, "tsconfig.json"), settings);
 	rmSync(join(project, "Example.SemanticModel", "definition", "obsolete.tmdl"));
 	importProject("--force");
-	expect(existsSync(join(out, "pages", "custom.ts"))).toBe(true);
+	expect(existsSync(join(out, "src", "pages", "custom.ts"))).toBe(true);
 	expect(existsSync(join(out, "notes.md"))).toBe(true);
-	expect(existsSync(join(out, "assets", "model", "definition", "obsolete.tmdl"))).toBe(false);
-	expect(existsSync(join(out, "pages", "second", "visuals", "1-card.ts"))).toBe(true);
+	expect(existsSync(join(out, "model", "definition", "obsolete.tmdl"))).toBe(false);
+	expect(existsSync(join(out, "src", "pages", "second", "visuals", "1-card.ts"))).toBe(true);
 	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toBe(settings);
 	edit(join(out, ".pbirkit-import.json"), (value) => value.replace('\t"IMPORT.md",\n', ""));
 	writeFileSync(join(out, "IMPORT.md"), "mine\n");
@@ -404,7 +406,7 @@ it("writes helper calls only where they rebuild the same JSON and type check", (
 		});
 	});
 	importProject("--idiomatic");
-	const notes = readFileSync(join(out, "pages", "first", "visuals", "notes.ts"), "utf8");
+	const notes = readFileSync(join(out, "src", "pages", "first", "visuals", "notes.ts"), "utf8");
 	expect(notes).toContain('import { col, double, entity, entry, literal, text } from "@pbirkit/core/expr";');
 	expect(notes).toContain('general: [\n\t\t\t\t{ properties: { paragraphs: [{ textRuns: [{ value: "Hi"');
 	expect(notes).toContain(
@@ -417,7 +419,7 @@ it("writes helper calls only where they rebuild the same JSON and type check", (
 	expect(bytes.status, bytes.stdout).toBe(0);
 	rmSync(out, { recursive: true });
 	importProject();
-	expect(readFileSync(join(out, "pages", "first", "visuals", "notes.ts"), "utf8")).not.toContain(
+	expect(readFileSync(join(out, "src", "pages", "first", "visuals", "notes.ts"), "utf8")).not.toContain(
 		"@pbirkit/core/expr",
 	);
 });
@@ -528,7 +530,7 @@ it.each([
 	const stdout = importProject();
 	expect(stdout).toContain(`Visual first/${name}: ${reason}`);
 	expect(stdout).toContain(`Visual first/notes: Its group "${name}" is not placed`);
-	expect(existsSync(join(out, "pages", "first", "visuals", "notes.ts"))).toBe(false);
+	expect(existsSync(join(out, "src", "pages", "first", "visuals", "notes.ts"))).toBe(false);
 	const fromProject = tree("--pbip", project);
 	expect(fromProject).toContain("visual (textbox, notes, -) [raw]");
 	expect(fromProject).toBe(tree("-c", config));
@@ -554,8 +556,8 @@ it("keeps a page raw when its visualInteractions name a visual that is not place
 	expect(stdout).toContain(
 		'Page second: visualInteractions names "1-card", which is not a placed visual on this page',
 	);
-	expect(readFileSync(join(out, "pages", "second", "page.ts"), "utf8")).toContain(
-		'file: new URL("../../assets/report/definition/pages/second/page.json", import.meta.url)',
+	expect(readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8")).toContain(
+		'file: new URL("../../../static/definition/pages/second/page.json", import.meta.url)',
 	);
 	const fromProject = tree("--pbip", project);
 	expect(fromProject).toContain("page (-, second, second) [raw]");

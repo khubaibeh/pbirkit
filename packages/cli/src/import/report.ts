@@ -6,11 +6,10 @@ import type { Config } from "@pbirkit/core/config";
 import { at, queryRefOf } from "@pbirkit/core/expr";
 import type { ReportTree } from "@pbirkit/core/tree";
 
+import { Layout } from "../layout.ts";
 import type { Fallback } from "./draft.ts";
 import type { Located } from "./modules.ts";
 import type { Ids } from "./names.ts";
-
-export const REPORT_FILE = "IMPORT.md";
 
 const FINGERPRINT_SKIP = new Set(["$schema", "name", "position", "parentGroupName"]);
 const NONE = "None.";
@@ -201,7 +200,7 @@ export const importReport = ({ config, index, fallbacks, ids, located }: ReportI
 			`- Pages: ${pages.length}, ${rawCount(pages)} kept as raw files`,
 			`- Visuals: ${placed.length}, ${rawCount(placed.map(({ visual }) => visual))} kept as raw files`,
 			`- Bookmarks: ${entries.length}, ${rawCount(entries)} kept as raw files`,
-			`- Readable ids in \`ids.ts\`: ${ids.paths.size}`,
+			`- Readable ids in \`${Layout.ids}\`: ${ids.paths.size}`,
 		]),
 		...section(
 			"## Files the import kept raw",

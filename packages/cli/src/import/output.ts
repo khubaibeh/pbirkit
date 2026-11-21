@@ -5,18 +5,17 @@ import { insideProject } from "@pbirkit/core/build";
 import { onFileSystem } from "../build/errors.ts";
 import { fileKey, treeOf, writeTree } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { Layout } from "../layout.ts";
 import { containedBy } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
 import { ImportOutputError } from "./errors.ts";
 import type { ImportFiles } from "./modules.ts";
 
-export const MANIFEST = ".pbirkit-import.json";
-
 const readManifest = Effect.fnUntraced(function* (out: string) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
 
-	const file = path.join(out, MANIFEST);
+	const file = path.join(out, Layout.manifest);
 	if (!(yield* fs.exists(file).pipe(onFileSystem("check", file)))) return [];
 	const text = yield* fs.readFileString(file).pipe(onFileSystem("read", file));
 	const value: unknown = yield* Effect.try({
@@ -57,7 +56,7 @@ export const checkOutput = Effect.fnUntraced(function* (
 		path.join(project.root, folder),
 	);
 	const pbip = path.join(project.root, project.filename);
-	const targets = [...files.files.map((file) => file.path), ...files.folders, MANIFEST].map((file) =>
+	const targets = [...files.files.map((file) => file.path), ...files.folders, Layout.manifest].map((file) =>
 		path.join(out, file),
 	);
 	if (
@@ -114,7 +113,7 @@ export const writeImport = Effect.fnUntraced(function* (
 		yield* fs.makeDirectory(target, { recursive: true }).pipe(onFileSystem("create", target));
 	}
 
-	const manifest = path.join(out, MANIFEST);
+	const manifest = path.join(out, Layout.manifest);
 	const listed = files.files.map((file) => file.path).toSorted();
 	yield* fs
 		.writeFileString(manifest, `${JSON.stringify(listed, null, "\t")}\n`)

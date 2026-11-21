@@ -1,7 +1,7 @@
 import { expect, it } from "vite-plus/test";
 
 import { renderModule, swapsOf } from "./modules.ts";
-import { colorName, colorRoles, keyOf } from "./names.ts";
+import { colorName, colorRoles, keyOf, nameScope, wordsOf } from "./names.ts";
 
 const VISUAL_JSON = `{
   "name": "sales",
@@ -347,7 +347,7 @@ it("swaps ids, colours and images for members of shared modules", () => {
 	const roles = colorRoles([{ foreground: "#252423", dataColors: ["#118DFF"] }]);
 	const swaps = swapsOf(
 		ids,
-		new Map([["logo.png", "images/logo.png.ts"]]),
+		new Map([["logo.png", "src/images/logo.ts"]]),
 		(color) => colorName(roles, color),
 		true,
 	);
@@ -393,11 +393,11 @@ it("swaps ids, colours and images for members of shared modules", () => {
 			],
 		},
 	};
-	expect(renderModule("pages/p/page.ts", value, () => "", { idiomatic: true, swaps }))
+	expect(renderModule("src/pages/p/index.ts", value, () => "", { idiomatic: true, swaps }))
 		.toBe(`import { col, imageRef, notIn, solid, v } from "@pbirkit/core/expr";
 import ids from "../../ids.ts";
 import palette from "../../palette.ts";
-import _logo_png from "../../images/logo.png.ts";
+import _logo from "../../images/logo.ts";
 
 export default {
 	name: ids.pages.overview,
@@ -405,7 +405,7 @@ export default {
 	line: solid(palette.hexABCDEF),
 	label: v("#118DFF"),
 	sections: { [ids.pages.overview]: { visible: true } },
-	image: v(imageRef(_logo_png)),
+	image: v(imageRef(_logo)),
 	other: v({
 		ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
 	}),
@@ -418,9 +418,20 @@ export default {
 });
 
 it("names ids and colours as dotted keys without clashes", () => {
-	expect(keyOf("2.1 - Executive Summary", "page")).toBe("_21ExecutiveSummary");
-	expect(keyOf("KPI card", "visual")).toBe("kpiCard");
-	expect(keyOf("--", "visual")).toBe("visual");
+	expect(keyOf(wordsOf("2.1 - Executive Summary"))).toBe("_21ExecutiveSummary");
+	expect(keyOf(wordsOf("KPI card"))).toBe("kpiCard");
+	expect(keyOf(wordsOf("Café milestoneTable"))).toBe("cafeMilestoneTable");
+
+	const scope = nameScope(["index"]);
+	expect(scope(wordsOf("Index"))).toEqual({ file: "index-2", key: "index2" });
+	expect(scope(wordsOf("KPI card"))).toEqual({ file: "kpi-card", key: "kpiCard" });
+	expect(scope(wordsOf("kpi-Card"))).toEqual({ file: "kpi-card-2", key: "kpiCard2" });
+	expect(scope(["card"], true)).toEqual({ file: "card-1", key: "card1" });
+	expect(scope(["a".repeat(70)]).file).toHaveLength(64);
+	expect(scope(wordsOf(`${"word ".repeat(20)}end`)).file).toBe(
+		Array.from({ length: 13 }, () => "word").join("-"),
+	);
+
 	const roles = colorRoles([{ foreground: "#000000" }, { foreground: "#111111", dataColors: ["#000000"] }]);
 	expect([...roles]).toEqual([["#000000", "foreground"]]);
 	expect(colorName(roles, "#111111")).toBe("hex111111");
