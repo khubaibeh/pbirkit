@@ -60,6 +60,10 @@
 			"types": "./dist/core/schemas/*.ts",
 			"default": "./dist/schemas/*.js"
 		},
+		"./schemas/*/shared": null,
+		"./schemas/common/*": null,
+		"./schemas/theme/*": null,
+		"./schemas/visual-configuration/*": null,
 		"./themes/*": {
 			"types": "./dist/core/themes/*.ts",
 			"default": "./dist/themes/*.js"

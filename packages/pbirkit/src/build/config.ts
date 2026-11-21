@@ -14,15 +14,8 @@ import { ConfigCheckError, ConfigLoadError, ConfigShapeError } from "./errors.ts
 const isCore = (specifier: string): boolean =>
 	specifier === CORE_PACKAGE || specifier.startsWith(`${CORE_PACKAGE}/`);
 
-export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextResolve) => {
-	try {
-		return nextResolve(specifier, context);
-	} catch (cause) {
-		if (!isCore(specifier) || !Predicate.hasProperty(cause, "code") || cause.code !== "ERR_MODULE_NOT_FOUND")
-			throw cause;
-		return nextResolve(specifier, { ...context, parentURL: import.meta.url });
-	}
-};
+export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextResolve) =>
+	nextResolve(specifier, isCore(specifier) ? { ...context, parentURL: import.meta.url } : context);
 
 const importDefault = Effect.fnUntraced(function* (file: string) {
 	const module: unknown = yield* Effect.tryPromise({

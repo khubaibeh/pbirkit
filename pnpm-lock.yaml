@@ -204,6 +204,8 @@ catalogs:
 overrides:
   vite@*: npm:@voidzero-dev/vite-plus-core@1.6.0
 
+pnpmfileChecksum: sha256-z2pJYA9dbubTSrwtCGEtzIGagYv9uR4Xwi8l20+88J0=
+
 importers:
 
   .:

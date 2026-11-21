@@ -10,7 +10,7 @@ it("mirrors the core export map", () => {
 		...Object.fromEntries(
 			Object.entries(corePackage.exports).map(([key, target]) => [
 				key,
-				{ types: typesOf(target), default: `./dist/${key.slice(2)}.js` },
+				target === null ? null : { types: typesOf(target), default: `./dist/${key.slice(2)}.js` },
 			]),
 		),
 		"./package.json": "./package.json",

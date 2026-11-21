@@ -21,6 +21,10 @@
 		"./register": "./src/register.ts",
 		"./resource": "./src/resource.ts",
 		"./schemas/*": "./src/schemas/*.ts",
+		"./schemas/*/shared": null,
+		"./schemas/common/*": null,
+		"./schemas/theme/*": null,
+		"./schemas/visual-configuration/*": null,
 		"./themes/*": "./src/themes/*.ts",
 		"./tree": "./src/tree/index.ts",
 		"./visual-type": "./src/visual-type.ts"
