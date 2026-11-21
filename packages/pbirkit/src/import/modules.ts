@@ -13,6 +13,7 @@ import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
 import { fileKey, treeFile } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { CORE_PACKAGE } from "../core-package.ts";
 import { Layout } from "../layout.ts";
 import type { Project } from "../pbip/project.ts";
 import { fileJson } from "../pbip/tree.ts";
@@ -50,7 +51,7 @@ const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
 	[Layout.pages, "pages"],
 	[Layout.bookmarks, "bookmarks"],
 ]);
-const SCHEMA_URL = "@pbirkit/core/schemas/schema-url";
+const SCHEMA_URL = `${CORE_PACKAGE}/schemas/schema-url`;
 const PACKAGE_EXPORTS: ReadonlyMap<string, string> = new Map([[SCHEMA_URL, "SchemaUrl"]]);
 const SCHEMA_PATHS: ReadonlyMap<string, ReadonlyArray<string>> = new Map(
 	Object.entries(SchemaUrl).flatMap(([kind, versions]) =>
@@ -62,7 +63,7 @@ const DEFINERS: ReadonlyMap<string, string> = new Map([
 	["page", "definePage"],
 	["bookmark", "defineBookmark"],
 ]);
-const CONFIG_DEFINER = { name: "defineConfig", from: "@pbirkit/core/config" };
+const CONFIG_DEFINER = { name: "defineConfig", from: `${CORE_PACKAGE}/config` };
 const encoder = new TextEncoder();
 
 type Report = Config["report"];
@@ -188,7 +189,7 @@ const definerOf = (value: unknown): { readonly definer: Definer; readonly value:
 	if (name === undefined) return undefined;
 
 	return {
-		definer: { name, from: `@pbirkit/core/schemas/${kind}/${version}` },
+		definer: { name, from: `${CORE_PACKAGE}/schemas/${kind}/${version}` },
 		value: Object.fromEntries(rest),
 	};
 };
@@ -268,7 +269,7 @@ export const renderModule = (
 	const body = render(tree, 0);
 	const lines = [
 		...(defined === undefined ? [] : [`import { ${defined.definer.name} } from "${defined.definer.from}";`]),
-		...(used.length === 0 ? [] : [`import { ${used.join(", ")} } from "@pbirkit/core/expr";`]),
+		...(used.length === 0 ? [] : [`import { ${used.join(", ")} } from "${CORE_PACKAGE}/expr";`]),
 		...Array.from(imports, ([target, name]) =>
 			PACKAGE_EXPORTS.has(target)
 				? `import { ${name} } from ${JSON.stringify(target)};`
@@ -321,7 +322,7 @@ const registerBlock = (config: Config): string => {
 	return fields.length === 0
 		? ""
 		: [
-				'declare module "@pbirkit/core/register" {',
+				`declare module "${CORE_PACKAGE}/register" {`,
 				"\tinterface Register {",
 				`\t\treadonly ${JSON.stringify(registerKey(config.name))}: {`,
 				...fields.map((field) => `\t\t\t${field}`),

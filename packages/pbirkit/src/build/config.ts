@@ -7,11 +7,12 @@ import { decodeUnknownEffect, is } from "effect/Schema";
 import { checkConfig } from "@pbirkit/core/check";
 import { Config } from "@pbirkit/core/config";
 
+import { CORE_PACKAGE } from "../core-package.ts";
 import { refreshCoreTypes } from "./core-types.ts";
 import { ConfigCheckError, ConfigLoadError, ConfigShapeError } from "./errors.ts";
 
 const isCore = (specifier: string): boolean =>
-	specifier === "@pbirkit/core" || specifier.startsWith("@pbirkit/core/");
+	specifier === CORE_PACKAGE || specifier.startsWith(`${CORE_PACKAGE}/`);
 
 export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextResolve) => {
 	try {

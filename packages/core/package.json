@@ -1,6 +1,6 @@
 {
 	"name": "@pbirkit/core",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"private": true,
 	"description": "Core types and building blocks for pbirkit.",
 	"license": "MIT",

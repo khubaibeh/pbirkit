@@ -238,9 +238,6 @@ importers:
       '@microsoft/powerbi-desktop-bridge-cli':
         specifier: 'catalog:'
         version: 1.0.0
-      '@pbirkit/core':
-        specifier: workspace:*
-        version: link:../core
       effect:
         specifier: 'catalog:'
         version: 4.1.4
@@ -250,6 +247,10 @@ importers:
       node-diff3:
         specifier: 'catalog:'
         version: 3.2.1
+    devDependencies:
+      '@pbirkit/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

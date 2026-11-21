@@ -4,6 +4,7 @@ import { Effect, FileSystem, Option, Path, Predicate } from "effect";
 
 import { at } from "@pbirkit/core/expr";
 
+import { CORE_PACKAGE } from "../core-package.ts";
 import { toPosix } from "./paths.ts";
 
 export const LOCAL_TSCONFIG = ".pbirkit/tsconfig.json";
@@ -22,20 +23,21 @@ const readJson = Effect.fnUntraced(function* (file: string) {
 
 const exportsOf = (value: unknown): ReadonlyArray<readonly [string, string]> =>
 	Predicate.isReadonlyObject(value)
-		? Object.entries(value).flatMap(([key, target]) =>
-				typeof target === "string" ? [[key, target] as const] : [],
-			)
+		? Object.entries(value).flatMap(([key, target]) => {
+				const types = typeof target === "string" ? target : at(target, "types");
+				return typeof types === "string" ? [[key, types] as const] : [];
+			})
 		: [];
 
 const coreTypePaths = Effect.fnUntraced(function* () {
 	const path = yield* Path.Path;
 
-	const root = fileURLToPath(new URL("../", import.meta.resolve("@pbirkit/core/config")));
+	const root = fileURLToPath(new URL("../", import.meta.resolve(`${CORE_PACKAGE}/config`)));
 	const manifest = yield* readJson(path.join(root, "package.json"));
-	if (at(manifest, "name") !== "@pbirkit/core") return {};
+	if (at(manifest, "name") !== CORE_PACKAGE) return {};
 	const paths: Readonly<Record<string, ReadonlyArray<string>>> = Object.fromEntries(
 		exportsOf(at(manifest, "exports")).map(([key, target]) => [
-			`@pbirkit/core${key.slice(1)}`,
+			`${CORE_PACKAGE}${key.slice(1)}`,
 			[toPosix(path, path.join(root, target))],
 		]),
 	);

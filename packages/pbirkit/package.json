@@ -1,23 +1,96 @@
 {
 	"name": "pbirkit",
-	"version": "0.0.0",
-	"private": true,
-	"description": "Command line tools for pbirkit.",
+	"version": "0.0.1",
+	"description": "Write Power BI reports (PBIR) in TypeScript.",
 	"license": "MIT",
-	"bin": {
-		"pbirkit": "./src/main.ts"
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/khubaibeh/pbirkit.git",
+		"directory": "packages/pbirkit"
 	},
+	"bin": {
+		"pbirkit": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.test.ts",
+		"docs"
+	],
 	"type": "module",
+	"imports": {
+		"#core/*.ts": "./dist/core/*.ts",
+		"#core/*": "./dist/core/*/index.ts",
+		"#schemas/*.ts": "./dist/core/schemas/*.ts",
+		"#schemas/*": "./dist/core/schemas/*.ts"
+	},
+	"exports": {
+		"./build": {
+			"types": "./dist/core/build/index.ts",
+			"default": "./dist/build.js"
+		},
+		"./check": {
+			"types": "./dist/core/check.ts",
+			"default": "./dist/check.js"
+		},
+		"./config": {
+			"types": "./dist/core/config.ts",
+			"default": "./dist/config.js"
+		},
+		"./custom-visual": {
+			"types": "./dist/core/custom-visual.ts",
+			"default": "./dist/custom-visual.js"
+		},
+		"./expr": {
+			"types": "./dist/core/expr/index.ts",
+			"default": "./dist/expr.js"
+		},
+		"./font": {
+			"types": "./dist/core/font.ts",
+			"default": "./dist/font.js"
+		},
+		"./register": {
+			"types": "./dist/core/register.ts",
+			"default": "./dist/register.js"
+		},
+		"./resource": {
+			"types": "./dist/core/resource.ts",
+			"default": "./dist/resource.js"
+		},
+		"./schemas/*": {
+			"types": "./dist/core/schemas/*.ts",
+			"default": "./dist/schemas/*.js"
+		},
+		"./themes/*": {
+			"types": "./dist/core/themes/*.ts",
+			"default": "./dist/themes/*.js"
+		},
+		"./tree": {
+			"types": "./dist/core/tree/index.ts",
+			"default": "./dist/tree.js"
+		},
+		"./visual-type": {
+			"types": "./dist/core/visual-type.ts",
+			"default": "./dist/visual-type.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"scripts": {
 		"pbirkit": "node src/main.ts",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsgo --noEmit",
+		"build": "vp pack",
+		"prepack": "vp pack"
 	},
 	"dependencies": {
 		"@effect/platform-node": "catalog:",
 		"@microsoft/powerbi-desktop-bridge-cli": "catalog:",
-		"@pbirkit/core": "workspace:*",
 		"effect": "catalog:",
 		"jsonc-parser": "catalog:",
 		"node-diff3": "catalog:"
+	},
+	"devDependencies": {
+		"@pbirkit/core": "workspace:*"
+	},
+	"engines": {
+		"node": ">=24"
 	}
 }

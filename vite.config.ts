@@ -70,6 +70,9 @@ export default defineConfig({
 			},
 		],
 	},
+	test: {
+		exclude: ["**/node_modules/**", "**/.git/**", "**/dist/**"],
+	},
 	staged: {
 		"*.{ts,mts,cts,js,mjs,cjs}": "effect-tsgo vp check --fix",
 		"*.json": "vp fmt",
