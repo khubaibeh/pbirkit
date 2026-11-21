@@ -8,8 +8,8 @@ import { omit } from "effect/Struct";
 import { buildFiles, resourcePackages } from "@pbirkit/core/build";
 import { Config, ReportItem } from "@pbirkit/core/config";
 import { at } from "@pbirkit/core/expr";
-import { Model } from "@pbirkit/core/model";
 import type { Resource } from "@pbirkit/core/resource";
+import { Model } from "@pbirkit/core/schemas/model";
 import { decoded, flattenVisuals } from "@pbirkit/core/tree";
 import type { BookmarkNode, Content, PageNode, ReportTree } from "@pbirkit/core/tree";
 

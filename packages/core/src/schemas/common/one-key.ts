@@ -29,8 +29,8 @@ export function oneKeyOf(base: Struct.Fields, kinds: Struct.Fields): Top {
 			if (typeof input !== "object" || input === null || Array.isArray(input)) {
 				return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
 			}
-			const found = keys.flatMap((key, index) => (Object.hasOwn(input, key) ? [index] : []));
-			const decode = found.length === 1 ? decoders[found[0]] : undefined;
+			const [index, ...rest] = keys.flatMap((key, at) => (Object.hasOwn(input, key) ? [at] : []));
+			const decode = index !== undefined && rest.length === 0 ? decoders[index] : undefined;
 			if (decode === undefined) {
 				const message = kindMessage(input, keys, Object.keys(base));
 				return Effect.fail(new SchemaIssue.InvalidValue({ message }, input, options));

@@ -1,5 +1,5 @@
 import { builtInTheme, themeRef } from "../resource.ts";
-import { defineTheme } from "../schemas/theme/index.ts";
+import { defineTheme } from "../schemas/theme.ts";
 
 export const accessibleDefault = builtInTheme({
 	name: "AccessibleDefault",

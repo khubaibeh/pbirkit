@@ -3,7 +3,10 @@ import { Array, Struct, URL as UrlSchema, Union } from "effect/Schema";
 import { AnyBookmark } from "#schemas/bookmark";
 import { RawItem } from "#schemas/common/raw.ts";
 
-import { BookmarkGroupMetadata, BookmarksMetadata as BookmarksMetadataV1_0 } from "./1.0.0.ts";
+import {
+	BookmarkGroupMetadata,
+	BookmarksMetadata as BookmarksMetadataV1_0,
+} from "./bookmarks-metadata/1.0.0.ts";
 
 export const BookmarkEntry = Union([AnyBookmark, RawItem]);
 

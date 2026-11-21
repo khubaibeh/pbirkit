@@ -204,6 +204,8 @@ catalogs:
 overrides:
   vite@*: npm:@voidzero-dev/vite-plus-core@1.6.0
 
+pnpmfileChecksum: sha256-z2pJYA9dbubTSrwtCGEtzIGagYv9uR4Xwi8l20+88J0=
+
 importers:
 
   .:
@@ -224,7 +226,13 @@ importers:
         specifier: 'catalog:'
         version: 1.6.0(@types/node@26.6.6)(@typescript/native-preview@7.0.0-dev.20260707.2)(@vitest/ui@5.1.0)
 
-  packages/cli:
+  packages/core:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+
+  packages/pbirkit:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
@@ -232,9 +240,6 @@ importers:
       '@microsoft/powerbi-desktop-bridge-cli':
         specifier: 'catalog:'
         version: 1.0.0
-      '@pbirkit/core':
-        specifier: workspace:*
-        version: link:../core
       effect:
         specifier: 'catalog:'
         version: 4.1.4
@@ -244,12 +249,10 @@ importers:
       node-diff3:
         specifier: 'catalog:'
         version: 3.2.1
-
-  packages/core:
-    dependencies:
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.4
+    devDependencies:
+      '@pbirkit/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

@@ -4,6 +4,7 @@ import { Effect, FileSystem, Option, Path, Predicate } from "effect";
 
 import { at } from "@pbirkit/core/expr";
 
+import { CORE_PACKAGE } from "../core-package.ts";
 import { toPosix } from "./paths.ts";
 
 export const LOCAL_TSCONFIG = ".pbirkit/tsconfig.json";
@@ -20,23 +21,33 @@ const readJson = Effect.fnUntraced(function* (file: string) {
 	);
 });
 
-const exportsOf = (value: unknown): ReadonlyArray<readonly [string, string]> =>
+const HIDDEN_TARGET = "hidden";
+
+type TypesEntry = readonly [string, string | undefined];
+
+const exportsOf = (value: unknown): ReadonlyArray<TypesEntry> =>
 	Predicate.isReadonlyObject(value)
-		? Object.entries(value).flatMap(([key, target]) =>
-				typeof target === "string" ? [[key, target] as const] : [],
-			)
+		? Object.entries(value).flatMap(([key, target]): ReadonlyArray<TypesEntry> => {
+				if (target === null) return [[key, undefined] as const];
+				const types = typeof target === "string" ? target : at(target, "types");
+				return typeof types === "string" ? [[key, types] as const] : [];
+			})
 		: [];
 
 const coreTypePaths = Effect.fnUntraced(function* () {
 	const path = yield* Path.Path;
 
-	const root = fileURLToPath(new URL("../", import.meta.resolve("@pbirkit/core/config")));
+	const root = fileURLToPath(new URL("../", import.meta.resolve(`${CORE_PACKAGE}/config`)));
 	const manifest = yield* readJson(path.join(root, "package.json"));
-	if (at(manifest, "name") !== "@pbirkit/core") return {};
+	if (at(manifest, "name") !== CORE_PACKAGE) return {};
+	const entries = exportsOf(at(manifest, "exports"));
 	const paths: Readonly<Record<string, ReadonlyArray<string>>> = Object.fromEntries(
-		exportsOf(at(manifest, "exports")).map(([key, target]) => [
-			`@pbirkit/core${key.slice(1)}`,
-			[toPosix(path, path.join(root, target))],
+		[
+			...entries.filter(([, target]) => target === undefined),
+			...entries.filter(([, target]) => target !== undefined),
+		].map(([key, target]) => [
+			`${CORE_PACKAGE}${key.slice(1)}`,
+			[toPosix(path, path.join(root, target ?? HIDDEN_TARGET))],
 		]),
 	);
 	return paths;
