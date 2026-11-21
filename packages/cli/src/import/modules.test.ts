@@ -417,6 +417,41 @@ export default {
 `);
 });
 
+it("points bookmark ids at page and visual modules and qualifies clashing imports", () => {
+	const page = "a3f9c1d2e4b5f6a7b8c9";
+	const card = "b4f9c1d2e4b5f6a7b8c9";
+	const other = "c5f9c1d2e4b5f6a7b8c9";
+	const ids = {
+		value: {},
+		paths: new Map([
+			[page, ["pages", "overview"]],
+			[card, ["visuals", "overview", "card"]],
+			[other, ["visuals", "detail", "card"]],
+		]),
+	};
+	const targets = new Map([
+		[page, "src/pages/overview/index.ts"],
+		[card, "src/pages/overview/visuals/card.ts"],
+		[other, "src/pages/detail/visuals/card.ts"],
+	]);
+	const swaps = swapsOf(ids, new Map(), (color) => color, true, targets);
+	const value = {
+		activeSection: page,
+		sections: { [page]: { visualContainers: { [card]: {}, [other]: {} } } },
+	};
+
+	expect(renderModule("src/bookmarks/b.ts", value, () => "", { idiomatic: true, swaps }))
+		.toBe(`import _overview from "../pages/overview/index.ts";
+import _card from "../pages/overview/visuals/card.ts";
+import _detailCard from "../pages/detail/visuals/card.ts";
+
+export default {
+	activeSection: _overview.name,
+	sections: { [_overview.name]: { visualContainers: { [_card.name]: {}, [_detailCard.name]: {} } } },
+} as const;
+`);
+});
+
 it("names ids and colours as dotted keys without clashes", () => {
 	expect(keyOf(wordsOf("2.1 - Executive Summary"))).toBe("_21ExecutiveSummary");
 	expect(keyOf(wordsOf("KPI card"))).toBe("kpiCard");

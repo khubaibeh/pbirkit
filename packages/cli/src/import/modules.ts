@@ -6,7 +6,7 @@ import { Literal, String as StringSchema, Struct, decodeUnknownOption } from "ef
 
 import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
-import { imageRef } from "@pbirkit/core/expr";
+import { at, imageRef } from "@pbirkit/core/expr";
 import { SchemaUrl } from "@pbirkit/core/schema-url";
 import type { ReportTree } from "@pbirkit/core/tree";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
@@ -67,6 +67,7 @@ const encoder = new TextEncoder();
 type Report = Config["report"];
 type Page = Report["pages"][number];
 type Resource = NonNullable<Report["resources"]>[number];
+type Visual = Page["visuals"][number];
 
 export interface ImportFiles {
 	readonly files: ReadonlyArray<TreeFile>;
@@ -77,6 +78,7 @@ interface Module {
 	readonly file: string;
 	readonly value: unknown;
 	readonly swaps: boolean;
+	readonly links: boolean;
 }
 
 export type Located = ReadonlyMap<unknown, string>;
@@ -105,6 +107,18 @@ const identifierOf = (file: string): string => {
 
 	const name = posix.basename(file, ".ts");
 	const key = keyOf(wordsOf(name === Layout.indexName ? posix.basename(posix.dirname(file)) : name));
+
+	return key.startsWith("_") ? key : `_${key === "" ? "module" : key}`;
+};
+
+const qualifiedIdentifierOf = (file: string): string => {
+	const parts = posix
+		.relative(Layout.sources, file)
+		.replace(/\.ts$/u, "")
+		.split("/")
+		.slice(1)
+		.filter((part) => part !== Layout.visualsFolder && part !== Layout.indexName);
+	const key = keyOf(parts.flatMap((part) => wordsOf(part)));
 
 	return key.startsWith("_") ? key : `_${key === "" ? "module" : key}`;
 };
@@ -164,7 +178,8 @@ export const renderModule = (
 	const importName = (target: string): string => {
 		const known = imports.get(target);
 		if (known !== undefined) return known;
-		const base = identifierOf(target);
+		const short = identifierOf(target);
+		const base = names.has(short) ? qualifiedIdentifierOf(target) : short;
 		let name = base;
 		for (let suffix = 2; names.has(name); suffix += 1) name = `${base}_${suffix}`;
 		names.add(name);
@@ -287,6 +302,39 @@ const registerBlock = (config: Config): string => {
 			].join("\n");
 };
 
+const groupTree = (visuals: ReadonlyArray<Visual>) => {
+	const names = new Set(visuals.map((visual) => visual.name));
+	const groups = new Set(visuals.flatMap((visual) => ("visualGroup" in visual ? [visual.name] : [])));
+	const parents = new Map(
+		visuals.flatMap((visual) => {
+			const parent = "parentGroupName" in visual ? visual.parentGroupName : undefined;
+			return typeof parent === "string" ? [[visual.name, parent] as const] : [];
+		}),
+	);
+
+	const reaches = (from: string, target: string) => {
+		const seen = new Set<string>();
+
+		for (
+			let step: string | undefined = from;
+			step !== undefined && !seen.has(step);
+			step = parents.get(step)
+		) {
+			if (step === target) return true;
+			seen.add(step);
+		}
+
+		return false;
+	};
+
+	const parentOf = (name: string): string | undefined => {
+		const parent = parents.get(name);
+		return parent !== undefined && groups.has(parent) && !reaches(parent, name) ? parent : undefined;
+	};
+
+	return { names, parentOf };
+};
+
 const projectModules = (
 	config: Config,
 	names: Names,
@@ -295,14 +343,17 @@ const projectModules = (
 	readonly root: unknown;
 	readonly images: ReadonlyMap<string, string>;
 	readonly located: Located;
+	readonly targets: ReadonlyMap<string, string>;
 } => {
 	const modules: Array<Module> = [];
+	const targets = new Map<string, string>();
 	const images = new Map<string, string>();
 	const located = new Map<unknown, string>();
+	const pageFiles = new Map<string, string>();
 	const themeName = nameScope();
 	const imageName = nameScope();
-	const add = (file: string, value: unknown, swaps = true) => {
-		modules.push({ file, value, swaps });
+	const add = (file: string, value: unknown, swaps = true, links = false) => {
+		modules.push({ file, value, swaps, links });
 		located.set(value, file);
 		return new ModuleReference(file);
 	};
@@ -310,26 +361,60 @@ const projectModules = (
 	const pageModule = (page: Page) => {
 		const folder = names.pages.get(page.name)?.file ?? fileName(page.name, "page");
 		const own = names.visuals.get(page.name);
+		const tree = groupTree(page.visuals.filter((visual) => !isRaw(visual)));
 		const visualFile = (name: string) =>
 			Layout.visual(folder, own?.get(name)?.file ?? fileName(name, "visual"));
+		const modulesOf = tree.names;
+		const memberOf = (name: unknown) =>
+			typeof name === "string" && modulesOf.has(name) ? new ModuleMember(visualFile(name), ["name"]) : name;
+
+		const withParent = (visual: Visual) => {
+			const parent = tree.parentOf(visual.name);
+			if (parent === undefined) return visual;
+
+			return { ...visual, parentGroupName: new ModuleMember(visualFile(parent), ["name"]) };
+		};
 
 		const visuals = page.visuals.map((visual) => {
 			if (isRaw(visual)) return visual;
 
 			const file = visualFile(visual.name);
 			located.set(visual, file);
-			return add(file, visual);
+			targets.set(visual.name, file);
+			return add(file, withParent(visual));
 		});
+
+		const interactions = "visualInteractions" in page ? page.visualInteractions : undefined;
+		const linked =
+			interactions === undefined
+				? {}
+				: {
+						visualInteractions: interactions.map((entry) =>
+							Object.fromEntries(
+								Object.entries(entry).map(([key, value]) => [
+									key,
+									key === "source" || key === "target" ? memberOf(value) : value,
+								]),
+							),
+						),
+					};
 
 		const file = Layout.page(folder);
 		located.set(page, file);
-		return add(file, { ...page, visuals });
+		pageFiles.set(page.name, file);
+		targets.set(page.name, file);
+		return add(file, { ...page, visuals, ...linked });
 	};
 
 	const bookmark = <A extends { readonly name: string }>(item: A) =>
 		isRaw(item)
 			? item
-			: add(Layout.bookmark(names.bookmarks.get(item.name)?.file ?? fileName(item.name, "bookmark")), item);
+			: add(
+					Layout.bookmark(names.bookmarks.get(item.name)?.file ?? fileName(item.name, "bookmark")),
+					item,
+					true,
+					true,
+				);
 
 	const resourceModule = (resource: Resource): unknown => {
 		if ("theme" in resource) {
@@ -344,11 +429,14 @@ const projectModules = (
 		return add(file, resource, false);
 	};
 
-	const { bookmarks, pages, resources } = config.report;
+	const { bookmarks, pages, pagesMetadata, resources } = config.report;
 	const pageList = add(
 		Layout.pages,
 		pages.map((page) => pageModule(page)),
 	);
+	const metadata = pagesMetadata instanceof URL ? undefined : pagesMetadata;
+	const active = at(metadata, "activePageName");
+	const activeFile = typeof active === "string" ? pageFiles.get(active) : undefined;
 	const bookmarkItems = bookmarks?.items.map((item) =>
 		"children" in item
 			? { name: item.name, displayName: item.displayName, children: item.children.map(bookmark) }
@@ -357,13 +445,16 @@ const projectModules = (
 	const report = {
 		...config.report,
 		pages: pageList,
+		...(activeFile === undefined
+			? {}
+			: { pagesMetadata: { ...metadata, activePageName: new ModuleMember(activeFile, ["name"]) } }),
 		...(bookmarks === undefined || bookmarkItems === undefined
 			? {}
 			: { bookmarks: { ...bookmarks, items: add(Layout.bookmarks, bookmarkItems) } }),
 		...(resources === undefined ? {} : { resources: resources.map((resource) => resourceModule(resource)) }),
 	};
 
-	return { modules, root: { ...config, report }, images, located };
+	return { modules, root: { ...config, report }, images, located, targets };
 };
 
 const ImageItem = decodeUnknownOption(
@@ -385,9 +476,13 @@ export const swapsOf = (
 	images: ReadonlyMap<string, string>,
 	colors: (color: string) => string,
 	idiomatic: boolean,
+	targets: ReadonlyMap<string, string> = new Map(),
 ): ModuleSwaps => {
 	const idMember = (value: string) =>
-		Option.map(Option.fromUndefinedOr(ids.paths.get(value)), (path) => new ModuleMember(Layout.ids, path));
+		Option.map(Option.fromUndefinedOr(ids.paths.get(value)), (path) => {
+			const target = targets.get(value);
+			return target === undefined ? new ModuleMember(Layout.ids, path) : new ModuleMember(target, ["name"]);
+		});
 
 	const imageCall = (value: unknown) =>
 		ImageItem(value).pipe(
@@ -467,7 +562,7 @@ export const importFiles = (
 ): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));
 	const names = namesOf(index, (path) => fileJson(project.tree, path));
-	const { modules, root, images, located } = projectModules(config, names);
+	const { modules, root, images, located, targets } = projectModules(config, names);
 	const ids = idsOf(index, names);
 	const roles = colorRoles(themesOf(config));
 	const used = new Set<string>();
@@ -476,11 +571,14 @@ export const importFiles = (
 		return colorName(roles, color);
 	};
 	const swaps = swapsOf(ids, images, colorOf, idiomatic);
+	const linkSwaps = swapsOf(ids, images, colorOf, idiomatic, targets);
 	const render = (file: string, value: unknown, options: Parameters<typeof renderModule>[3] = {}) =>
 		treeFile(file, encoder.encode(renderModule(file, value, assetOf, { idiomatic, ...options })));
 
 	const rendered = [
-		...modules.map((module) => render(module.file, module.value, module.swaps ? { swaps } : {})),
+		...modules.map((module) =>
+			render(module.file, module.value, module.swaps ? { swaps: module.links ? linkSwaps : swaps } : {}),
+		),
 		render(Layout.config, root, { header: registerBlock(config), swaps }),
 	];
 	const shared = [

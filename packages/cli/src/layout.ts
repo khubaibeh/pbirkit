@@ -26,6 +26,7 @@ export const Layout = {
 	pages: `${PAGES}/${INDEX}`,
 	bookmarks: `${BOOKMARKS}/${INDEX}`,
 	indexName: posix.basename(INDEX, ".ts"),
+	visualsFolder: VISUALS,
 	page: (page: string): string => `${PAGES}/${page}/${INDEX}`,
 	visual: (page: string, visual: string): string => `${PAGES}/${page}/${VISUALS}/${visual}.ts`,
 	bookmark: (bookmark: string): string => `${BOOKMARKS}/${bookmark}.ts`,

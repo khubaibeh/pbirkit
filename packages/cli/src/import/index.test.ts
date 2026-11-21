@@ -198,6 +198,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(page).toContain("export default definePage({");
 	expect(page).not.toContain("$schema");
 	expect(contents).toContain('$schema: SchemaUrl.report["3.3.0"],');
+	expect(contents).toContain("activePageName: _second.name,");
 	expect(readFileSync(join(out, "model", "definition", "model.tmdl"), "utf8")).toBe("model Model\r\n");
 	expect(readFileSync(join(out, "static", "CustomVisuals", "FileVisual", "extra.txt"), "utf8")).toBe(
 		"Unmapped\n",
@@ -518,6 +519,19 @@ const addGroup = () => {
 	);
 };
 
+it("keeps the id for a group that names itself as its parent", () => {
+	addGroup();
+	edit(visual("box", "visual.json"), (value) =>
+		value.replace('"position"', '"parentGroupName": "box",\n  "position"'),
+	);
+	const result = run(root, ["import", project, "-o", out]);
+	expect(result.status).toBe(2);
+	expect(result.stderr).toContain("parent groups form a cycle");
+	const box = readFileSync(join(out, "src", "pages", "first", "visuals", "box.ts"), "utf8");
+	expect(box).not.toContain("import _box");
+	expect(spawnSync(tsgo, ["-p", out], { encoding: "utf8" }).stdout).toBe("");
+});
+
 it.each([
 	["a renamed folder", "box", "other", "Visual or page folder differs from its name"],
 	["a bad name", "bad.group", "bad.group", 'The name "bad.group" must use only letters, digits, "_" or "-"'],
@@ -525,6 +539,9 @@ it.each([
 	addGroup();
 	const typed = importProject();
 	expect(typed).not.toContain("Visual first/");
+	const notes = readFileSync(join(out, "src", "pages", "first", "visuals", "notes.ts"), "utf8");
+	expect(notes).toContain('import _box from "./box.ts";');
+	expect(notes).toContain("parentGroupName: _box.name,");
 	rmSync(out, { recursive: true });
 	renameSync(visual("box"), visual(folder));
 	edit(visual(folder, "visual.json"), (value) => value.replace('"name": "box"', `"name": "${name}"`));
@@ -552,6 +569,9 @@ it("keeps a page raw when its visualInteractions name a visual that is not place
 		);
 	});
 	expect(importProject()).not.toContain("Page second");
+	const linked = readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8");
+	expect(linked).toContain("source: _1Card.name,");
+	expect(linked).toContain("target: _1Card2.name,");
 	rmSync(out, { recursive: true });
 	const pageVisual = (...path: ReadonlyArray<string>) => definition("pages", "second", "visuals", ...path);
 	renameSync(pageVisual("1-card"), pageVisual("moved"));
