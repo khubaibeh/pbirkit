@@ -5,6 +5,10 @@ import pbirkitPackage from "../package.json" with { type: "json" };
 
 const typesOf = (target: string): string => target.replace("./src/", "./dist/core/");
 
+it("keeps the core version", () => {
+	expect(corePackage.version).toBe(pbirkitPackage.version);
+});
+
 it("mirrors the core export map", () => {
 	expect(pbirkitPackage.exports).toEqual({
 		...Object.fromEntries(

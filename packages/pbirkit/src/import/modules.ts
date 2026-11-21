@@ -17,6 +17,7 @@ import { CORE_PACKAGE } from "../core-package.ts";
 import { Layout } from "../layout.ts";
 import type { Project } from "../pbip/project.ts";
 import { fileJson } from "../pbip/tree.ts";
+import { VERSION } from "../version.ts";
 import type { Fallback } from "./draft.ts";
 import {
 	colorName,
@@ -579,7 +580,11 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			: [];
 
 const SUPPORT_FILES = {
-	[Layout.packageJson]: { type: "module", imports: Layout.aliases },
+	[Layout.packageJson]: {
+		type: "module",
+		imports: Layout.aliases,
+		devDependencies: { [CORE_PACKAGE]: `^${VERSION}` },
+	},
 	[Layout.tsconfig]: {
 		extends: `./${Layout.localTsconfig}`,
 		compilerOptions: {

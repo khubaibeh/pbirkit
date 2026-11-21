@@ -41,6 +41,16 @@ The package also holds these docs, at `node_modules/pbirkit/docs/`. An agent in 
 
 Each pbirkit command writes `.pbirkit/tsconfig.json`, and the project's `tsconfig.json` extends it. Git ignores the file. After a fresh clone, run any pbirkit command once, so that the file exists.
 
+## Compiler options
+
+pbirkit ships its types as TS source. `tsc` checks that source with the options of your project.
+
+- Start from the `tsconfig.json` that `pbirkit import` writes. It sets every option that pbirkit needs.
+- Keep `allowImportingTsExtensions` on. The pbirkit source imports its own files by their `.ts` names.
+- Keep `noEmit` on. The CLI loads the TS files itself, so a report project needs no JS output.
+- Set `moduleResolution` to `NodeNext` or `Bundler`.
+- You can add these stricter options: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `verbatimModuleSyntax`, `isolatedModules` and `erasableSyntaxOnly`.
+
 ## Windows and WSL
 
 - You can work in WSL, but the `desktop` commands only run from Windows Node.

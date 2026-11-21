@@ -1,1 +1,3 @@
-export const VERSION = "0.0.1";
+import pbirkitPackage from "../package.json" with { type: "json" };
+
+export const VERSION = pbirkitPackage.version;

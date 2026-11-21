@@ -13,14 +13,14 @@ pbirkit import [SOURCE] [-o DIR] [--force] [--idiomatic]
 
 After it writes the files, the import builds the new project in memory and compares it with the source. It writes the output even when that check fails, so that you can fix the rest by hand.
 
-The new `package.json` does not list pbirkit. If no parent folder installs it, run `npm i -D pbirkit typescript` in the new project.
+The new `package.json` lists `pbirkit` as a dev dependency. Run `npm i -D typescript` in the new project, so that npm installs both. If the folder already has a `package.json`, the import adds only the aliases to it.
 
 ## Output layout
 
 ```
 my-report/
   pbirkit.config.ts        the config: report, model, resources
-  package.json             "type": "module" and the #/ and #static/ aliases
+  package.json             "type": "module", the #/ and #static/ aliases, pbirkit
   tsconfig.json            extends .pbirkit/tsconfig.json
   IMPORT.md                work left for agents (read this first)
   .pbirkit-import.json     list of generated files, for --force

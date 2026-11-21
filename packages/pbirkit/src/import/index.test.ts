@@ -24,6 +24,7 @@ import { toJson } from "@pbirkit/core/build";
 
 import { findProject } from "../pbip/project.ts";
 import { indexTree } from "../pbip/tree.ts";
+import { VERSION } from "../version.ts";
 import { MAX_ROUNDS, settleConfig } from "./draft.ts";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -207,6 +208,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
 		type: "module",
 		imports: { "#/*": "./src/*", "#static/*": "./static/*" },
+		devDependencies: { "@pbirkit/core": `^${VERSION}` },
 	});
 	const settings = readFileSync(join(out, "tsconfig.json"), "utf8");
 	expect(settings).toContain('"extends": "./.pbirkit/tsconfig.json"');
