@@ -3,7 +3,7 @@ import { Effect, FileSystem, Path } from "effect";
 import { insideProject } from "@pbirkit/core/build";
 
 import { onFileSystem } from "../build/errors.ts";
-import { treeOf, writeTree } from "../build/tree.ts";
+import { fileKey, treeOf, writeTree } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
 import { containedBy } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
@@ -69,12 +69,27 @@ export const checkOutput = Effect.fnUntraced(function* (
 		});
 
 	if (!(yield* fs.exists(out).pipe(onFileSystem("check", out)))) return yield* Effect.void;
+
 	const entries = yield* fs.readDirectory(out).pipe(onFileSystem("list", out));
-	if (entries.length > 0 && !force)
+	if (entries.length === 0) return yield* Effect.void;
+	if (!force)
 		return yield* new ImportOutputError({
 			path: out,
 			detail: "the folder is not empty. Use --force to replace the files an earlier import wrote",
 		});
+
+	const owned = new Set((yield* readManifest(out)).map((file) => fileKey(file)));
+	for (const file of files.files) {
+		const target = path.join(out, file.path);
+		if (owned.has(fileKey(file.path)) || !(yield* fs.exists(target).pipe(onFileSystem("check", target))))
+			continue;
+
+		return yield* new ImportOutputError({
+			path: target,
+			detail: "an earlier import did not write this file, so --force does not replace it",
+		});
+	}
+
 	return yield* Effect.void;
 });
 

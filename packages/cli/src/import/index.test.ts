@@ -180,9 +180,12 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(contents).toContain('readonly "import:Example": {');
 	expect(contents).toContain('readonly visuals: readonly [{ readonly guid: "FileVisual" }];');
 	expect(contents).toContain('readonly builtinVisuals: readonly ["PublicVisual"];');
-	expect(contents).toContain(
-		'new URL("./assets/report/StaticResources/RegisteredResources/logo.png", import.meta.url)',
+	expect(contents).toContain('import _logo_png from "./images/logo.png.ts";');
+	expect(readFileSync(join(out, "images", "logo.png.ts"), "utf8")).toContain(
+		'new URL("../assets/report/StaticResources/RegisteredResources/logo.png", import.meta.url)',
 	);
+	expect(stdout).toContain(`import: listed the work left for agents in ${join("out", "IMPORT.md")}`);
+	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toContain("# Import report for Example");
 	const page = readFileSync(join(out, "pages", "second", "page.ts"), "utf8");
 	expect(page).toContain('from "./visuals/1-card.ts"');
 	expect(page).toContain('from "./visuals/1_card.ts"');
@@ -326,6 +329,12 @@ it("uses --force to replace only the files an earlier import wrote", () => {
 	expect(existsSync(join(out, "assets", "model", "definition", "obsolete.tmdl"))).toBe(false);
 	expect(existsSync(join(out, "pages", "second", "visuals", "1-card.ts"))).toBe(true);
 	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toBe(settings);
+	edit(join(out, ".pbirkit-import.json"), (value) => value.replace('\t"IMPORT.md",\n', ""));
+	writeFileSync(join(out, "IMPORT.md"), "mine\n");
+	const refused = run(root, ["import", project, "-o", out, "--force"]);
+	expect(refused.status).not.toBe(0);
+	expect(refused.stderr).toContain("an earlier import did not write this file");
+	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toBe("mine\n");
 });
 
 it("rejects ambiguous input and protects a non-empty output without --force", () => {

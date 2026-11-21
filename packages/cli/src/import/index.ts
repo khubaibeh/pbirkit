@@ -16,6 +16,7 @@ import { settleConfig } from "./draft.ts";
 import { diffCommand, verifiedMessage, writtenMessage } from "./messages.ts";
 import { CONFIG_FILE, importFiles, supportFiles } from "./modules.ts";
 import { checkOutput, writeImport } from "./output.ts";
+import { REPORT_FILE } from "./report.ts";
 
 const flags = {
 	source: Argument.String("source").pipe(
@@ -73,14 +74,17 @@ const runImport = Effect.fnUntraced(function* ({
 
 	const project = yield* findProject(source);
 	yield* requireFiles(project);
-	const { config, fallbacks } = settleConfig(project, indexTree(project.name, project.report, project.tree));
+	const index = indexTree(project.name, project.report, project.tree);
+	const { config, fallbacks } = settleConfig(project, index);
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	const files = importFiles(project, config, idiomatic);
+	const files = importFiles(project, index, config, fallbacks, idiomatic);
 	yield* checkOutput(out, project, files, force);
 	yield* writeImport(out, files, supportFiles());
 
 	const configFile = path.join(out, CONFIG_FILE);
-	yield* Console.log(writtenMessage(fromCwd(path, configFile), config, fallbacks));
+	yield* Console.log(
+		writtenMessage(fromCwd(path, configFile), fromCwd(path, path.join(out, REPORT_FILE)), config, fallbacks),
+	);
 	const loaded = yield* loadConfig(configFile, false);
 	const comparison = yield* compareProject(loaded.config, project.root, "text", NO_SELECTORS);
 	if (comparison.differences.length > 0) {

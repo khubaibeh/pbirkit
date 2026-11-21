@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
 
-import { renderModule } from "./modules.ts";
+import { renderModule, swapsOf } from "./modules.ts";
+import { colorName, colorRoles, keyOf } from "./names.ts";
 
 const VISUAL_JSON = `{
   "name": "sales",
@@ -269,7 +270,7 @@ const VISUAL_JSON = `{
   }
 }`;
 
-const VISUAL_TS = `import { alias, categorical, col, defaultSort, desc, double, filterDef, from, gt, isIn, literal, long, measure, nil, obj, project, role, solid, text, theme, when, wildcard } from "@pbirkit/core/expr";
+const VISUAL_TS = `import { categorical, col, defaultSort, desc, double, gt, inValues, literal, long, measure, nil, obj, project, role, solid, text, theme, when, wildcard } from "@pbirkit/core/expr";
 
 export default {
 	name: "sales",
@@ -298,7 +299,7 @@ export default {
 	filterConfig: {
 		filters: [
 			categorical("f1", col("Sales", "Year"), {
-				filter: filterDef([from("s", "Sales")], isIn([col(alias("s"), "Year")], [[long(2024)], [nil]])),
+				filter: inValues(col("Sales", "Year"), [long(2024), nil]),
 				howCreated: "User",
 			}),
 		],
@@ -334,4 +335,93 @@ export default {
 	zero: -0,
 } as const;
 `);
+});
+
+const literalProperty = (Value: string) => ({ expr: { Literal: { Value } } });
+
+it("swaps ids, colours and images for members of shared modules", () => {
+	const ids = {
+		value: { pages: { overview: "a3f9c1d2e4b5f6a7b8c9" } },
+		paths: new Map([["a3f9c1d2e4b5f6a7b8c9", ["pages", "overview"]]]),
+	};
+	const roles = colorRoles([{ foreground: "#252423", dataColors: ["#118DFF"] }]);
+	const swaps = swapsOf(
+		ids,
+		new Map([["logo.png", "images/logo.png.ts"]]),
+		(color) => colorName(roles, color),
+		true,
+	);
+	const value = {
+		name: "a3f9c1d2e4b5f6a7b8c9",
+		fill: { solid: { color: literalProperty("'#118DFF'") } },
+		line: { solid: { color: literalProperty("'#ABCDEF'") } },
+		label: literalProperty("'#118DFF'"),
+		sections: { a3f9c1d2e4b5f6a7b8c9: { visible: true } },
+		image: {
+			expr: {
+				ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "logo.png" },
+			},
+		},
+		other: {
+			expr: {
+				ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
+			},
+		},
+		reordered: {
+			expr: {
+				ResourcePackageItem: { ItemName: "logo.png", PackageName: "RegisteredResources", PackageType: 1 },
+			},
+		},
+		filter: {
+			Version: 2,
+			From: [{ Name: "x", Entity: "Sales", Type: 0 }],
+			Where: [
+				{
+					Condition: {
+						Not: {
+							Expression: {
+								In: {
+									Expressions: [
+										{ Column: { Expression: { SourceRef: { Source: "x" } }, Property: "Region" } },
+									],
+									Values: [[literalProperty("'East'").expr]],
+								},
+							},
+						},
+					},
+				},
+			],
+		},
+	};
+	expect(renderModule("pages/p/page.ts", value, () => "", { idiomatic: true, swaps }))
+		.toBe(`import { col, imageRef, notIn, solid, v } from "@pbirkit/core/expr";
+import ids from "../../ids.ts";
+import palette from "../../palette.ts";
+import _logo_png from "../../images/logo.png.ts";
+
+export default {
+	name: ids.pages.overview,
+	fill: solid(palette.data1),
+	line: solid(palette.hexABCDEF),
+	label: v("#118DFF"),
+	sections: { [ids.pages.overview]: { visible: true } },
+	image: v(imageRef(_logo_png)),
+	other: v({
+		ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
+	}),
+	reordered: v({
+		ResourcePackageItem: { ItemName: "logo.png", PackageName: "RegisteredResources", PackageType: 1 },
+	}),
+	filter: notIn(col("Sales", "Region"), ["East"], "x"),
+} as const;
+`);
+});
+
+it("names ids and colours as dotted keys without clashes", () => {
+	expect(keyOf("2.1 - Executive Summary", "page")).toBe("_21ExecutiveSummary");
+	expect(keyOf("KPI card", "visual")).toBe("kpiCard");
+	expect(keyOf("--", "visual")).toBe("visual");
+	const roles = colorRoles([{ foreground: "#000000" }, { foreground: "#111111", dataColors: ["#000000"] }]);
+	expect([...roles]).toEqual([["#000000", "foreground"]]);
+	expect(colorName(roles, "#111111")).toBe("hex111111");
 });
