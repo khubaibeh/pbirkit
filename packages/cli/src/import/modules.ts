@@ -1,12 +1,13 @@
 import { posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Array as Arr, HashMap, Option } from "effect";
+import { Array as Arr, HashMap, Option, Predicate } from "effect";
 import { Literal, String as StringSchema, Struct, decodeUnknownOption } from "effect/Schema";
 
 import { isRaw } from "@pbirkit/core/config";
 import type { Config } from "@pbirkit/core/config";
 import { imageRef } from "@pbirkit/core/expr";
+import { SchemaUrl } from "@pbirkit/core/schema-url";
 import type { ReportTree } from "@pbirkit/core/tree";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
@@ -48,6 +49,19 @@ const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
 	[Layout.pages, "pages"],
 	[Layout.bookmarks, "bookmarks"],
 ]);
+const SCHEMA_URL = "@pbirkit/core/schema-url";
+const PACKAGE_EXPORTS: ReadonlyMap<string, string> = new Map([[SCHEMA_URL, "SchemaUrl"]]);
+const SCHEMA_PATHS: ReadonlyMap<string, ReadonlyArray<string>> = new Map(
+	Object.entries(SchemaUrl).flatMap(([kind, versions]) =>
+		Object.entries(versions).map(([version, url]) => [url, [kind, version]] as const),
+	),
+);
+const DEFINERS: ReadonlyMap<string, string> = new Map([
+	["visual", "defineVisual"],
+	["page", "definePage"],
+	["bookmark", "defineBookmark"],
+]);
+const CONFIG_DEFINER = { name: "defineConfig", from: "@pbirkit/core/config" };
 const encoder = new TextEncoder();
 
 type Report = Config["report"];
@@ -86,7 +100,7 @@ const relativeTo = (file: string, target: string): string => {
 };
 
 const identifierOf = (file: string): string => {
-	const shared = SHARED_MODULES.get(file);
+	const shared = SHARED_MODULES.get(file) ?? PACKAGE_EXPORTS.get(file);
 	if (shared !== undefined) return shared;
 
 	const name = posix.basename(file, ".ts");
@@ -116,6 +130,24 @@ const projectPath = (project: Project, url: URL): string =>
 	relative(project.root, fileURLToPath(url)).split(sep).join("/");
 
 const isFolder = (url: URL): boolean => url.pathname.endsWith("/");
+
+interface Definer {
+	readonly name: string;
+	readonly from: string;
+}
+
+const definerOf = (value: unknown): { readonly definer: Definer; readonly value: unknown } | undefined => {
+	if (!Predicate.isReadonlyObject(value) || Array.isArray(value)) return undefined;
+
+	const [first, ...rest] = Object.entries(value);
+	const schema =
+		first?.[0] === "$schema" && typeof first[1] === "string" ? SCHEMA_PATHS.get(first[1]) : undefined;
+	const [kind = "", version = ""] = schema ?? [];
+	const name = DEFINERS.get(kind);
+	if (name === undefined) return undefined;
+
+	return { definer: { name, from: `@pbirkit/core/${kind}/${version}` }, value: Object.fromEntries(rest) };
+};
 
 export const renderModule = (
 	file: string,
@@ -186,22 +218,25 @@ export const renderModule = (
 				),
 		});
 
-	const tree = toNode(value, idiomatic, { ...swaps, nameOf: importName });
+	const defined = file === Layout.config ? { definer: CONFIG_DEFINER, value } : definerOf(value);
+	const tree = toNode(defined?.value ?? value, idiomatic, { ...swaps, nameOf: importName });
 	const used = [...new Set(helperNames(tree))].toSorted();
-	const isConfig = file === Layout.config;
 	const body = render(tree, 0);
 	const lines = [
-		...(isConfig ? ['import { defineConfig } from "@pbirkit/core/config";'] : []),
+		...(defined === undefined ? [] : [`import { ${defined.definer.name} } from "${defined.definer.from}";`]),
 		...(used.length === 0 ? [] : [`import { ${used.join(", ")} } from "@pbirkit/core/expr";`]),
-		...Array.from(
-			imports,
-			([target, name]) => `import ${name} from ${JSON.stringify(urlPath(relativeTo(file, target)))};`,
+		...Array.from(imports, ([target, name]) =>
+			PACKAGE_EXPORTS.has(target)
+				? `import { ${name} } from ${JSON.stringify(target)};`
+				: `import ${name} from ${JSON.stringify(urlPath(relativeTo(file, target)))};`,
 		),
 	];
 	return [
 		...(lines.length === 0 ? [] : [...lines, ""]),
 		...(header === "" ? [] : [header, ""]),
-		isConfig ? `export default defineConfig(${body});` : `export default ${body} as const;`,
+		defined === undefined
+			? `export default ${body} as const;`
+			: `export default ${defined.definer.name}(${body});`,
 		"",
 	].join("\n");
 };
@@ -342,6 +377,9 @@ const ImageItem = decodeUnknownOption(
 	{ onExcessProperty: "error" },
 );
 
+const schemaMember = (value: string) =>
+	Option.map(Option.fromUndefinedOr(SCHEMA_PATHS.get(value)), (path) => new ModuleMember(SCHEMA_URL, path));
+
 export const swapsOf = (
 	ids: Ids,
 	images: ReadonlyMap<string, string>,
@@ -364,7 +402,7 @@ export const swapsOf = (
 		swap: (value, helper) => {
 			if (typeof value !== "string") return idiomatic ? imageCall(value) : Option.none();
 
-			const member = idMember(value);
+			const member = Option.orElse(idMember(value), () => schemaMember(value));
 			if (Option.isSome(member) || !idiomatic || helper !== "solid" || !isColor(value)) return member;
 
 			return Option.some(new ModuleMember(Layout.palette, [colors(value)]));

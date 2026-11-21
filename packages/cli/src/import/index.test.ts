@@ -194,6 +194,10 @@ it("imports split modules, model assets and unmapped files without local depende
 	const page = readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8");
 	expect(page).toContain('import _1Card from "./visuals/1-card.ts";');
 	expect(page).toContain('import _1Card2 from "./visuals/1-card-2.ts";');
+	expect(page).toContain('import { definePage } from "@pbirkit/core/page/2.1.0";');
+	expect(page).toContain("export default definePage({");
+	expect(page).not.toContain("$schema");
+	expect(contents).toContain('$schema: SchemaUrl.report["3.3.0"],');
 	expect(readFileSync(join(out, "model", "definition", "model.tmdl"), "utf8")).toBe("model Model\r\n");
 	expect(readFileSync(join(out, "static", "CustomVisuals", "FileVisual", "extra.txt"), "utf8")).toBe(
 		"Unmapped\n",

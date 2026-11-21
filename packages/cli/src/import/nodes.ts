@@ -4,6 +4,7 @@ import { RecordArg, helperMatch } from "./helpers.ts";
 import type { HelperMatch } from "./helpers.ts";
 
 export const LINE_WIDTH = 100;
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/u;
 
 export class ModuleReference {
 	readonly file: string;
@@ -61,9 +62,10 @@ export type Node = Data.TaggedEnum<{
 export const Node = Data.taggedEnum<Node>();
 
 export const property = (key: string): string =>
-	key === "__proto__" ? '["__proto__"]' : /^[A-Za-z_$][\w$]*$/u.test(key) ? key : JSON.stringify(key);
+	key === "__proto__" ? '["__proto__"]' : IDENTIFIER.test(key) ? key : JSON.stringify(key);
 
-export const memberPath = (path: ReadonlyArray<string>): string => path.map((key) => `.${key}`).join("");
+export const memberPath = (path: ReadonlyArray<string>): string =>
+	path.map((key) => (IDENTIFIER.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`)).join("");
 
 export const toNode = (
 	value: unknown,
