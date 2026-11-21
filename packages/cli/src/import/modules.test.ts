@@ -345,12 +345,7 @@ it("swaps ids, colours and images for members of shared modules", () => {
 		paths: new Map([["a3f9c1d2e4b5f6a7b8c9", ["pages", "overview"]]]),
 	};
 	const roles = colorRoles([{ foreground: "#252423", dataColors: ["#118DFF"] }]);
-	const swaps = swapsOf(
-		ids,
-		new Map([["logo.png", "src/images/logo.ts"]]),
-		(color) => colorName(roles, color),
-		true,
-	);
+	const swaps = swapsOf(ids, new Map([["logo.png", "logo"]]), (color) => colorName(roles, color), true);
 	const value = {
 		name: "a3f9c1d2e4b5f6a7b8c9",
 		fill: { solid: { color: literalProperty("'#118DFF'") } },
@@ -395,9 +390,9 @@ it("swaps ids, colours and images for members of shared modules", () => {
 	};
 	expect(renderModule("src/pages/p/index.ts", value, () => "", { idiomatic: true, swaps }))
 		.toBe(`import { col, imageRef, notIn, solid, v } from "@pbirkit/core/expr";
-import ids from "../../ids.ts";
-import palette from "../../palette.ts";
-import _logo from "../../images/logo.ts";
+import ids from "#/ids.ts";
+import palette from "#/palette.ts";
+import resources from "#/resources.ts";
 
 export default {
 	name: ids.pages.overview,
@@ -405,7 +400,7 @@ export default {
 	line: solid(palette.hexABCDEF),
 	label: v("#118DFF"),
 	sections: { [ids.pages.overview]: { visible: true } },
-	image: v(imageRef(_logo)),
+	image: v(imageRef(resources.logo)),
 	other: v({
 		ResourcePackageItem: { PackageName: "RegisteredResources", PackageType: 1, ItemName: "missing.png" },
 	}),
@@ -441,13 +436,34 @@ it("points bookmark ids at page and visual modules and qualifies clashing import
 	};
 
 	expect(renderModule("src/bookmarks/b.ts", value, () => "", { idiomatic: true, swaps }))
-		.toBe(`import _overview from "../pages/overview/index.ts";
-import _card from "../pages/overview/visuals/card.ts";
-import _detailCard from "../pages/detail/visuals/card.ts";
+		.toBe(`import _overview from "#/pages/overview/index.ts";
+import _card from "#/pages/overview/visuals/card.ts";
+import _detailCard from "#/pages/detail/visuals/card.ts";
 
 export default {
 	activeSection: _overview.name,
 	sections: { [_overview.name]: { visualContainers: { [_card.name]: {}, [_detailCard.name]: {} } } },
+} as const;
+`);
+});
+
+it("keeps a relative URL for static paths that Node cannot resolve through an alias", () => {
+	const value = {
+		logo: new URL("file:///p/logo%20one.png"),
+		blocked: new URL("file:///p/NODE_MODULES/a.png"),
+		folder: new URL("file:///p/CustomVisuals/"),
+	};
+	const assets = new Map([
+		["/p/logo%20one.png", "static/logo one.png"],
+		["/p/NODE_MODULES/a.png", "static/NODE_MODULES/a.png"],
+		["/p/CustomVisuals/", "static/CustomVisuals"],
+	]);
+
+	expect(renderModule("src/resources.ts", value, (url) => assets.get(url.pathname) ?? ""))
+		.toBe(`export default {
+	logo: new URL(import.meta.resolve("#static/logo%20one.png")),
+	blocked: new URL("../static/NODE_MODULES/a.png", import.meta.url),
+	folder: new URL(\`\${import.meta.resolve("#static/CustomVisuals")}/\`),
 } as const;
 `);
 });

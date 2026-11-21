@@ -46,6 +46,7 @@ import { importReport } from "./report.ts";
 const SHARED_MODULES: ReadonlyMap<string, string> = new Map([
 	[Layout.ids, "ids"],
 	[Layout.palette, "palette"],
+	[Layout.resources, "resources"],
 	[Layout.pages, "pages"],
 	[Layout.bookmarks, "bookmarks"],
 ]);
@@ -101,6 +102,15 @@ const relativeTo = (file: string, target: string): string => {
 	return path.startsWith("../") ? path : `./${path}`;
 };
 
+const isSource = (path: string): boolean => !posix.relative(Layout.sources, path).startsWith("../");
+
+const specifierOf = (file: string, target: string): string => {
+	const path = relativeTo(file, target);
+	const aliased = isSource(target) && (!isSource(file) || path.startsWith("../"));
+
+	return aliased ? `${Layout.alias}${urlPath(posix.relative(Layout.sources, target))}` : urlPath(path);
+};
+
 const identifierOf = (file: string): string => {
 	const shared = SHARED_MODULES.get(file) ?? PACKAGE_EXPORTS.get(file);
 	if (shared !== undefined) return shared;
@@ -144,6 +154,23 @@ const projectPath = (project: Project, url: URL): string =>
 	relative(project.root, fileURLToPath(url)).split(sep).join("/");
 
 const isFolder = (url: URL): boolean => url.pathname.endsWith("/");
+
+const isResolvable = (part: string): boolean =>
+	part !== "" &&
+	part !== "." &&
+	part !== ".." &&
+	part.toLowerCase() !== "node_modules" &&
+	!part.includes("\\");
+
+const urlText = (file: string, asset: string, folder: boolean): string => {
+	const inside = posix.relative(Layout.staticFolder, asset);
+	const aliased = !inside.startsWith("../") && inside.split("/").every((part) => isResolvable(part));
+	if (!aliased)
+		return `new URL(${JSON.stringify(`${urlPath(relativeTo(file, asset))}${folder ? "/" : ""}`)}, import.meta.url)`;
+
+	const resolved = `import.meta.resolve(${JSON.stringify(`${Layout.staticAlias}${urlPath(inside)}`)})`;
+	return folder ? `new URL(\`\${${resolved}}/\`)` : `new URL(${resolved})`;
+};
 
 interface Definer {
 	readonly name: string;
@@ -205,8 +232,7 @@ export const renderModule = (
 			Scalar: ({ text }) => text,
 			Module: ({ file: target }) => importName(target),
 			Member: ({ file: target, path }) => `${importName(target)}${memberPath(path)}`,
-			Url: ({ url }) =>
-				`new URL(${JSON.stringify(`${urlPath(relativeTo(file, assetOf(url)))}${isFolder(url) ? "/" : ""}`)}, import.meta.url)`,
+			Url: ({ url }) => urlText(file, assetOf(url), isFolder(url)),
 			Constant: ({ name }) => name,
 			Call: ({ name, args }) =>
 				Option.getOrElse(hugged(name, args, depth), () =>
@@ -243,7 +269,7 @@ export const renderModule = (
 		...Array.from(imports, ([target, name]) =>
 			PACKAGE_EXPORTS.has(target)
 				? `import { ${name} } from ${JSON.stringify(target)};`
-				: `import ${name} from ${JSON.stringify(urlPath(relativeTo(file, target)))};`,
+				: `import ${name} from ${JSON.stringify(specifierOf(file, target))};`,
 		),
 	];
 	return [
@@ -348,6 +374,7 @@ const projectModules = (
 	const modules: Array<Module> = [];
 	const targets = new Map<string, string>();
 	const images = new Map<string, string>();
+	const imageResources: Record<string, unknown> = {};
 	const located = new Map<unknown, string>();
 	const pageFiles = new Map<string, string>();
 	const themeName = nameScope();
@@ -424,9 +451,10 @@ const projectModules = (
 		if (resource.kind !== "image") return resource;
 
 		const words = wordsOf(posix.basename(resource.name, posix.extname(resource.name)));
-		const file = Layout.image(imageName(words.length > 0 ? words : ["image"]).file);
-		images.set(resource.name, file);
-		return add(file, resource, false);
+		const { key } = imageName(words.length > 0 ? words : ["image"]);
+		images.set(resource.name, key);
+		imageResources[key] = resource;
+		return new ModuleMember(Layout.resources, [key]);
 	};
 
 	const { bookmarks, pages, pagesMetadata, resources } = config.report;
@@ -453,6 +481,7 @@ const projectModules = (
 			: { bookmarks: { ...bookmarks, items: add(Layout.bookmarks, bookmarkItems) } }),
 		...(resources === undefined ? {} : { resources: resources.map((resource) => resourceModule(resource)) }),
 	};
+	if (Object.keys(imageResources).length > 0) add(Layout.resources, imageResources, false);
 
 	return { modules, root: { ...config, report }, images, located, targets };
 };
@@ -489,7 +518,7 @@ export const swapsOf = (
 			Option.map(({ ResourcePackageItem }) => ResourcePackageItem.ItemName),
 			Option.filter((name) => JSON.stringify(imageRef({ kind: "image", name })) === JSON.stringify(value)),
 			Option.flatMap((name) => Option.fromUndefinedOr(images.get(name))),
-			Option.map((file) => new HelperCall("imageRef", [new ModuleMember(file, [])])),
+			Option.map((key) => new HelperCall("imageRef", [new ModuleMember(Layout.resources, [key])])),
 		);
 
 	return {
@@ -531,7 +560,7 @@ const urlsIn = (value: unknown): ReadonlyArray<URL> =>
 			: [];
 
 const SUPPORT_FILES = {
-	[Layout.packageJson]: { type: "module" },
+	[Layout.packageJson]: { type: "module", imports: Layout.aliases },
 	[Layout.tsconfig]: {
 		extends: `./${Layout.localTsconfig}`,
 		compilerOptions: {

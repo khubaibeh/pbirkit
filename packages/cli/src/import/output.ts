@@ -1,6 +1,7 @@
-import { Effect, FileSystem, Path } from "effect";
+import { Effect, FileSystem, Path, Predicate } from "effect";
 
 import { insideProject } from "@pbirkit/core/build";
+import { at } from "@pbirkit/core/expr";
 
 import { onFileSystem } from "../build/errors.ts";
 import { fileKey, treeOf, writeTree } from "../build/tree.ts";
@@ -24,6 +25,28 @@ const readManifest = Effect.fnUntraced(function* (out: string) {
 	});
 	const files = Array.isArray(value) ? value : [];
 	return files.filter((entry): entry is string => typeof entry === "string" && insideProject(entry));
+});
+
+const addAliases = Effect.fnUntraced(function* (out: string) {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+
+	const file = path.join(out, Layout.packageJson);
+	const text = yield* fs.readFileString(file).pipe(onFileSystem("read", file));
+	const value: unknown = yield* Effect.try({
+		try: (): unknown => JSON.parse(text),
+		catch: () => new ImportOutputError({ path: file, detail: "package.json is not valid JSON" }),
+	});
+	if (!Predicate.isReadonlyObject(value) || Array.isArray(value))
+		return yield* new ImportOutputError({ path: file, detail: "package.json is not a JSON object" });
+
+	const imports = at(value, "imports");
+	const known = Predicate.isReadonlyObject(imports) && !Array.isArray(imports) ? imports : {};
+	const missing = Object.entries(Layout.aliases).filter(([key]) => !(key in known));
+	if (missing.length === 0) return yield* Effect.void;
+
+	const next = { ...value, imports: { ...known, ...Object.fromEntries(missing) } };
+	yield* fs.writeFileString(file, `${JSON.stringify(next, null, "\t")}\n`).pipe(onFileSystem("write", file));
 });
 
 const removeFile = Effect.fnUntraced(function* (out: string, relative: string) {
@@ -108,6 +131,7 @@ export const writeImport = Effect.fnUntraced(function* (
 		if (!(yield* fs.exists(target).pipe(onFileSystem("check", target)))) missing.push(file);
 	}
 	yield* writeTree(out, treeOf([...files.files, ...missing]));
+	if (!missing.some((file) => file.path === Layout.packageJson)) yield* addAliases(out);
 	for (const folder of files.folders) {
 		const target = path.join(out, folder);
 		yield* fs.makeDirectory(target, { recursive: true }).pipe(onFileSystem("create", target));

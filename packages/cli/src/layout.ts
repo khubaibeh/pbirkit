@@ -9,6 +9,8 @@ const STATIC = "static";
 const MODEL = "model";
 const INDEX = "index.ts";
 const VISUALS = "visuals";
+const ALIAS = "#/";
+const STATIC_ALIAS = "#static/";
 
 export const Layout = {
 	config: "pbirkit.config.ts",
@@ -20,9 +22,14 @@ export const Layout = {
 	localTsconfig: LOCAL_TSCONFIG,
 	localFolder: posix.dirname(LOCAL_TSCONFIG),
 	sources: SOURCES,
+	aliases: { [`${ALIAS}*`]: `./${SOURCES}/*`, [`${STATIC_ALIAS}*`]: `./${STATIC}/*` },
+	alias: ALIAS,
+	staticAlias: STATIC_ALIAS,
+	staticFolder: STATIC,
 	model: MODEL,
 	ids: `${SOURCES}/ids.ts`,
 	palette: `${SOURCES}/palette.ts`,
+	resources: `${SOURCES}/resources.ts`,
 	pages: `${PAGES}/${INDEX}`,
 	bookmarks: `${BOOKMARKS}/${INDEX}`,
 	indexName: posix.basename(INDEX, ".ts"),
@@ -31,7 +38,6 @@ export const Layout = {
 	visual: (page: string, visual: string): string => `${PAGES}/${page}/${VISUALS}/${visual}.ts`,
 	bookmark: (bookmark: string): string => `${BOOKMARKS}/${bookmark}.ts`,
 	theme: (theme: string): string => `${SOURCES}/themes/${theme}.ts`,
-	image: (image: string): string => `${SOURCES}/images/${image}.ts`,
 	staticFile: (path: string): string => `${STATIC}/${path}`,
 	modelFile: (path: string): string => `${MODEL}/${path}`,
 } as const;

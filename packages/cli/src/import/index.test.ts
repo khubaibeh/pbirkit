@@ -173,7 +173,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(stdout).toContain("import: verified 23 files");
 	expect(stdout).toContain("extra.txt: Copied 1 unmapped file");
 	const contents = readFileSync(config, "utf8");
-	expect(contents).toContain('import pages from "./src/pages/index.ts";');
+	expect(contents).toContain('import pages from "#/pages/index.ts";');
 	expect(readFileSync(join(out, "src", "pages", "index.ts"), "utf8")).toContain(
 		"export default [\n\t_second,\n\t_first,\n] as const;",
 	);
@@ -185,9 +185,10 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(contents).toContain('readonly "import:Example": {');
 	expect(contents).toContain('readonly visuals: readonly [{ readonly guid: "FileVisual" }];');
 	expect(contents).toContain('readonly builtinVisuals: readonly ["PublicVisual"];');
-	expect(contents).toContain('import _logo from "./src/images/logo.ts";');
-	expect(readFileSync(join(out, "src", "images", "logo.ts"), "utf8")).toContain(
-		'new URL("../../static/StaticResources/RegisteredResources/logo.png", import.meta.url)',
+	expect(contents).toContain('import resources from "#/resources.ts";');
+	expect(contents).toContain("resources.logo,");
+	expect(readFileSync(join(out, "src", "resources.ts"), "utf8")).toContain(
+		'file: new URL(import.meta.resolve("#static/StaticResources/RegisteredResources/logo.png")),',
 	);
 	expect(stdout).toContain(`import: listed the work left for agents in ${join("out", "IMPORT.md")}`);
 	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toContain("# Import report for Example");
@@ -203,7 +204,10 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(readFileSync(join(out, "static", "CustomVisuals", "FileVisual", "extra.txt"), "utf8")).toBe(
 		"Unmapped\n",
 	);
-	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({ type: "module" });
+	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
+		type: "module",
+		imports: { "#/*": "./src/*", "#static/*": "./static/*" },
+	});
 	const settings = readFileSync(join(out, "tsconfig.json"), "utf8");
 	expect(settings).toContain('"extends": "./.pbirkit/tsconfig.json"');
 	expect(settings).not.toContain(core);
@@ -289,9 +293,7 @@ it("keeps pages.json and bookmarks.json typed around a raw page and a raw bookma
 		'name: "overview",\n\t\t\t\tfile: new URL(',
 	);
 	const page = readFileSync(join(out, "src", "pages", "first", "index.ts"), "utf8");
-	expect(page).toContain(
-		'file: new URL("../../../static/definition/pages/first/page.json", import.meta.url)',
-	);
+	expect(page).toContain('file: new URL(import.meta.resolve("#static/definition/pages/first/page.json"))');
 	expect(page).toContain('import _notes from "./visuals/notes.ts";');
 	expect(existsSync(join(out, "src", "bookmarks", "detail.ts"))).toBe(true);
 	expect(tree("--pbip", project)).toBe(tree("-c", config));
@@ -319,7 +321,7 @@ it("types a Desktop custom theme registered as Image and escapes generated modul
 	const contents = readFileSync(config, "utf8");
 	expect(contents).toContain('kind: "customTheme"');
 	expect(contents).toContain('itemType: "Image"');
-	expect(contents).toContain('from "./src/themes/brand-100.ts"');
+	expect(contents).toContain('from "#/themes/brand-100.ts"');
 	expect(contents).not.toContain("resourcePackages:");
 });
 
@@ -329,6 +331,7 @@ it("uses --force to replace only the files an earlier import wrote", () => {
 	writeFileSync(join(out, "notes.md"), "");
 	const settings = '{"compilerOptions":{"strict":true}}';
 	writeFileSync(join(out, "tsconfig.json"), settings);
+	writeFileSync(join(out, "package.json"), '{"type":"module","name":"mine"}');
 	rmSync(join(project, "Example.SemanticModel", "definition", "obsolete.tmdl"));
 	importProject("--force");
 	expect(existsSync(join(out, "src", "pages", "custom.ts"))).toBe(true);
@@ -336,6 +339,11 @@ it("uses --force to replace only the files an earlier import wrote", () => {
 	expect(existsSync(join(out, "model", "definition", "obsolete.tmdl"))).toBe(false);
 	expect(existsSync(join(out, "src", "pages", "second", "visuals", "1-card.ts"))).toBe(true);
 	expect(readFileSync(join(out, "tsconfig.json"), "utf8")).toBe(settings);
+	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
+		type: "module",
+		name: "mine",
+		imports: { "#/*": "./src/*", "#static/*": "./static/*" },
+	});
 	edit(join(out, ".pbirkit-import.json"), (value) => value.replace('\t"IMPORT.md",\n', ""));
 	writeFileSync(join(out, "IMPORT.md"), "mine\n");
 	const refused = run(root, ["import", project, "-o", out, "--force"]);
@@ -581,7 +589,7 @@ it("keeps a page raw when its visualInteractions name a visual that is not place
 		'Page second: visualInteractions names "1-card", which is not a placed visual on this page',
 	);
 	expect(readFileSync(join(out, "src", "pages", "second", "index.ts"), "utf8")).toContain(
-		'file: new URL("../../../static/definition/pages/second/page.json", import.meta.url)',
+		'file: new URL(import.meta.resolve("#static/definition/pages/second/page.json"))',
 	);
 	const fromProject = tree("--pbip", project);
 	expect(fromProject).toContain("page (-, second, second) [raw]");
