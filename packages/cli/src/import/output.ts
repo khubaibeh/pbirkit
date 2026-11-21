@@ -1,22 +1,22 @@
-import { Effect, FileSystem, Path } from "effect";
+import { Effect, FileSystem, Path, Predicate } from "effect";
 
 import { insideProject } from "@pbirkit/core/build";
+import { at } from "@pbirkit/core/expr";
 
 import { onFileSystem } from "../build/errors.ts";
-import { treeOf, writeTree } from "../build/tree.ts";
+import { fileKey, treeOf, writeTree } from "../build/tree.ts";
 import type { TreeFile } from "../build/tree.ts";
+import { Layout } from "../layout.ts";
 import { containedBy } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
 import { ImportOutputError } from "./errors.ts";
 import type { ImportFiles } from "./modules.ts";
 
-export const MANIFEST = ".pbirkit-import.json";
-
 const readManifest = Effect.fnUntraced(function* (out: string) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
 
-	const file = path.join(out, MANIFEST);
+	const file = path.join(out, Layout.manifest);
 	if (!(yield* fs.exists(file).pipe(onFileSystem("check", file)))) return [];
 	const text = yield* fs.readFileString(file).pipe(onFileSystem("read", file));
 	const value: unknown = yield* Effect.try({
@@ -25,6 +25,28 @@ const readManifest = Effect.fnUntraced(function* (out: string) {
 	});
 	const files = Array.isArray(value) ? value : [];
 	return files.filter((entry): entry is string => typeof entry === "string" && insideProject(entry));
+});
+
+const addAliases = Effect.fnUntraced(function* (out: string) {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+
+	const file = path.join(out, Layout.packageJson);
+	const text = yield* fs.readFileString(file).pipe(onFileSystem("read", file));
+	const value: unknown = yield* Effect.try({
+		try: (): unknown => JSON.parse(text),
+		catch: () => new ImportOutputError({ path: file, detail: "package.json is not valid JSON" }),
+	});
+	if (!Predicate.isReadonlyObject(value) || Array.isArray(value))
+		return yield* new ImportOutputError({ path: file, detail: "package.json is not a JSON object" });
+
+	const imports = at(value, "imports");
+	const known = Predicate.isReadonlyObject(imports) && !Array.isArray(imports) ? imports : {};
+	const missing = Object.entries(Layout.aliases).filter(([key]) => !(key in known));
+	if (missing.length === 0) return yield* Effect.void;
+
+	const next = { ...value, imports: { ...known, ...Object.fromEntries(missing) } };
+	yield* fs.writeFileString(file, `${JSON.stringify(next, null, "\t")}\n`).pipe(onFileSystem("write", file));
 });
 
 const removeFile = Effect.fnUntraced(function* (out: string, relative: string) {
@@ -57,7 +79,7 @@ export const checkOutput = Effect.fnUntraced(function* (
 		path.join(project.root, folder),
 	);
 	const pbip = path.join(project.root, project.filename);
-	const targets = [...files.files.map((file) => file.path), ...files.folders, MANIFEST].map((file) =>
+	const targets = [...files.files.map((file) => file.path), ...files.folders, Layout.manifest].map((file) =>
 		path.join(out, file),
 	);
 	if (
@@ -69,12 +91,27 @@ export const checkOutput = Effect.fnUntraced(function* (
 		});
 
 	if (!(yield* fs.exists(out).pipe(onFileSystem("check", out)))) return yield* Effect.void;
+
 	const entries = yield* fs.readDirectory(out).pipe(onFileSystem("list", out));
-	if (entries.length > 0 && !force)
+	if (entries.length === 0) return yield* Effect.void;
+	if (!force)
 		return yield* new ImportOutputError({
 			path: out,
 			detail: "the folder is not empty. Use --force to replace the files an earlier import wrote",
 		});
+
+	const owned = new Set((yield* readManifest(out)).map((file) => fileKey(file)));
+	for (const file of files.files) {
+		const target = path.join(out, file.path);
+		if (owned.has(fileKey(file.path)) || !(yield* fs.exists(target).pipe(onFileSystem("check", target))))
+			continue;
+
+		return yield* new ImportOutputError({
+			path: target,
+			detail: "an earlier import did not write this file, so --force does not replace it",
+		});
+	}
+
 	return yield* Effect.void;
 });
 
@@ -94,12 +131,13 @@ export const writeImport = Effect.fnUntraced(function* (
 		if (!(yield* fs.exists(target).pipe(onFileSystem("check", target)))) missing.push(file);
 	}
 	yield* writeTree(out, treeOf([...files.files, ...missing]));
+	if (!missing.some((file) => file.path === Layout.packageJson)) yield* addAliases(out);
 	for (const folder of files.folders) {
 		const target = path.join(out, folder);
 		yield* fs.makeDirectory(target, { recursive: true }).pipe(onFileSystem("create", target));
 	}
 
-	const manifest = path.join(out, MANIFEST);
+	const manifest = path.join(out, Layout.manifest);
 	const listed = files.files.map((file) => file.path).toSorted();
 	yield* fs
 		.writeFileString(manifest, `${JSON.stringify(listed, null, "\t")}\n`)

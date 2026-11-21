@@ -20,10 +20,16 @@ const rawItems = ({ report }: Config): number =>
 		...(report.bookmarks?.items ?? []).flatMap((item) => ("children" in item ? item.children : [item])),
 	].filter((item) => isRaw(item)).length;
 
-export const writtenMessage = (file: string, config: Config, fallbacks: ReadonlyArray<Fallback>): string => {
+export const writtenMessage = (
+	file: string,
+	report: string,
+	config: Config,
+	fallbacks: ReadonlyArray<Fallback>,
+): string => {
 	const raw = rawItems(config);
 	return [
 		`import: wrote ${file}`,
+		`import: listed the work left for agents in ${report}`,
 		...fallbacks.map(({ label, reason }) => `  ${label}: ${reason}`),
 		...(raw === 0
 			? []
