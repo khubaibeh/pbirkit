@@ -20,6 +20,7 @@ import {
 import { nameProblems } from "./name.ts";
 import { packageItem, samePackageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
+import { themeCatalogIssues, visualCatalogIssues } from "./visual-catalog/index.ts";
 import { isBuiltinVisual } from "./visual-type.ts";
 
 type Page = Config["report"]["pages"][number];
@@ -234,6 +235,23 @@ const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
 		}),
 	);
 };
+
+const catalogIssues = (config: Config): ReadonlyArray<string> => [
+	...config.report.pages.flatMap((page) =>
+		typedVisuals(page).flatMap((visual) =>
+			visualCatalogIssues(valueAt(visual, "visual")).map(
+				(issue) => `page "${page.name}" visual "${visual.name}": ${issue}`,
+			),
+		),
+	),
+	...(config.report.resources ?? []).flatMap((resource) =>
+		resource.kind === "customTheme"
+			? themeCatalogIssues(valueAt(resource.theme, "visualStyles")).map(
+					(issue) => `${resourceLabel(resource)}: ${issue}`,
+				)
+			: [],
+	),
+];
 
 const rawEntries = (owner: "model" | "report", files: { readonly [path: string]: URL } = {}) =>
 	Object.entries(files).map(([path, url]) => ({ where: `${owner}: files "${path}"`, owner, path, url }));
@@ -580,6 +598,7 @@ export const checkConfig = (config: Config): ConfigIssues => {
 		...fontIssues.warnings,
 		...ignoredFields(config),
 		...visualTypeIssues(config),
+		...catalogIssues(config),
 		...bookmarks.flatMap((bookmark) => checkBookmark(bookmark, visualsByPage)),
 		...pages.flatMap((page) =>
 			page.visuals.flatMap((visual) =>

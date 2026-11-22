@@ -58,6 +58,24 @@ Prints pages, visuals and bookmarks. Each line has this form:
 
 The command skips the report checks, so it works on a project that fails `build`.
 
+## visual
+
+```sh
+pbirkit visual
+pbirkit visual TYPE [OBJECT] [--json]
+pbirkit visual container [OBJECT] [--json]
+```
+
+Looks up the formatting objects of the built-in visuals in Microsoft's visual catalog (`@microsoft/powerbi-core-visual-schema`).
+
+- With no argument, it lists the visual types.
+- With a type, it lists the query roles, the objects and the states of each object.
+- With an object, it lists each property, its name in the Format pane and its kind. An enum kind lists the values that the property takes.
+- `container` stands for the objects that every visual frame shares (`visualContainerObjects`).
+- `--json` prints the catalog entry as it is.
+
+Exit codes: `0` found, `2` unknown type or object.
+
 ## desktop
 
 Windows only. See [desktop.md](desktop.md).

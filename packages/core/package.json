@@ -26,12 +26,15 @@
 		"./schemas/theme/*": null,
 		"./schemas/visual-configuration/*": null,
 		"./tree": "./src/tree/index.ts",
+		"./visual-catalog": "./src/visual-catalog/index.ts",
 		"./visual-type": "./src/visual-type.ts"
 	},
 	"scripts": {
+		"visual-objects": "node scripts/visual-objects.ts",
 		"typecheck": "tsgo --noEmit"
 	},
 	"dependencies": {
+		"@microsoft/powerbi-core-visual-schema": "catalog:",
 		"effect": "catalog:"
 	}
 }

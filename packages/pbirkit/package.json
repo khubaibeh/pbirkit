@@ -69,6 +69,10 @@
 			"types": "./dist/core/tree/index.ts",
 			"default": "./dist/tree.js"
 		},
+		"./visual-catalog": {
+			"types": "./dist/core/visual-catalog/index.ts",
+			"default": "./dist/visual-catalog.js"
+		},
 		"./visual-type": {
 			"types": "./dist/core/visual-type.ts",
 			"default": "./dist/visual-type.js"
@@ -83,6 +87,7 @@
 	},
 	"dependencies": {
 		"@effect/platform-node": "catalog:",
+		"@microsoft/powerbi-core-visual-schema": "catalog:",
 		"@microsoft/powerbi-desktop-bridge-cli": "catalog:",
 		"effect": "catalog:",
 		"jsonc-parser": "catalog:",

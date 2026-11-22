@@ -17,6 +17,7 @@ Start here. Find your task in the table, then open that page. Each page starts w
 | Compare TS with a PBIP folder                                                    | [cli.md#diff](cli.md#diff)       |
 | Look at the report structure fast                                                | [cli.md#tree](cli.md#tree)       |
 | Open, reload or screenshot the report in Desktop                                 | [desktop.md](desktop.md)         |
+| Look up the objects, properties and enum values of a visual                      | [cli.md#visual](cli.md#visual)   |
 | Look up every command and flag                                                   | [cli.md](cli.md)                 |
 | Avoid the known traps (date tables, culture files, fonts, names)                 | [rules.md](rules.md)             |
 | Know what pbirkit cannot do yet                                                  | [limits.md](limits.md)           |

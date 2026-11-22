@@ -33,4 +33,7 @@ Read this before you change a report. Each rule comes from a real break.
 
 - Run `pbirkit diff` after each refactor step.
 - Prefer `pbirkit tree` to raw JSON reads when you need the structure.
+- Run `pbirkit visual TYPE OBJECT` before you guess a property name or an enum value.
+- Never add a name to Register `visualObjects` or `visualRoles` to clear a type error. Add it only when a report that Desktop saved uses it. Otherwise fix the name.
+- Test a conditional setting in every state, not only the default one. A setting that Desktop ignores looks the same as one that has nothing to show.
 - Keep one tsconfig per report project.
