@@ -1,5 +1,6 @@
 import { Literal, Literals, Struct, Union, optionalKey } from "effect/Schema";
 
+import type { CheckedVisual } from "#core/visual-catalog/types.ts";
 import type { WithoutSchema } from "#schemas/common/define.ts";
 import { FilterTypeValues, filterConfiguration } from "#schemas/filter-configuration/shared.ts";
 import { DataViewObjectDefinitions, Selector } from "#schemas/formatting-object-definitions/1.0.0.ts";
@@ -72,7 +73,9 @@ export const Visual = Union([
 
 export type Visual = typeof Visual.Type;
 
-export const defineVisual = (visual: WithoutSchema<Visual>): Visual => ({
+export const defineVisual = <T extends string, const O, S>(
+	visual: CheckedVisual<WithoutSchema<Visual>, T, O, S>,
+): Visual => ({
 	$schema: fields.$schema.literal,
 	...visual,
 });

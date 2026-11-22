@@ -1,5 +1,6 @@
 import { Literal, Struct, Union, optionalKey } from "effect/Schema";
 
+import type { CheckedVisual } from "#core/visual-catalog/types.ts";
 import type { WithoutSchema } from "#schemas/common/define.ts";
 import { FilterConfig } from "#schemas/filter-configuration/1.1.0.ts";
 import { SchemaUrl } from "#schemas/schema-url.ts";
@@ -28,7 +29,9 @@ export const Visual = Union([
 
 export type Visual = typeof Visual.Type;
 
-export const defineVisual = (visual: WithoutSchema<Visual>): Visual => ({
+export const defineVisual = <T extends string, const O, S>(
+	visual: CheckedVisual<WithoutSchema<Visual>, T, O, S>,
+): Visual => ({
 	$schema: fields.$schema.literal,
 	...visual,
 });
