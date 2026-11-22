@@ -257,6 +257,31 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(diff.stdout).toContain("No differences in 23 files.");
 });
 
+it("registers objects that the visual catalog lacks so the import still typechecks", () => {
+	edit(visual("notes", "visual.json"), (value) => {
+		const parsed: unknown = JSON.parse(value);
+		return toJson({
+			...(Predicate.isReadonlyObject(parsed) ? parsed : {}),
+			visual: {
+				visualType: "textbox",
+				objects: {
+					general: [{ properties: { keepLayerOrder: literal("true") } }],
+					overflow: [{ properties: { type: literal("0D") } }],
+				},
+			},
+		});
+	});
+	importProject();
+	expect(readFileSync(config, "utf8")).toContain(
+		'readonly visualObjects: { readonly "textbox": { readonly "general": "keepLayerOrder"; readonly "overflow": "type" } };',
+	);
+	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toContain(
+		'page "first" visual "notes": objects.overflow is not a textbox object',
+	);
+	const typecheck = spawnSync(tsgo, ["-p", out], { encoding: "utf8" });
+	expect(typecheck.status, typecheck.stdout).toBe(0);
+});
+
 it("follows a renamed PBIP file's report artifact and preserves the report display name", () => {
 	renameSync(join(project, "Example.pbip"), join(project, "Renamed.pbip"));
 	importProject();

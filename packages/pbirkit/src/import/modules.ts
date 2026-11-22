@@ -9,6 +9,7 @@ import type { Config } from "@pbirkit/core/config";
 import { at, imageRef } from "@pbirkit/core/expr";
 import { SchemaUrl } from "@pbirkit/core/schemas/schema-url";
 import type { ReportTree } from "@pbirkit/core/tree";
+import { unlistedObjects, unlistedRoles } from "@pbirkit/core/visual-catalog";
 import { isBuiltinVisual } from "@pbirkit/core/visual-type";
 
 import { fileKey, treeFile } from "../build/tree.ts";
@@ -289,6 +290,64 @@ export const renderModule = (
 
 export const registerKey = (name: string): string => `import:${name}`;
 
+const visualObjectsField = (config: Config): ReadonlyArray<string> => {
+	const byType = new Map<string, Map<string, Set<string>>>();
+	for (const page of config.report.pages)
+		for (const visual of page.visuals) {
+			if (isRaw(visual) || !("visual" in visual)) continue;
+			for (const [name, properties] of Object.entries(unlistedObjects(visual.visual))) {
+				const objects = byType.get(visual.visual.visualType) ?? new Map<string, Set<string>>();
+				byType.set(visual.visual.visualType, objects);
+				objects.set(name, new Set([...(objects.get(name) ?? []), ...properties]));
+			}
+		}
+	const types = [...byType].toSorted(([first], [second]) => first.localeCompare(second));
+	return types.length === 0
+		? []
+		: [
+				`readonly visualObjects: { ${types
+					.map(
+						([type, objects]) =>
+							`readonly ${JSON.stringify(type)}: { ${[...objects]
+								.toSorted(([first], [second]) => first.localeCompare(second))
+								.map(([name, properties]) => {
+									const names = [...properties].toSorted().map((property) => JSON.stringify(property));
+									return `readonly ${JSON.stringify(name)}: ${names.length === 0 ? "never" : names.join(" | ")}`;
+								})
+								.join("; ")} }`,
+					)
+					.join("; ")} };`,
+			];
+};
+
+const visualRolesField = (config: Config): ReadonlyArray<string> => {
+	const byType = new Map<string, Set<string>>();
+	for (const page of config.report.pages)
+		for (const visual of page.visuals) {
+			if (isRaw(visual) || !("visual" in visual)) continue;
+			const roles = unlistedRoles(visual.visual);
+			if (roles.length > 0)
+				byType.set(
+					visual.visual.visualType,
+					new Set([...(byType.get(visual.visual.visualType) ?? []), ...roles]),
+				);
+		}
+	const types = [...byType].toSorted(([first], [second]) => first.localeCompare(second));
+	return types.length === 0
+		? []
+		: [
+				`readonly visualRoles: { ${types
+					.map(
+						([type, roles]) =>
+							`readonly ${JSON.stringify(type)}: ${[...roles]
+								.toSorted()
+								.map((role) => JSON.stringify(role))
+								.join(" | ")}`,
+					)
+					.join("; ")} };`,
+			];
+};
+
 const registerBlock = (config: Config): string => {
 	const guids = new Set(
 		(config.report.resources ?? []).flatMap((resource) =>
@@ -319,6 +378,8 @@ const registerBlock = (config: Config): string => {
 			: [
 					`readonly builtinVisuals: readonly [${builtinVisuals.map((type) => JSON.stringify(type)).join(", ")}];`,
 				]),
+		...visualObjectsField(config),
+		...visualRolesField(config),
 	];
 	return fields.length === 0
 		? ""
