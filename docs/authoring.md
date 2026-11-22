@@ -49,6 +49,18 @@ export default defineVisual({
 - `visualType` takes a built-in type (49 known names) or a custom visual that you registered. A typo fails the typecheck.
 - A group is a visual with `visualGroup` in place of `visual`. Children point at it with `parentGroupName: group.name`.
 
+## Visual catalog
+
+pbirkit reads Microsoft's visual catalog (`@microsoft/powerbi-core-visual-schema`). It lists the objects, properties, query roles and states of each built-in visual. Desktop ignores a name that it does not know, so the catalog turns a silent failure into a message.
+
+- **Typecheck:** in `defineVisual`, an object name in `objects`, a property name in an entry, and a role name in `queryState` must be in the catalog for that `visualType`. Property values and `visualContainerObjects` have no catalog typecheck. The error names the bad name and the `pbirkit visual` command that lists the valid ones.
+- **Build warnings:** `pbirkit build` also checks `visualContainerObjects`, enum values, selector state ids, the number of fields per role, and the visual styles of custom themes. A query must fit one of the field limits that the visual lists, so a pie chart with a `Series` field takes one `Y` field.
+- **Lookup:** run `pbirkit visual cardVisual referenceLabel` to list the properties of one object (see [cli.md](cli.md#visual)).
+
+The typecheck skips a custom visual, a `visualType` that is a union of types, and an `objects` value typed as a plain record.
+
+The catalog can lag behind Desktop. When Desktop writes an object or property that the catalog lacks, add it to the Register (see below). `pbirkit import` does this for the objects in the report that it imports.
+
 ## A page
 
 ```ts
@@ -91,6 +103,30 @@ declare module "pbirkit/register" {
 	}
 }
 ```
+
+`visualObjects` adds objects and properties that the visual catalog lacks. Each visual type maps object names to a union of property names. Use `never` for an object with no properties:
+
+```ts
+declare module "pbirkit/register" {
+	interface Register {
+		readonly visualObjects: { readonly cardVisual: { readonly overflow: "type" } };
+	}
+}
+```
+
+`visualRoles` adds query roles that the visual catalog lacks. Each visual type maps to a union of role names:
+
+```ts
+declare module "pbirkit/register" {
+	interface Register {
+		readonly visualRoles: { readonly cardVisual: "NewRole" };
+	}
+}
+```
+
+`pbirkit import` writes both keys for names in the report that the catalog lacks.
+
+Add a name to `visualObjects` or `visualRoles` only when a report that Desktop saved uses it. A name that Desktop does not know does nothing in the report, so never add one to clear a type error. Fix the name instead: `pbirkit visual TYPE` lists the names that the catalog takes.
 
 Keep one tsconfig per project (see [setup.md](setup.md#one-tsconfig-per-project)).
 
