@@ -6,6 +6,7 @@ import { toJson } from "./json.ts";
 
 export type BuildFile =
 	| { readonly path: string; readonly content: string }
+	| { readonly path: string; readonly text: string }
 	| { readonly path: string; readonly source: URL }
 	| { readonly path: string; readonly sourceFolder: URL };
 
@@ -21,11 +22,15 @@ export const insideProject = (path: string): boolean =>
 		.split("/")
 		.every((part) => part !== "" && part !== "." && part !== ".." && !/[\\:]/u.test(part));
 
-export const rawFiles = (folder: string, files: { readonly [path: string]: URL }): ReadonlyArray<BuildFile> =>
-	Object.entries(files).map(([path, url]) => {
+export const rawFiles = (
+	folder: string,
+	files: { readonly [path: string]: URL | string },
+): ReadonlyArray<BuildFile> =>
+	Object.entries(files).map(([path, value]) => {
 		const target = `${folder}/${withoutDot(path)}`;
 
-		return path.endsWith("/") ? { path: target, sourceFolder: url } : { path: target, source: url };
+		if (typeof value === "string") return { path: target, text: value };
+		return path.endsWith("/") ? { path: target, sourceFolder: value } : { path: target, source: value };
 	});
 
 export const whenSet = <A, B>(

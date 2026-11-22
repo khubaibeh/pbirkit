@@ -18,22 +18,22 @@ Many fields take either a typed object or a `URL` to a JSON file. A URL copies t
 
 ## report
 
-| Field                              | Output or meaning                                                                                                            |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `path`, `displayName`, `logicalId` | folder name, display name and the stable id in `.platform`                                                                   |
-| `platform`                         | `.platform`                                                                                                                  |
-| `pbir`                             | `definition.pbir`. Set `datasetReference.byConnection` for a live connection; leave it out and set `model` for a local model |
-| `definition`                       | `definition/report.json`                                                                                                     |
-| `version`                          | `definition/version.json`                                                                                                    |
-| `pagesMetadata`                    | `definition/pages/pages.json`. The `pages` list sets `pageOrder`                                                             |
-| `pages`                            | one `page.json` per page, and one `visual.json` per visual                                                                   |
-| `bookmarks`                        | `bookmarks/bookmarks.json` and one `*.bookmark.json` per bookmark                                                            |
-| `resources`                        | `StaticResources/`, `CustomVisuals/` and `resourcePackages` in `report.json` (see [resources.md](resources.md))              |
-| `fonts`                            | custom font names the report uses                                                                                            |
-| `extensions`                       | `reportExtensions.json`                                                                                                      |
-| `semanticModelDiagramLayout`       | the report-side diagram layout file                                                                                          |
-| `files`                            | extra raw files: `{ "relative/path": URL }`. A path that ends in `/` maps a folder                                           |
-| `desktopOwned`                     | paths where Desktop always wins; the build never lists them for a port                                                       |
+| Field                              | Output or meaning                                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`, `displayName`, `logicalId` | folder name, display name and the stable id in `.platform`                                                                              |
+| `platform`                         | `.platform`                                                                                                                             |
+| `pbir`                             | `definition.pbir`. Set `datasetReference.byConnection` for a live connection; leave it out and set `model` for a local model            |
+| `definition`                       | `definition/report.json`                                                                                                                |
+| `version`                          | `definition/version.json`                                                                                                               |
+| `pagesMetadata`                    | `definition/pages/pages.json`. The `pages` list sets `pageOrder`                                                                        |
+| `pages`                            | one `page.json` per page, and one `visual.json` per visual                                                                              |
+| `bookmarks`                        | `bookmarks/bookmarks.json` and one `*.bookmark.json` per bookmark                                                                       |
+| `resources`                        | `StaticResources/`, `CustomVisuals/` and `resourcePackages` in `report.json` (see [resources.md](resources.md))                         |
+| `fonts`                            | custom font names the report uses                                                                                                       |
+| `extensions`                       | `reportExtensions.json`                                                                                                                 |
+| `semanticModelDiagramLayout`       | the report-side diagram layout file                                                                                                     |
+| `files`                            | extra raw files: `{ "relative/path": URL \| string }`. A string is the file text. A path that ends in `/` maps a folder and takes a URL |
+| `desktopOwned`                     | paths where Desktop always wins; the build never lists them for a port                                                                  |
 
 ## model
 
@@ -53,4 +53,6 @@ Set exactly one of `model` and `report.pbir.datasetReference.byConnection`. `che
 
 ## Raw files and git ignore
 
-The build copies folder URLs through `git check-ignore`, so ignored files stay out. It always skips `.git`. It turns JSON and TMDL line ends into CRLF, as Desktop writes them. It leaves DAX and binary files as they are.
+The build copies folder URLs through `git check-ignore`, so ignored files stay out. It always skips `.git`. It turns JSON and TMDL line ends into CRLF, as Desktop writes them. It leaves DAX and binary files as they are. A text entry in `files` gets the same line ends.
+
+A `files` entry for one file replaces the same file from a copied folder. For example, `model.files: { "definition/expressions.tmdl": text }` replaces the `expressions.tmdl` that `model.definition` copies. Two single files at one path still fail the build. Desktop also saves a replaced file, so the merge treats a Desktop edit to it like any other.

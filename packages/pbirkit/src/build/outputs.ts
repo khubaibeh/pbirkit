@@ -110,6 +110,7 @@ const readFolder = Effect.fnUntraced(function* (sourceFolder: URL, target: strin
 
 const readBuildFile = Effect.fnUntraced(function* (file: BuildFile) {
 	if ("content" in file) return [treeFile(file.path, encoder.encode(file.content))];
+	if ("text" in file) return [rawFile(file.path, encoder.encode(file.text))];
 	if ("source" in file)
 		return [rawFile(file.path, yield* readSource(yield* toFilePath(file.source, file.path), file.path))];
 
@@ -140,7 +141,15 @@ export const buildTree = Effect.fnUntraced(function* (
 	files: ReadonlyArray<BuildFile>,
 	owned: ReadonlyArray<string>,
 ) {
-	const built = (yield* Effect.forEach(files, readBuildFile)).flat();
+	const read = yield* Effect.forEach(files, (file) =>
+		Effect.map(readBuildFile(file), (items) => ({ items, copied: "sourceFolder" in file })),
+	);
+	const single = new Set(
+		read.flatMap(({ items, copied }) => (copied ? [] : items.map((item) => fileKey(item.path)))),
+	);
+	const built = read.flatMap(({ items, copied }) =>
+		copied ? items.filter((item) => !single.has(fileKey(item.path))) : items,
+	);
 
 	const issues = buildIssues(built, owned);
 	if (issues.length > 0) return yield* new BuildOutputError({ issues });

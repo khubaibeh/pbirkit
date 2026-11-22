@@ -31,7 +31,7 @@ export const ReportItem = Struct({
 	fonts: optionalKey(Array(String)),
 	extensions: optionalKey(ReportExtension),
 	semanticModelDiagramLayout: optionalKey(UrlSchema),
-	files: optionalKey(Record(String, UrlSchema)),
+	files: optionalKey(Record(String, Union([UrlSchema, String]))),
 	desktopOwned: optionalKey(Array(String)),
 });
 
