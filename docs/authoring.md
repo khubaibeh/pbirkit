@@ -57,7 +57,57 @@ pbirkit reads Microsoft's visual catalog (`@microsoft/powerbi-core-visual-schema
 - **Build warnings:** `pbirkit build` also checks `visualContainerObjects`, enum values, selector state ids, the number of fields per role, and the visual styles of custom themes. A query must fit one of the field limits that the visual lists, so a pie chart with a `Series` field takes one `Y` field.
 - **Lookup:** run `pbirkit visual cardVisual referenceLabel` to list the properties of one object (see [cli.md](cli.md#visual)).
 
-The typecheck skips a custom visual, a `visualType` that is a union of types, and an `objects` value typed as a plain record.
+The typecheck skips a custom visual, a `visualType` that is a union of types or a plain `string`, and an `objects` or `queryState` value typed as a plain record. A shared builder hits these cases easily, so read the next section before you write one.
+
+## Shared builders
+
+`defineVisual<Type, Objects, QueryState>` takes its three type parameters from the call: `Type` from `visualType`, `Objects` from `objects` and `QueryState` from `query.queryState`. Never pass them by hand. TS has no partial inference, so `defineVisual<"cardVisual">(...)` fails.
+
+A builder keeps the check only when it keeps the literal types. Pick one of two forms.
+
+Check at the call site with `objectsFor` and `rolesFor` from `pbirkit/visual-catalog`. Each takes the visual type first and the value second:
+
+```ts
+import { measure, obj, project, role } from "pbirkit/expr";
+import { objectsFor, rolesFor } from "pbirkit/visual-catalog";
+
+const objects = objectsFor("clusteredBarChart")({ legend: obj({ show: true }) });
+const roles = rolesFor("clusteredBarChart")({ Y: role(project(measure("Sales", "Revenue"))) });
+```
+
+Or make the builder generic, with `CheckedObjects` and `CheckedRoles` on its parameters:
+
+```ts
+import { defineVisual } from "pbirkit/schemas/visual/2.11.0";
+import type { Visual } from "pbirkit/schemas/visual/2.11.0";
+import type { CatalogVisual, CheckedObjects, CheckedRoles } from "pbirkit/visual-catalog";
+
+type Config = Extract<Visual, { readonly visual: unknown }>["visual"];
+
+export const chart = <
+	const Type extends CatalogVisual,
+	const Objects extends NonNullable<Config["objects"]>,
+	const QueryState extends NonNullable<Config["query"]>["queryState"],
+>(input: {
+	readonly name: string;
+	readonly type: Type;
+	readonly objects: CheckedObjects<Type, Objects>;
+	readonly roles: CheckedRoles<Type, QueryState>;
+}) =>
+	defineVisual({
+		name: input.name,
+		position: { x: 0, y: 0, z: 0, width: 400, height: 240, tabOrder: 0 },
+		visual: { visualType: input.type, objects: input.objects, query: { queryState: input.roles } },
+	});
+```
+
+These forms turn the check off:
+
+- `(visual: Parameters<typeof defineVisual>[0]) => defineVisual(visual)`
+- a `visualType` parameter typed as `string` or `VisualType`
+- an `objects` parameter typed as a record, such as `Record<string, unknown>`
+
+`CatalogVisual` holds the visual types that the catalog lists and that `visualType` takes, including types that you add to the Register. The build warnings still catch a name that escapes the typecheck.
 
 The catalog can lag behind Desktop. When Desktop writes an object or property that the catalog lacks, add it to the Register (see below). `pbirkit import` does this for the objects in the report that it imports.
 

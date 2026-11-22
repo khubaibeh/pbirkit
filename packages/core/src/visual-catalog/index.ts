@@ -12,6 +12,9 @@ import type {
 } from "@microsoft/powerbi-core-visual-schema";
 
 import { at } from "../expr/query.ts";
+import type { CatalogVisual, CheckedObjects, CheckedRoles } from "./types.ts";
+
+export type { CatalogVisual, CheckedObjects, CheckedRoles } from "./types.ts";
 
 export type PropertyType = PropertyTypeDescriptor | VcoPropertyType;
 
@@ -37,6 +40,16 @@ const containerKeys: ReadonlySet<string> = new Set(listVcoKeys().filter((key) =>
 export const catalogVisualTypes = (): ReadonlyArray<string> => [...visualTypes];
 
 export const isCatalogVisual = (type: string): boolean => visualTypes.has(type);
+
+export const objectsFor =
+	<const Type extends CatalogVisual>(_type: Type) =>
+	<const Objects>(objects: CheckedObjects<Type, Objects>) =>
+		objects;
+
+export const rolesFor =
+	<const Type extends CatalogVisual>(_type: Type) =>
+	<const QueryState>(queryState: CheckedRoles<Type, QueryState>) =>
+		queryState;
 
 const capabilities = (type: string) => (visualTypes.has(type) ? getCapabilities(type) : undefined);
 
