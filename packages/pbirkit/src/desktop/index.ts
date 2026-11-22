@@ -30,6 +30,9 @@ const POLL = "1 second";
 
 const SHOTS_FOLDER = "shots";
 
+const THEME_NOTE =
+	"Desktop reads theme files only when it opens the project. To apply a theme change, close Desktop and run pbirkit desktop open";
+
 const MIN_SCALE = 1;
 
 const MAX_SCALE = 3;
@@ -191,7 +194,10 @@ const reload = Command.make("reload", reloadFlags, ({ config, model }) =>
 		);
 
 		return yield* Console.log(
-			`desktop: pid ${instance.pid} reloaded ${project.shown}${model ? " and its model definition" : ""}`,
+			[
+				`desktop: pid ${instance.pid} reloaded ${project.shown}${model ? " and its model definition" : ""}`,
+				THEME_NOTE,
+			].join("\n"),
 		);
 	}).pipe(Effect.catch(reportError)),
 ).pipe(
