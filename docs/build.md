@@ -18,16 +18,26 @@ pbirkit build [-c CONFIG] [--out DIR] [--prefer src|desktop]
 
 The build keeps a snapshot of its last output. For each file it compares three versions: the snapshot, the new build and the file in `dist/`.
 
-| src changed | Desktop changed  | Result                                                            |
-| ----------- | ---------------- | ----------------------------------------------------------------- |
-| yes         | no               | the build writes the new file                                     |
-| no          | yes              | the build keeps the Desktop file and lists it under "port to src" |
-| yes         | yes, other lines | a line merge keeps both changes                                   |
-| yes         | yes, same lines  | a conflict: the build writes nothing and stops                    |
+| src changed | Desktop changed  | Result                                                                               |
+| ----------- | ---------------- | ------------------------------------------------------------------------------------ |
+| yes         | no               | the build writes the new file                                                        |
+| no          | yes              | the build keeps the Desktop file and lists it under "Desktop changes not in src yet" |
+| yes         | yes, other lines | a line merge keeps both changes                                                      |
+| yes         | yes, same lines  | a conflict: the build writes nothing and stops                                       |
 
 `--prefer src` or `--prefer desktop` settles a conflict. A Desktop deletion counts as a change.
 
 The first build over a `dist/` that pbirkit did not write has no snapshot to compare with. Each file that differs from the new build then counts as a conflict, and the build asks for `--prefer`.
+
+## Throw away Desktop changes
+
+A Desktop save can drop part of the model, such as the ordinals and the partition of a calculation group, and Desktop shows no error. The merge keeps such a change like any other. To go back to the build:
+
+1. Close Desktop.
+2. Delete `dist/`.
+3. Run `pbirkit build`.
+
+The build writes every file from src and restores the data cache from `.pbirkit/`. It cannot restore the files that only Desktop writes, such as `localSettings.json` and the paths in `desktopOwned`. Desktop writes them again on the next save.
 
 ## The .pbirkit folder
 
@@ -43,7 +53,7 @@ Desktop keeps imported data in `.pbi/cache.abf`. The build never deletes it. If 
 
 ## Desktop-owned paths
 
-List paths in `report.desktopOwned` or `model.desktopOwned` when Desktop always wins and you never port them. The culture file is the usual case. The build keeps those paths and leaves them off the "port to src" list.
+List paths in `report.desktopOwned` or `model.desktopOwned` when Desktop always wins and you never port them. The culture file is the usual case. The build keeps those paths and leaves them off the "Desktop changes not in src yet" list.
 
 ## Exit codes
 

@@ -23,10 +23,17 @@ Read this before you change a report. Each rule comes from a real break.
 - Font sizes: whole numbers 8–60.
 - Keep long decimals like `153.00003051757813` as they are. Rounding changes the bytes.
 
+## Visual settings
+
+These rules come from Desktop's behavior, not from Microsoft's visual catalog. pbirkit does not check them, and Desktop shows no error when you break them.
+
+- A `cardVisual` `referenceLabel` entry that sets `value` to a field needs `data: [{ dataViewWildcard: { matchingOption: 0 } }]` in its selector, next to `id` and `metadata`. Without it, the label draws but the value stays empty, and the card shows the `showBlankAs` text. `wildcard(field, 0)` from `pbirkit/expr` builds that selector.
+- In an `actionButton`, put `show` for `text`, `icon`, `fill` and `outline` in an entry with no selector. Desktop ignores a `show` that only appears in a state entry such as `{ id: "default" }`. Other button-like visuals may follow the same rule; test them in Desktop.
+
 ## Files
 
 - Never edit `.pbi/localSettings.json` or `.pbi/cache.abf`.
-- Never build over a `dist/` that Desktop saved before you looked at its changes. The merge keeps the changes, but read the "port to src" list first.
+- Never build over a `dist/` that Desktop saved before you looked at its changes. The merge keeps the changes, but read the "Desktop changes not in src yet" list first. To throw the changes away, see [build.md](build.md#throw-away-desktop-changes).
 - Desktop raises a file's schema version when it saves that file. Port the new `$schema` along with the change.
 
 ## Work style for agents
