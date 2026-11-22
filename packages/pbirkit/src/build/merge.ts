@@ -127,7 +127,9 @@ export const mergeTrees = ({
 		const versions = { key, next: HashMap.get(next, key), project: lookup(project, key) };
 		const outcome = isOwned(owned, key)
 			? Outcome.Resolved({ file: versions.project, merged: false })
-			: mergeFile(snapshot, unfinished, versions);
+			: Option.isNone(project)
+				? Outcome.Resolved({ file: versions.next, merged: false })
+				: mergeFile(snapshot, unfinished, versions);
 
 		if (Outcome.$is("Resolved")(outcome)) {
 			if (outcome.merged) merged.push(displayPath(key, outcome.file));

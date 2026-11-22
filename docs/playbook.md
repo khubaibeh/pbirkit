@@ -20,13 +20,22 @@ Read this when you need a recipe for a common job. Each recipe lists the command
 
 ## Port edits that a person made in Desktop
 
-1. Run `pbirkit build`. The build keeps the Desktop edits in `dist/` and prints the files under "port to src".
-2. For each listed file, compare it with the TS module that owns it. `git diff dist/` shows the change, if `dist/` is in git.
-3. Change the TS so it produces the same JSON.
+1. Run `pbirkit build`. The build keeps the Desktop edits in `dist/` and lists the files under "Desktop changes not in src yet".
+2. Run `pbirkit diff`. For each changed file, it prints the JSON paths that differ, with the value from the build and the value in `dist/`. Narrow it with `--page`, `--visual`, `--bookmark` or `--theme`.
+3. Sort each listed file into one of the cases below.
 4. Run `pbirkit build` again. A ported file drops off the list.
 5. Run `pbirkit diff --bytes` for a strict check of the whole project.
 
-Find the TS module for a visual with `pbirkit tree`. The id in the tree is the `name` field of the module.
+| What `pbirkit diff` shows                    | What to do                                                                                                                                                                                            |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nothing for a listed file                    | Desktop only reordered keys or changed whitespace. Nothing to port. Keep the file, or throw the change away (see below).                                                                              |
+| a few paths in one visual, page or bookmark  | Change the TS module so it builds the same values. `pbirkit tree` gives the module: its id is the `name` in the module.                                                                               |
+| `/$schema` with a new version                | Desktop raised the version when it saved the file. Change the `$schema` and the `pbirkit/schemas/...` import in the module to the new version, then port the other paths.                             |
+| many paths, or a new visual or page          | Import the saved project into a scratch folder with `pbirkit import dist -o <scratch folder>` and copy the module you need. An unknown schema version stays raw there, and a raw module still builds. |
+| a model file (`.tmdl`, `diagramLayout.json`) | The model is plain files. Copy the file from `dist/` over the source file that the config points to, or throw the change away if Desktop dropped something.                                           |
+| an added file                                | Map it in `model.files` or `report.files`, or list it in `desktopOwned` if Desktop always writes it.                                                                                                  |
+
+To throw away every Desktop change instead, close Desktop, delete `dist/` and run `pbirkit build` (see [build.md](build.md#throw-away-desktop-changes)). Port the changes you want to keep first.
 
 ## Add a page
 

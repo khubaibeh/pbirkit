@@ -89,9 +89,10 @@ const pendingBlock = ({ out, pending, snapshot }: Summary): ReadonlyArray<string
 				`Desktop changes not in src yet (${fileCount(pending.length)}). Port them to src, then build again:`,
 				...pending.map(({ path, kind }) => `  ${PENDING[kind]}: ${path}`),
 				...(pending.some(({ kind }) => kind === "added") ? [ADDED_NOTE] : []),
-				"To see them, run:",
+				"To see the changed values, run pbirkit diff. To see the raw files, run:",
 				diffCommand(snapshot, out),
 				IGNORED_NOTE,
+				`To throw them away instead, close Desktop, delete ${out} and build again.`,
 			];
 
 export const summary = (input: Summary): string =>
