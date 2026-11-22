@@ -4,6 +4,7 @@ import type { CacheOutcome } from "./cache.ts";
 import type { ConflictError, ConflictReason } from "./errors.ts";
 import type { Change, Pending, PendingKind } from "./merge.ts";
 import { MARKER, STATE_FOLDER } from "./paths.ts";
+import type { Loss } from "./tmdl.ts";
 
 const REASONS: Record<ConflictReason, string> = {
 	"both-changed": "changed in src and in Desktop",
@@ -17,8 +18,11 @@ const REASONS: Record<ConflictReason, string> = {
 const PENDING: Record<PendingKind, string> = {
 	added: "added in Desktop",
 	changed: "changed in Desktop",
+	reformatted: "reformatted in Desktop",
 	deleted: "deleted in Desktop",
 };
+
+const MAX_LOSSES = 20;
 
 const CACHE_NOTES: Record<CacheOutcome, string> = {
 	kept: "",
@@ -62,6 +66,9 @@ export interface Summary {
 	readonly cache: Option.Option<CacheOutcome>;
 	readonly modelChanged: boolean;
 	readonly pending: ReadonlyArray<Pending>;
+	readonly losses: ReadonlyArray<Loss>;
+	readonly discarded: ReadonlyArray<string>;
+	readonly desktopChecked: boolean;
 	readonly snapshot: string;
 }
 
@@ -82,22 +89,58 @@ const headline = ({ out, recorded, changes, total, merged, cache }: Summary): st
 	].join("");
 };
 
-const pendingBlock = ({ out, pending, snapshot }: Summary): ReadonlyArray<string> =>
-	pending.length === 0
+const UNCHECKED_NOTE =
+	"The build can't check Desktop from this OS. If Desktop has the project open, close it without saving, or its next save brings the changes back.";
+
+const discardBlock = ({ discarded, desktopChecked }: Summary): ReadonlyArray<string> => [
+	...(discarded.length === 0
 		? []
 		: [
-				`Desktop changes not in src yet (${fileCount(pending.length)}). Port them to src, then build again:`,
-				...pending.map(({ path, kind }) => `  ${PENDING[kind]}: ${path}`),
-				...(pending.some(({ kind }) => kind === "added") ? [ADDED_NOTE] : []),
+				`Threw away the Desktop changes in ${fileCount(discarded.length)}:`,
+				...discarded.map((path) => `  ${path}`),
+			]),
+	...(desktopChecked ? [] : [UNCHECKED_NOTE]),
+];
+
+const lossBlock = ({ losses }: Summary): ReadonlyArray<string> =>
+	losses.length === 0
+		? []
+		: [
+				`[WARN] build: Desktop removed ${losses.length} ${losses.length === 1 ? "part" : "parts"} of the model that src still has, and the build kept the Desktop version:`,
+				...losses.slice(0, MAX_LOSSES).map(({ path, part }) => `  ${part} (${path})`),
+				...(losses.length > MAX_LOSSES ? [`  and ${losses.length - MAX_LOSSES} more`] : []),
+				"If Desktop dropped them by mistake, close Desktop without saving and run pbirkit build --discard-desktop. If you removed them on purpose, remove them from src too.",
+			];
+
+const reformattedNote = (count: number): ReadonlyArray<string> =>
+	count === 0
+		? []
+		: [
+				`Desktop only reformatted ${fileCount(count)} (key order, whitespace or line endings). Nothing to port there.`,
+			];
+
+const pendingBlock = ({ out, pending, snapshot }: Summary): ReadonlyArray<string> => {
+	const changed = pending.filter(({ kind }) => kind !== "reformatted");
+	const reformatted = pending.length - changed.length;
+
+	return changed.length === 0
+		? reformattedNote(reformatted)
+		: [
+				`Desktop changes not in src yet (${fileCount(changed.length)}). Port them to src, then build again:`,
+				...changed.map(({ path, kind }) => `  ${PENDING[kind]}: ${path}`),
+				...(changed.some(({ kind }) => kind === "added") ? [ADDED_NOTE] : []),
+				...reformattedNote(reformatted),
 				"To see the changed values, run pbirkit diff. To see the raw files, run:",
 				diffCommand(snapshot, out),
 				IGNORED_NOTE,
-				`To throw them away instead, close Desktop, delete ${out} and build again.`,
+				"To throw them away instead, close Desktop without saving and run pbirkit build --discard-desktop.",
 			];
+};
 
 export const summary = (input: Summary): string =>
 	[
 		headline(input),
 		...(input.modelChanged ? ["The model changed since the last build. Refresh the data in Desktop."] : []),
-		...(input.recorded ? pendingBlock(input) : []),
+		...discardBlock(input),
+		...(input.recorded ? [...lossBlock(input), ...pendingBlock(input)] : []),
 	].join("\n");

@@ -103,6 +103,13 @@ export class ConflictError extends TaggedError<ConflictError, { readonly brand: 
 	},
 ) {}
 
+export class DiscardError extends TaggedError<DiscardError, { readonly brand: unique symbol }>()(
+	"DiscardError",
+	{
+		detail: String,
+	},
+) {}
+
 export type BuildError =
 	| ConfigLoadError
 	| ConfigShapeError
@@ -114,7 +121,8 @@ export type BuildError =
 	| FileSystemError
 	| ProjectChangedError
 	| PathClashError
-	| ConflictError;
+	| ConflictError
+	| DiscardError;
 
 export const onFileSystem =
 	(operation: string, path: string) =>

@@ -1,5 +1,6 @@
 import { Option } from "effect";
-import { visit } from "jsonc-parser";
+import { parseTree, visit } from "jsonc-parser";
+import type { Node } from "jsonc-parser";
 import { diff3Merge } from "node-diff3";
 
 import type { TreeFile } from "./tree.ts";
@@ -72,4 +73,50 @@ export const mergeText = (base: TreeFile, desktop: TreeFile, src: TreeFile): Opt
 			),
 			(text) => treeFile(src.path, encoder.encode(text)),
 		),
+	);
+
+const numberKey = (raw: string): string => {
+	const value = Number(raw);
+	return Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value))
+		? String(value)
+		: raw;
+};
+
+const canonicalOf = (node: Node, text: string): string => {
+	const children = node.children ?? [];
+	if (node.type === "object") {
+		const entries = children.map((property) => {
+			const [key, value] = property.children ?? [];
+			return [JSON.stringify(key?.value), value === undefined ? "" : canonicalOf(value, text)] as const;
+		});
+		return `{${entries
+			.toSorted(([first], [second]) => (first < second ? -1 : 1))
+			.map(([key, value]) => `${key}:${value}`)
+			.join(",")}}`;
+	}
+	if (node.type === "array") return `[${children.map((child) => canonicalOf(child, text)).join(",")}]`;
+	if (node.type === "number") return numberKey(text.slice(node.offset, node.offset + node.length));
+	return JSON.stringify(node.value) ?? "null";
+};
+
+const canonicalTree = (body: string): string | undefined => {
+	if (!isStrictJson(body)) return undefined;
+	const tree = parseTree(body, [], { disallowComments: true, allowTrailingComma: false });
+	return tree === undefined ? undefined : canonicalOf(tree, body);
+};
+
+const canonicalJson = (file: TreeFile): Option.Option<string> =>
+	Option.flatMap(
+		Option.filter(asText(file), () => isJsonFile(file.path)),
+		(text) =>
+			Option.flatMap(
+				Option.liftThrowable(() => canonicalTree(text.replace(/^\uFEFF/u, "")))(),
+				Option.fromNullishOr,
+			),
+	);
+
+export const sameJson = (left: TreeFile, right: TreeFile): boolean =>
+	Option.exists(
+		Option.all([canonicalJson(left), canonicalJson(right)]),
+		([first, second]) => first === second,
 	);

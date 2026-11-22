@@ -35,6 +35,7 @@ export const errorMessage = (command: string): ((error: CliError) => string) => 
 				...pairs.map((pair) => `  ${pair}`),
 			].join("\n"),
 		ConflictError: conflictMessage,
+		DiscardError: ({ detail }) => `${prefix} cannot throw away the Desktop changes: ${detail}.`,
 		TargetMissingError: ({ folder }) => `${prefix} target folder ${folder} does not exist`,
 		SelectorNotFoundError: ({ kind, selector }) =>
 			`${prefix} --${kind} ${JSON.stringify(selector)} matched no files`,
