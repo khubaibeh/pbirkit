@@ -1,6 +1,6 @@
 {
 	"name": "pbirkit",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Write Power BI reports (PBIR) in TypeScript.",
 	"license": "MIT",
 	"repository": {
