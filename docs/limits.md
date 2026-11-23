@@ -20,6 +20,7 @@ Read this when a task seems to need something that pbirkit may not do yet.
 
 - **Desktop save mid-build:** a Desktop save between the build's last check and its write can get lost.
 - **Case-only renames:** a rename that changes only letter case is not handled.
+- **Lost model parts:** the build finds them from TMDL lines, not the full grammar, so it can miss one. Check a model change with `pbirkit diff`.
 - **Two builds at once:** two builds of one project at the same time can clash. Run one at a time.
 - **Model folder rename:** after a rename, the saved data cache no longer matches the model. Refresh the data in Desktop.
 - **Same-name imports:** two imported projects with the same name clash in one tsconfig. Keep one tsconfig per project.

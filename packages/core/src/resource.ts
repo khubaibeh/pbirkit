@@ -1,10 +1,10 @@
 import { Literal, String, Struct, URL as UrlSchema, Union, optionalKey } from "effect/Schema";
 
-import { Theme } from "#schemas/theme";
+import { DesktopTheme, Theme } from "#schemas/theme";
 
 import { CustomVisualResource } from "./custom-visual.ts";
 
-export const BaseThemeResource = Struct({ kind: Literal("baseTheme"), name: String, theme: Theme });
+export const BaseThemeResource = Struct({ kind: Literal("baseTheme"), name: String, theme: DesktopTheme });
 
 export type BaseThemeResource = typeof BaseThemeResource.Type;
 
@@ -17,7 +17,11 @@ export const CustomThemeResource = Struct({
 
 export type CustomThemeResource = typeof CustomThemeResource.Type;
 
-export const BuiltInThemeResource = Struct({ kind: Literal("builtInTheme"), name: String, theme: Theme });
+export const BuiltInThemeResource = Struct({
+	kind: Literal("builtInTheme"),
+	name: String,
+	theme: DesktopTheme,
+});
 
 export type BuiltInThemeResource = typeof BuiltInThemeResource.Type;
 
@@ -93,7 +97,10 @@ export const samePackageItem = (
 	left.item.path === right.item.path &&
 	left.item.type === right.item.type;
 
-export const baseTheme = <const N extends string>(resource: { readonly name: N; readonly theme: Theme }) => ({
+export const baseTheme = <const N extends string, T extends DesktopTheme>(resource: {
+	readonly name: N;
+	readonly theme: T;
+}) => ({
 	kind: "baseTheme" as const,
 	...resource,
 });
@@ -107,9 +114,9 @@ export const customTheme = <const N extends string>(resource: {
 	...resource,
 });
 
-export const builtInTheme = <const N extends string>(resource: {
+export const builtInTheme = <const N extends string, T extends DesktopTheme>(resource: {
 	readonly name: N;
-	readonly theme: Theme;
+	readonly theme: T;
 }) => ({
 	kind: "builtInTheme" as const,
 	...resource,

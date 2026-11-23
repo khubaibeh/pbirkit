@@ -9,10 +9,10 @@ Paths in flags are relative to the folder where you run the command. `-c` defaul
 ## build
 
 ```sh
-pbirkit build [-c FILE] [-o DIR] [--prefer src|desktop]
+pbirkit build [-c FILE] [-o DIR] [--prefer src|desktop | --discard-desktop]
 ```
 
-Builds the PBIP project and merges it with Desktop edits. See [build.md](build.md).
+Builds the PBIP project and merges it with Desktop edits. `--discard-desktop` throws the Desktop edits away. See [build.md](build.md).
 
 ## import
 

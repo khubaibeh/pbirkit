@@ -19,7 +19,7 @@ export const Model = Struct({
 	unappliedChanges: optionalKey(UrlSchema),
 	cache: optionalKey(UrlSchema),
 	modelReference: optionalKey(ModelReference),
-	files: optionalKey(Record(String, UrlSchema)),
+	files: optionalKey(Record(String, Union([UrlSchema, String]))),
 	desktopOwned: optionalKey(Array(String)),
 });
 

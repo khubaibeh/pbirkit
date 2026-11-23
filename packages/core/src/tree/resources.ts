@@ -1,6 +1,6 @@
 import { Result } from "effect";
 
-import { Theme } from "#schemas/theme";
+import { DesktopTheme, Theme } from "#schemas/theme";
 
 import { insideProject } from "../build/shared.ts";
 import { at } from "../expr/query.ts";
@@ -17,7 +17,10 @@ type ThemeIdentity = Extract<
 export type ResourceData =
 	| (Extract<ResourceIdentity, { readonly kind: "customVisual" }> & { readonly source: "file" })
 	| Extract<ResourceIdentity, { readonly kind: "image" }>
-	| (ThemeIdentity & { readonly theme: Theme });
+	| (Extract<ThemeIdentity, { readonly kind: "customTheme" }> & { readonly theme: Theme })
+	| (Extract<ThemeIdentity, { readonly kind: "baseTheme" | "builtInTheme" }> & {
+			readonly theme: DesktopTheme;
+	  });
 
 export interface ResourceNode extends IndexedFile<ResourceData> {
 	readonly name: string;
@@ -38,6 +41,8 @@ const IDENTITIES: Readonly<Record<string, (name: string) => ResourceIdentity>> =
 };
 
 const readTheme = decoded(Theme, "theme");
+
+const readDesktopTheme = decoded(DesktopTheme, "theme");
 
 const isImageTheme = (report: unknown, { package: name, item }: PackageEntry): boolean => {
 	const custom = at(at(report, "themeCollection"), "customTheme");
@@ -77,6 +82,8 @@ const contentOf = (
 	if (!files.has(path)) return Result.fail("Resource file is missing");
 	if (identity.kind === "image") return Result.succeed(identity);
 	const value = files.json(path);
+	if (identity.kind !== "customTheme")
+		return Result.map(fileContent(files, path, value, readDesktopTheme), (theme) => ({ ...identity, theme }));
 	if (at(value, "$schema") !== undefined) return Result.fail("Unknown theme $schema");
 	return Result.map(fileContent(files, path, value, readTheme), (theme) => ({ ...identity, theme }));
 };

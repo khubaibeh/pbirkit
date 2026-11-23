@@ -3,7 +3,7 @@ import { Command, Flag } from "effect/cli";
 
 import { loadConfig } from "../build/config.ts";
 import { DEFAULT_OUT } from "../build/paths.ts";
-import { errorMessage, exitWith } from "../messages.ts";
+import { errorMessage, exitWith, setExitCode } from "../messages.ts";
 import { compareProject } from "./compare.ts";
 import { renderComparison } from "./render.ts";
 
@@ -64,7 +64,7 @@ const runDiff = Effect.fnUntraced(function* ({
 		onSome: (dir) => path.resolve(dir),
 	});
 	const comparison = yield* compareProject(config, folder, bytes ? "bytes" : "semantic", selectors);
-	if (comparison.differences.length > 0) process.exitCode = 1;
+	if (comparison.differences.length > 0) yield* setExitCode(1);
 	return yield* Console.log(renderComparison(comparison));
 });
 

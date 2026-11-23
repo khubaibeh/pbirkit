@@ -2,13 +2,14 @@ import { Console, Effect, HashMap, Option, Path } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
 import { loadConfig } from "../build/config.ts";
+import { ConfigBuildError } from "../build/errors.ts";
 import { fromCwd } from "../build/paths.ts";
 import { fileKey } from "../build/tree.ts";
 import { compareProject } from "../diff/compare.ts";
 import { renderComparison } from "../diff/render.ts";
 import { NO_SELECTORS } from "../diff/scope.ts";
 import { Layout } from "../layout.ts";
-import { errorMessage, exitWith } from "../messages.ts";
+import { errorMessage, exitWith, setExitCode } from "../messages.ts";
 import { ProjectSourceError } from "../pbip/errors.ts";
 import { findProject } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
@@ -75,7 +76,10 @@ const runImport = Effect.fnUntraced(function* ({
 	const project = yield* findProject(source);
 	yield* requireFiles(project);
 	const index = indexTree(project.name, project.report, project.tree);
-	const { config, fallbacks } = settleConfig(project, index);
+	const { config, fallbacks } = yield* Effect.try({
+		try: () => settleConfig(project, index),
+		catch: (cause) => new ConfigBuildError({ detail: String(cause) }),
+	});
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
 	const files = importFiles(project, index, config, fallbacks, idiomatic);
 	yield* checkOutput(out, project, files, force);
@@ -94,8 +98,7 @@ const runImport = Effect.fnUntraced(function* ({
 	const comparison = yield* compareProject(loaded.config, project.root, "text", NO_SELECTORS);
 	if (comparison.differences.length > 0) {
 		yield* Console.log(renderComparison(comparison));
-		process.exitCode = 1;
-		return;
+		return yield* setExitCode(1);
 	}
 	yield* Console.log(
 		verifiedMessage(

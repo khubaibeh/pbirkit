@@ -46,7 +46,7 @@ export const decoded = <S extends Top & { readonly DecodingServices: never }>(sc
 	return (value: unknown, text?: string): Content<S["Type"]> => {
 		if (Option.isNone(read(value, { onExcessProperty: "error" })) || !matches(value))
 			return Result.fail(`Unsupported ${label} schema or properties`);
-		if (text !== undefined && toJson(value) !== desktopText(text))
+		if (text !== undefined && !Option.contains(Option.liftThrowable(toJson)(value), desktopText(text)))
 			return Result.fail(`The ${label} JSON does not rebuild to the same text`);
 		return Result.succeed(value);
 	};

@@ -1,0 +1,28 @@
+/// One row per shipping carrier.
+table Shipper
+	lineageTag: a9253256-0dc8-4184-9afc-510b4aa6659d
+
+	column 'Shipper ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		lineageTag: e0c7cae6-1a4f-4be4-be22-66a234e5c567
+		summarizeBy: none
+		sourceColumn: Shipper ID
+
+	column Shipper
+		dataType: string
+		lineageTag: fd551a83-fb22-4776-a781-f0115226a7ed
+		summarizeBy: none
+		sourceColumn: Shipper
+
+	partition Shipper = m
+		mode: import
+		source =
+				let
+				    Source = ReadCsv("shippers.csv", {{"shipperID", Int64.Type}, {"companyName", type text}}),
+				    Renamed = Table.RenameColumns(Source, {{"shipperID", "Shipper ID"}, {"companyName", "Shipper"}})
+				in
+				    Renamed
+

@@ -3,7 +3,7 @@
 Read this when you need to know what `pbirkit build` does to `dist/`, or why it stopped.
 
 ```sh
-pbirkit build [-c CONFIG] [--out DIR] [--prefer src|desktop]
+pbirkit build [-c CONFIG] [--out DIR] [--prefer src|desktop | --discard-desktop]
 ```
 
 ## What it does
@@ -25,19 +25,35 @@ The build keeps a snapshot of its last output. For each file it compares three v
 | yes         | yes, other lines | a line merge keeps both changes                                                      |
 | yes         | yes, same lines  | a conflict: the build writes nothing and stops                                       |
 
-`--prefer src` or `--prefer desktop` settles a conflict. A Desktop deletion counts as a change.
+`--prefer src` or `--prefer desktop` settles a conflict. It does not touch the Desktop changes that merge cleanly. A Desktop deletion counts as a change.
+
+The build prints the list of Desktop changes to stderr, under a `[WARN] build:` line. The file paths follow on their own lines without the prefix. When you filter or capture the build output, keep stderr and the lines after the warning, for example `pbirkit build 2>&1 | tee build.log`. A file that Desktop only reformatted gets one line with a count on stdout: its JSON keys moved, or its whitespace or line endings changed. Such a file needs no port.
 
 The first build over a `dist/` that pbirkit did not write has no snapshot to compare with. Each file that differs from the new build then counts as a conflict, and the build asks for `--prefer`.
 
+## Lost model parts
+
+A Desktop save can drop part of the model, such as the ordinals and the partition of a calculation group, and Desktop shows no error. The merge keeps such a change like any other. The build then prints to stderr a `[WARN] build:` list of the model parts that src has and `dist/` lacks.
+
+- The check reads the object lines of each TMDL file (`table`, `column`, `measure`, `partition`, `calculationItem`, `ref` and others) and the `ordinal` property.
+- A part that moved to another file does not count as lost.
+- The check reads lines, not the full TMDL grammar, so it can miss a loss. Run `pbirkit diff` after a Desktop save that touched the model.
+
 ## Throw away Desktop changes
 
-A Desktop save can drop part of the model, such as the ordinals and the partition of a calculation group, and Desktop shows no error. The merge keeps such a change like any other. To go back to the build:
+To go back to the build, close Desktop without saving and run:
 
-1. Close Desktop.
-2. Delete `dist/`.
-3. Run `pbirkit build`.
+```sh
+pbirkit build --discard-desktop
+```
 
-The build writes every file from src and restores the data cache from `.pbirkit/`. It cannot restore the files that only Desktop writes, such as `localSettings.json` and the paths in `desktopOwned`. Desktop writes them again on the next save.
+- The build writes every file from src and lists each Desktop change that it threw away.
+- It deletes the files that Desktop added inside the `.pbip` file, the report folder and the model folder. It keeps other files in `dist/`.
+- It keeps the data cache, `localSettings.json` and the paths in `desktopOwned`.
+- On Windows, it stops when the bridge finds a Desktop window with the project open, or a window that does not answer. The bridge can't see every Desktop window, so close Desktop first anyway. On other systems it can't check Desktop, so it prints a reminder.
+- It stops when a file that it would change or delete leads through a link to a place outside `dist/`.
+
+`--discard-desktop` and `--prefer` do not go together.
 
 ## The .pbirkit folder
 

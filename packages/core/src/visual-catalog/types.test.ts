@@ -2,6 +2,8 @@ import { expectTypeOf, it } from "vite-plus/test";
 
 import { entry, measure, project, props, role } from "../expr/index.ts";
 import { defineVisual } from "../schemas/visual/2.13.0.ts";
+import { objectsFor, rolesFor } from "./index.ts";
+import type { CheckedObjects, CheckedRoles } from "./types.ts";
 
 type Empty = Record<string, never>;
 
@@ -37,4 +39,23 @@ it("rejects names that the catalog does not list in defineVisual", () => {
 		position,
 		visual: { visualType: "cardVisual" as const, query: { queryState: roles } },
 	}).not.toExtend<Card<Empty, typeof roles>>();
+});
+
+it("checks names in objectsFor and rolesFor", () => {
+	const known = { legend: [entry(props({ show: true }))] } as const;
+	const object = { bogus: [entry(props({ show: true }))] } as const;
+	const property = { legend: [entry(props({ nope: true }))] } as const;
+	const roles = { Y: role(project(measure("Sales", "Net Sales"))) };
+	const unknown = { Values: role(project(measure("Sales", "Net Sales"))) };
+
+	type Objects<O> = CheckedObjects<"clusteredBarChart", O>;
+	type Roles<S> = CheckedRoles<"clusteredBarChart", S>;
+
+	expectTypeOf(known).toExtend<Objects<typeof known>>();
+	expectTypeOf(object).not.toExtend<Objects<typeof object>>();
+	expectTypeOf(property).not.toExtend<Objects<typeof property>>();
+	expectTypeOf(roles).toExtend<Roles<typeof roles>>();
+	expectTypeOf(unknown).not.toExtend<Roles<typeof unknown>>();
+	expectTypeOf(objectsFor("clusteredBarChart")(known)).toExtend<typeof known>();
+	expectTypeOf(rolesFor("clusteredBarChart")(roles)).toExtend<typeof roles>();
 });

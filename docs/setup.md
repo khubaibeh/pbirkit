@@ -49,6 +49,7 @@ pbirkit ships its types as TS source. `tsc` checks that source with the options 
 - Keep `allowImportingTsExtensions` on. The pbirkit source imports its own files by their `.ts` names.
 - Keep `noEmit` on. The CLI loads the TS files itself, so a report project needs no JS output.
 - Set `moduleResolution` to `NodeNext` or `Bundler`.
+- Install `@types/node` to use `process` or `node:*` modules in the config. TS 7 loads no global types by default. When `@types/node` resolves from the project folder, pbirkit adds `"types": ["node"]` to `.pbirkit/tsconfig.json`. A `types` list in your own `tsconfig.json` replaces it.
 - You can add these stricter options: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `verbatimModuleSyntax`, `isolatedModules` and `erasableSyntaxOnly`.
 
 ## Windows and WSL

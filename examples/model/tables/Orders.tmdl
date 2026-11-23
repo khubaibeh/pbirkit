@@ -1,0 +1,165 @@
+/// Fact: one row per order header. Holds fulfilment dates, freight and the order's net value.
+table Orders
+	lineageTag: f04df2ce-54c1-4581-b7ae-09a8ad04e823
+
+	column 'Order ID'
+		dataType: int64
+		isKey
+		formatString: 0
+		lineageTag: 377cfcfb-c94b-4e6f-a53c-bdd587773363
+		summarizeBy: none
+		sourceColumn: Order ID
+
+	column 'Customer ID'
+		dataType: string
+		isHidden
+		lineageTag: f8942e47-ec5a-44a5-ba9a-a533e4127674
+		summarizeBy: none
+		sourceColumn: Customer ID
+
+	column 'Employee ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 3290acb3-ca55-4931-acf4-ba5127814370
+		summarizeBy: none
+		sourceColumn: Employee ID
+
+	column 'Shipper ID'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: b4f7fc06-07e5-4700-8919-8cd8b65aaf33
+		summarizeBy: none
+		sourceColumn: Shipper ID
+
+	column 'Order Date'
+		dataType: dateTime
+		isHidden
+		formatString: d mmm yyyy
+		lineageTag: 30e7c855-eca0-4eb7-8ca9-c85ee19593c1
+		summarizeBy: none
+		sourceColumn: Order Date
+
+	column 'Required Date'
+		dataType: dateTime
+		formatString: d mmm yyyy
+		lineageTag: d7f2a93a-a335-49d7-9dfa-6146c8771508
+		summarizeBy: none
+		sourceColumn: Required Date
+
+	column 'Shipped Date'
+		dataType: dateTime
+		formatString: d mmm yyyy
+		lineageTag: d314b8a2-c330-45b0-a585-fdb6f18539ed
+		summarizeBy: none
+		sourceColumn: Shipped Date
+
+	column Freight
+		dataType: decimal
+		isHidden
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: b85dca6a-cf9d-4efe-ac80-b6bd35644c57
+		summarizeBy: sum
+		sourceColumn: Freight
+
+	column 'Order Value'
+		dataType: decimal
+		isHidden
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 8127c4a3-b563-4391-b20f-40a1b16607fe
+		summarizeBy: sum
+		sourceColumn: Order Value
+
+	column 'Days to Ship'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 0b9ed458-4025-46f4-9140-35efdbce60d8
+		summarizeBy: none
+		sourceColumn: Days to Ship
+
+	column 'Days Late'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: e13e68bd-ca8a-487f-a491-d27d79d3fd5e
+		summarizeBy: none
+		sourceColumn: Days Late
+
+	column 'Shipping Status'
+		dataType: string
+		lineageTag: 1c129077-de3f-4024-8c9a-48791fc68a56
+		summarizeBy: none
+		sourceColumn: Shipping Status
+
+	column 'Order Size'
+		dataType: string
+		lineageTag: 723116ad-c57b-4832-83c2-e047e85c67a4
+		summarizeBy: none
+		sourceColumn: Order Size
+		sortByColumn: 'Order Size Order'
+
+	column 'Order Size Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 62c28155-6e25-4ba0-b903-0bc1b0c2da29
+		summarizeBy: none
+		sourceColumn: Order Size Order
+
+	partition Orders = m
+		mode: import
+		source =
+				let
+				    OrderValues = Table.Group(OrderLines, {"orderID"}, {{"orderValue", each List.Sum([netAmount]), Currency.Type}}),
+				    Joined = Table.NestedJoin(OrderHeaders, {"orderID"}, OrderValues, {"orderID"}, "value", JoinKind.LeftOuter),
+				    Expanded = Table.ExpandTableColumn(Joined, "value", {"orderValue"}),
+				    DaysToShip = Table.AddColumn(
+				        Expanded,
+				        "Days to Ship",
+				        each if [shippedDate] = null then null else Duration.Days([shippedDate] - [orderDate]),
+				        Int64.Type
+				    ),
+				    DaysLate = Table.AddColumn(
+				        DaysToShip,
+				        "Days Late",
+				        each if [shippedDate] = null then null else List.Max({0, Duration.Days([shippedDate] - [requiredDate])}),
+				        Int64.Type
+				    ),
+				    Status = Table.AddColumn(
+				        DaysLate,
+				        "Shipping Status",
+				        each if [shippedDate] = null then "Not shipped"
+				            else if [shippedDate] <= [requiredDate] then "On time"
+				            else "Late",
+				        type text
+				    ),
+				    Band = Table.AddColumn(
+				        Status,
+				        "Order Size",
+				        each if [orderValue] < 500 then "Under $500"
+				            else if [orderValue] < 1000 then "$500–1K"
+				            else if [orderValue] < 2500 then "$1K–2.5K"
+				            else if [orderValue] < 5000 then "$2.5K–5K"
+				            else "$5K and over",
+				        type text
+				    ),
+				    BandOrder = Table.AddColumn(
+				        Band,
+				        "Order Size Order",
+				        each if [orderValue] < 500 then 1 else if [orderValue] < 1000 then 2
+				            else if [orderValue] < 2500 then 3 else if [orderValue] < 5000 then 4 else 5,
+				        Int64.Type
+				    ),
+				    Renamed = Table.RenameColumns(
+				        BandOrder,
+				        {
+				            {"orderID", "Order ID"}, {"customerID", "Customer ID"}, {"employeeID", "Employee ID"},
+				            {"orderDate", "Order Date"}, {"requiredDate", "Required Date"}, {"shippedDate", "Shipped Date"},
+				            {"shipperID", "Shipper ID"}, {"freight", "Freight"}, {"orderValue", "Order Value"}
+				        }
+				    )
+				in
+				    Renamed
+

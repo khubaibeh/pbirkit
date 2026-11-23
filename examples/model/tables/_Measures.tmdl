@@ -1,0 +1,687 @@
+/// Home of every measure. Holds no data.
+table _Measures
+	lineageTag: f1232daa-eae0-4a40-b754-a33e40c32aee
+
+	/// Revenue after line discounts. Excludes freight.
+	measure 'Net Sales' = SUM ( Sales[Net Amount] )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales
+		lineageTag: 5967e58c-553f-41e1-9858-30b9bcc1e157
+
+	/// Revenue at the invoiced unit price, before discounts.
+	measure 'Gross Sales' = SUM ( Sales[Gross Amount] )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales
+		lineageTag: 16df427e-8391-43d8-92f2-eee31f063367
+
+	/// Revenue given away through line discounts.
+	measure 'Discount Amount' = [Gross Sales] - [Net Sales]
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales
+		lineageTag: a455c391-afc6-4162-b6e7-d625b5c45a35
+
+	/// Number of orders with at least one line in the current filter.
+	measure Orders = DISTINCTCOUNT ( Sales[Order ID] )
+		formatString: #,0
+		displayFolder: Sales
+		lineageTag: f782a8dc-9cc5-4a7c-a498-a707bb5d9886
+
+	/// Number of order lines.
+	measure 'Order Lines' = COUNTROWS ( Sales )
+		formatString: #,0
+		displayFolder: Sales
+		lineageTag: b7701ee7-080c-4721-80e8-937439d335d9
+
+	/// Units shipped across all order lines.
+	measure 'Units Sold' = SUM ( Sales[Quantity] )
+		formatString: #,0
+		displayFolder: Sales
+		lineageTag: f259cd31-d7b4-4594-9106-0adc7bc19d92
+
+	/// Net sales per order.
+	measure 'Avg Order Value' = DIVIDE ( [Net Sales], [Orders] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Sales
+		lineageTag: 008daf3b-7211-4145-88e2-adcafb572c68
+
+	/// Gross sales per unit, before discounts.
+	measure 'Avg Unit Price' = DIVIDE ( [Gross Sales], [Units Sold] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Sales
+		lineageTag: 589682d2-85c9-4fde-8a18-3f3c74275a67
+
+	/// Net sales per unit, after discounts.
+	measure 'Avg Net Price' = DIVIDE ( [Net Sales], [Units Sold] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Sales
+		lineageTag: fd2ec3f8-4ec3-4c14-8151-7cad599472f2
+
+	/// Average number of products on an order.
+	measure 'Lines per Order' = DIVIDE ( [Order Lines], [Orders] )
+		formatString: #,0.0
+		displayFolder: Sales
+		lineageTag: 5459b2a4-4dee-4475-9a7f-d31bd4a39518
+
+	/// Share of net sales within the visual's total.
+	measure 'Net Sales % of Total' = DIVIDE ( [Net Sales], CALCULATE ( [Net Sales], ALLSELECTED () ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Sales
+		lineageTag: 78770eb7-ed52-4ad1-821b-9b9c7893369b
+
+	/// Number of distinct products sold.
+	measure 'Products Sold' = DISTINCTCOUNT ( Sales[Product ID] )
+		formatString: #,0
+		displayFolder: Sales
+		lineageTag: 5ed5e93e-27f8-4d5b-a1d5-c0e76a02b794
+
+	/// Discount amount as a share of gross sales.
+	measure 'Discount Rate' = DIVIDE ( [Discount Amount], [Gross Sales] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: c065c393-9ad6-4e92-8892-bc92b5e7bd18
+
+	/// Share of order lines that carry any discount.
+	measure 'Discounted Line Share' = DIVIDE ( CALCULATE ( [Order Lines], KEEPFILTERS ( Sales[Discount] > 0 ) ), [Order Lines] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: fa42ad8f-6382-4209-93ef-3aca40ff25cc
+
+	/// Average discount on the lines that carry one.
+	measure 'Avg Discount When Given' = CALCULATE ( AVERAGE ( Sales[Discount] ), KEEPFILTERS ( Sales[Discount] > 0 ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: a0e5fc23-b9e3-437e-91e9-702491a0df8c
+
+	/// What the units sold would cost at today's list price.
+	measure 'List Price Sales' = SUMX ( Sales, Sales[Quantity] * RELATED ( 'Product'[List Price] ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Pricing
+		lineageTag: 78aaba19-cfa1-4c39-a30a-b6afa4a6c493
+
+	/// Net sales as a share of today's list price. Below 100% means older prices or discounts.
+	measure 'Price Realisation' = DIVIDE ( [Net Sales], [List Price Sales] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: 60bc01af-4199-4593-81e3-9b4a8a151d77
+
+	/// Net sales on the same dates one year earlier.
+	measure 'Net Sales PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Net Sales], _dates ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 4e95d625-f4c4-4bbe-b83e-94b7e6c773e0
+
+	/// Change in net sales against the same dates one year earlier.
+	measure 'Net Sales YoY %' =
+			VAR _current = [Net Sales]
+			VAR _prior = [Net Sales PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Sales\Time comparison
+		lineageTag: 35ead896-f98e-451f-b1f9-404c4e2e219c
+
+	/// Change in net sales against the same dates one year earlier.
+	measure 'Net Sales YoY' = IF ( NOT ISBLANK ( [Net Sales PY] ), [Net Sales] - [Net Sales PY] )
+		formatString: +\$#,0;-\$#,0;\$#,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 7e71642e-15a5-4da6-a52d-c833dd4d64de
+
+	/// Net sales from 1 January to the end of the current period, stopping at the last date with data.
+	measure 'Net Sales YTD' =
+			VAR _ytd = CALCULATETABLE ( DATESYTD ( 'Date'[Date] ), 'Date'[Is Past] )
+			RETURN IF ( NOT ISEMPTY ( _ytd ), CALCULATE ( [Net Sales], _ytd ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 9b70bd2b-e1a3-4a4e-860c-4b5ba58d862d
+
+	/// Year-to-date net sales over the same dates one year earlier.
+	measure 'Net Sales YTD PY' =
+			VAR _ytd = CALCULATETABLE ( DATESYTD ( 'Date'[Date] ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _ytd ), CALCULATE ( [Net Sales], DATEADD ( _ytd, -1, YEAR ) ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 95f37849-ed25-4b99-95d9-1f01a2b86486
+
+	/// Year-to-date growth against the same dates one year earlier.
+	measure 'Net Sales YTD YoY %' =
+			VAR _current = [Net Sales YTD]
+			VAR _prior = [Net Sales YTD PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Sales\Time comparison
+		lineageTag: 17431727-00ab-4008-a115-b28c017b3a36
+
+	/// Orders on the same dates one year earlier.
+	measure 'Orders PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Orders], _dates ) )
+		formatString: #,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 136eb676-40b4-408a-b658-183c786ce6e9
+
+	/// Change in orders against the same dates one year earlier.
+	measure 'Orders YoY %' =
+			VAR _current = [Orders]
+			VAR _prior = [Orders PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Sales\Time comparison
+		lineageTag: 74da05a7-3db0-4f12-9a39-9dfab2f44f75
+
+	/// Average order value on the same dates one year earlier.
+	measure 'Avg Order Value PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Avg Order Value], _dates ) )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Sales\Time comparison
+		lineageTag: 4ee0f80f-7248-4ac7-8459-266d664af66d
+
+	/// Change in average order value against the same dates one year earlier.
+	measure 'Avg Order Value YoY %' =
+			VAR _current = [Avg Order Value]
+			VAR _prior = [Avg Order Value PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Sales\Time comparison
+		lineageTag: b590d356-7690-4476-8658-cdcb654db925
+
+	/// Units sold on the same dates one year earlier.
+	measure 'Units Sold PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Units Sold], _dates ) )
+		formatString: #,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 8e492fed-7c96-496e-b18d-28b996436fbd
+
+	/// Change in units sold against the same dates one year earlier.
+	measure 'Units Sold YoY %' =
+			VAR _current = [Units Sold]
+			VAR _prior = [Units Sold PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Sales\Time comparison
+		lineageTag: c085b7bb-31d4-4739-b4a4-9246859cacb3
+
+	/// Discount rate on the same dates one year earlier.
+	measure 'Discount Rate PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Discount Rate], _dates ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: 9c51f15a-0f83-4407-8c49-3e1c8c7ed22a
+
+	/// Change in discount rate against the same dates one year earlier.
+	measure 'Discount Rate YoY %' =
+			VAR _current = [Discount Rate]
+			VAR _prior = [Discount Rate PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Pricing
+		lineageTag: 6bb345a8-fdeb-4135-9dbd-83e47520b80c
+
+	/// Net sales over the three months that end with the current period.
+	measure 'Net Sales Rolling 3M' =
+			VAR _last = [Last Order Date]
+			VAR _end = MIN ( MAX ( 'Date'[Date] ), _last )
+			VAR _window = DATESINPERIOD ( 'Date'[Date], _end, -3, MONTH )
+			RETURN IF ( MIN ( 'Date'[Date] ) <= _last, CALCULATE ( [Net Sales], _window ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Sales\Time comparison
+		lineageTag: 7d4a8072-dcc9-4028-8590-b85c6cb69300
+
+	/// Customers with at least one order in the current filter.
+	measure 'Active Customers' = DISTINCTCOUNT ( Sales[Customer ID] )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 11c18b56-584e-462c-a7d8-a1e9428e9988
+
+	/// Active customers on the same dates one year earlier.
+	measure 'Active Customers PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Active Customers], _dates ) )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 0458f51c-1bba-43c1-8dcd-4e43c0385965
+
+	/// Change in active customers against the same dates one year earlier.
+	measure 'Active Customers YoY %' =
+			VAR _current = [Active Customers]
+			VAR _prior = [Active Customers PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Customers
+		lineageTag: f96c0ba2-efa5-476a-b4ea-0fa16219a7b6
+
+	/// Active customers whose first ever order falls in the current period.
+	measure 'New Customers' =
+			VAR _start = MIN ( 'Date'[Date] )
+			VAR _end = MAX ( 'Date'[Date] )
+			RETURN
+			    CALCULATE (
+			        [Active Customers],
+			        KEEPFILTERS ( Customer[First Order Date] >= _start && Customer[First Order Date] <= _end )
+			    )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 8b09aa11-61d6-433c-acef-76f3532f9373
+
+	/// Active customers who had ordered before the current period.
+	measure 'Returning Customers' = [Active Customers] - [New Customers]
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: b910b98c-c74b-49fc-9c75-178c98577150
+
+	/// Net sales per active customer.
+	measure 'Net Sales per Customer' = DIVIDE ( [Net Sales], [Active Customers] )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Customers
+		lineageTag: 9d272cbc-1751-4742-9e27-299abbf8b5b8
+
+	/// Orders per active customer.
+	measure 'Orders per Customer' = DIVIDE ( [Orders], [Active Customers] )
+		formatString: #,0.0
+		displayFolder: Customers
+		lineageTag: dda463b1-c4ef-4a18-937f-558941797042
+
+	/// Share of active customers with more than one order in the current period.
+	measure 'Repeat Customer Rate' =
+			DIVIDE (
+			    COUNTROWS ( FILTER ( VALUES ( Sales[Customer ID] ), [Orders] > 1 ) ),
+			    [Active Customers]
+			)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Customers
+		lineageTag: f384ed8a-29ac-4c00-b076-40b88a1ca1f4
+
+	/// Customer accounts, with or without orders.
+	measure 'Customer Count' = COUNTROWS ( Customer )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 59348bde-78eb-4dfd-afd0-cc143d1dbfed
+
+	/// Share of a cohort's customers who ordered in the period.
+	measure 'Cohort Retention' = DIVIDE ( [Active Customers], CALCULATE ( [Customer Count], REMOVEFILTERS ( 'Date' ) ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Customers
+		lineageTag: 4d1db176-226e-410f-a27b-8b40339175f2
+
+	/// Share of net sales that comes from the ten largest customers.
+	measure 'Top 10 Customer Share' =
+			VAR _top = TOPN ( 10, VALUES ( Customer[Customer ID] ), [Net Sales] )
+			RETURN DIVIDE ( CALCULATE ( [Net Sales], _top ), [Net Sales] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Customers
+		lineageTag: 9b6041c7-0cd7-4ce7-8254-baaa53b05b5c
+
+	/// Running share of net sales when customers are ranked from largest to smallest.
+	measure 'Customer Cumulative Share' =
+			VAR _current = [Net Sales]
+			VAR _all = ADDCOLUMNS ( ALLSELECTED ( Customer[Customer] ), "@sales", [Net Sales] )
+			RETURN
+			    IF (
+			        NOT ISBLANK ( _current ),
+			        DIVIDE ( SUMX ( FILTER ( _all, [@sales] >= _current ), [@sales] ), SUMX ( _all, [@sales] ) )
+			    )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Customers
+		lineageTag: cf99579e-46bc-4fdb-8692-3afbb64cd06f
+
+	/// Rank of the customer by net sales.
+	measure 'Customer Rank' = IF ( NOT ISBLANK ( [Net Sales] ), RANKX ( ALLSELECTED ( Customer[Customer] ), [Net Sales] ) )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 0cc994c1-30e9-4915-99d5-8b405036ee76
+
+	/// Customers whose last order is more than 60 days before the end of the data.
+	measure 'Customers at Risk' = CALCULATE ( [Customer Count], KEEPFILTERS ( Customer[Recency] IN { "Cooling", "Lapsed" } ) )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: 5710a788-5784-4aae-a479-1d6d1be277d8
+
+	/// Average days between a customer's last order and the end of the data.
+	measure 'Avg Days Since Last Order' = AVERAGE ( Customer[Days Since Last Order] )
+		formatString: #,0
+		displayFolder: Customers
+		lineageTag: a07e6ff5-af60-472f-a973-df6e889a9a43
+
+	/// Rank of the product by net sales.
+	measure 'Product Rank' = IF ( NOT ISBLANK ( [Net Sales] ), RANKX ( ALLSELECTED ( 'Product'[Product] ), [Net Sales] ) )
+		formatString: #,0
+		displayFolder: Products
+		lineageTag: 85502bb4-463f-4a5b-9d7f-a9c065f58b73
+
+	/// Share of net sales from products that are now discontinued.
+	measure 'Discontinued Sales Share' = DIVIDE ( CALCULATE ( [Net Sales], KEEPFILTERS ( 'Product'[Status] = "Discontinued" ) ), [Net Sales] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Products
+		lineageTag: b52b2e03-cd86-4470-8694-0bfc6cb01e0b
+
+	/// Average current list price.
+	measure 'Avg List Price' = AVERAGE ( 'Product'[List Price] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Products
+		lineageTag: 7c7eb075-058f-4f46-a497-4dee88c7ab06
+
+	/// Orders placed. Counts order headers, so product filters do not apply.
+	measure 'Orders Placed' = COUNTROWS ( Orders )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: bbaa80eb-3ff4-462b-8ce0-9a6b16ca9377
+
+	/// Orders that have shipped.
+	measure 'Shipped Orders' = CALCULATE ( [Orders Placed], KEEPFILTERS ( Orders[Shipping Status] <> "Not shipped" ) )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: 14e91eab-f046-40c1-ab97-ece6bd2a6c30
+
+	/// Orders shipped on or before the required date.
+	measure 'On-Time Orders' = CALCULATE ( [Orders Placed], KEEPFILTERS ( Orders[Shipping Status] = "On time" ) )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: a85be1e9-49ec-4927-8de4-bd0521d91d97
+
+	/// Orders shipped after the required date.
+	measure 'Late Orders' = CALCULATE ( [Orders Placed], KEEPFILTERS ( Orders[Shipping Status] = "Late" ) )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: 99018807-6400-47f9-9afc-d87d7806fb16
+
+	/// Orders not yet shipped.
+	measure 'Open Orders' = CALCULATE ( [Orders Placed], KEEPFILTERS ( Orders[Shipping Status] = "Not shipped" ) )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: 8970010d-1379-42cd-b233-7d9e8be1d6f8
+
+	/// Share of shipped orders that left on or before the required date.
+	measure 'On-Time Rate' = DIVIDE ( [On-Time Orders], [Shipped Orders] )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: 12b03ae5-75a8-4b9b-a198-95d42df0225a
+
+	/// Service level the business commits to.
+	measure 'On-Time Target' = 0.95
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: f9693c67-2db9-4ddd-8089-2133d5c97fdc
+
+	/// On-time rate minus the target, in percentage points.
+	measure 'On-Time Gap' = IF ( NOT ISBLANK ( [On-Time Rate] ), [On-Time Rate] - [On-Time Target] )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: 4450f682-6b09-4c58-a905-726b1d95174a
+
+	/// On-time rate on the same dates one year earlier.
+	measure 'On-Time Rate PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [On-Time Rate], _dates ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: d4285f0b-4de7-4d03-9a67-9e14a0f07611
+
+	/// Change in on-time rate against the same dates one year earlier.
+	measure 'On-Time Rate YoY %' =
+			VAR _current = [On-Time Rate]
+			VAR _prior = [On-Time Rate PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: 429dd552-f9a0-4a84-9819-d706aad73e18
+
+	/// Average days from order to shipment.
+	measure 'Avg Days to Ship' = AVERAGE ( Orders[Days to Ship] )
+		formatString: #,0.0
+		displayFolder: Fulfilment
+		lineageTag: 3bfc8a33-3333-4871-9300-febc3a3c9d57
+
+	/// Average days past the required date, for late orders.
+	measure 'Avg Days Late' = CALCULATE ( AVERAGE ( Orders[Days Late] ), KEEPFILTERS ( Orders[Shipping Status] = "Late" ) )
+		formatString: #,0.0
+		displayFolder: Fulfilment
+		lineageTag: 8f9c6340-dfbf-414c-aec3-5843c7d904fc
+
+	/// Freight charged on orders.
+	measure Freight = SUM ( Orders[Freight] )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Fulfilment
+		lineageTag: 1a84350e-39c4-4b58-b563-928b11e157af
+
+	/// Freight as a share of the net value of the same orders.
+	measure 'Freight % of Sales' = DIVIDE ( [Freight], SUM ( Orders[Order Value] ) )
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: e74c08bb-b8c4-4e58-b498-a01e42552d0f
+
+	/// Freight per order placed.
+	measure 'Avg Freight per Order' = DIVIDE ( [Freight], [Orders Placed] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Fulfilment
+		lineageTag: d4167c3a-f61a-4160-a38f-bdb28bbb4235
+
+	/// Freight on the same dates one year earlier.
+	measure 'Freight PY' =
+			VAR _dates = CALCULATETABLE ( DATEADD ( 'Date'[Date], -1, YEAR ), 'Date'[Is Past] )
+			RETURN IF ( HASONEVALUE ( 'Date'[Year] ) && NOT ISEMPTY ( _dates ), CALCULATE ( [Freight], _dates ) )
+		formatString: \$#,0;-\$#,0;\$#,0
+		displayFolder: Fulfilment
+		lineageTag: a9c57bc8-993a-4e74-832c-27b7b304a7c8
+
+	/// Change in freight against the same dates one year earlier.
+	measure 'Freight YoY %' =
+			VAR _current = [Freight]
+			VAR _prior = [Freight PY]
+			RETURN IF ( NOT ISBLANK ( _current ) && NOT ISBLANK ( _prior ), DIVIDE ( _current - _prior, _prior ) )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: Fulfilment
+		lineageTag: 91f07301-cc62-4b6a-8dc7-030f61a9dca9
+
+	/// Orders by the date they shipped, not the date they were placed.
+	measure 'Orders Shipped' = CALCULATE ( [Shipped Orders], USERELATIONSHIP ( Orders[Shipped Date], 'Date'[Date] ) )
+		formatString: #,0
+		displayFolder: Fulfilment
+		lineageTag: 8f4b215c-399e-459f-8864-f091d3f36745
+
+	/// Last order date in the data.
+	measure 'Last Order Date' = CALCULATE ( MAX ( Orders[Order Date] ), REMOVEFILTERS () )
+		formatString: d mmm yyyy
+		displayFolder: Report
+		lineageTag: 2fc95a5e-405c-4c44-8556-887b1f02a9dc
+
+	/// Header note on every page.
+	measure 'Data Through Label' = "Data through " & FORMAT ( [Last Order Date], "d mmm yyyy" )
+		displayFolder: Report
+		lineageTag: 5a24a2af-ec5d-4a5a-9e05-b87032a51bf4
+
+	/// Span of order dates in the current selection.
+	measure 'Period Label' =
+			VAR _first = CALCULATE ( MIN ( Sales[Order Date] ) )
+			VAR _last = CALCULATE ( MAX ( Sales[Order Date] ) )
+			RETURN IF ( NOT ISBLANK ( _first ), FORMAT ( _first, "mmm yyyy" ) & " – " & FORMAT ( _last, "mmm yyyy" ), "No sales in this selection" )
+		displayFolder: Report
+		lineageTag: d1f5254d-0e73-422b-8b50-e958e30b163c
+
+	/// KPI card note for net sales.
+	measure 'Net Sales vs PY Label' =
+			VAR _change = [Net Sales YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: 7359c601-013c-4a69-9604-c57908f5c411
+
+	/// KPI card note for orders.
+	measure 'Orders vs PY Label' =
+			VAR _change = [Orders YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: 2c88809d-ff11-4a72-8f66-2e61bf343057
+
+	/// KPI card note for average order value.
+	measure 'Avg Order Value vs PY Label' =
+			VAR _change = [Avg Order Value YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: e6c53331-448e-46f3-8a9c-2fb73a4841fe
+
+	/// KPI card note for active customers.
+	measure 'Active Customers vs PY Label' =
+			VAR _change = [Active Customers YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: ee622f21-2308-4806-b654-7c8d669fdd50
+
+	/// KPI card note for units sold.
+	measure 'Units Sold vs PY Label' =
+			VAR _change = [Units Sold YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: 5e08371f-698b-4456-9ed4-ece5ca720611
+
+	/// KPI card note for freight.
+	measure 'Freight vs PY Label' =
+			VAR _change = [Freight YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: a6ffd204-abe1-43ad-a7ca-7a31e6590024
+
+	/// KPI card note for year-to-date net sales.
+	measure 'Net Sales YTD vs PY Label' =
+			VAR _change = [Net Sales YTD YoY %]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _change ), "No prior-year data",
+			        FORMAT ( _change, "▲ 0%;▼ 0%;0%" ) & " vs last year to date"
+			    )
+		displayFolder: Report
+		lineageTag: b7b5580f-fe45-4b06-a3e2-8cd8660ac3cd
+
+	/// KPI card note for the on-time rate.
+	measure 'On-Time vs Target Label' =
+			VAR _gap = [On-Time Gap]
+			RETURN IF ( ISBLANK ( _gap ), "No shipped orders", FORMAT ( _gap * 100, "+0.0;-0.0;0.0" ) & " pts against the 95% target" )
+		displayFolder: Report
+		lineageTag: 9797c298-3895-410e-b846-2bc655e78262
+
+	/// KPI card note for the discount rate.
+	measure 'Discount Rate vs PY Label' =
+			VAR _now = [Discount Rate]
+			VAR _prior = [Discount Rate PY]
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        NOT HASONEVALUE ( 'Date'[Year] ), "Pick one year to compare",
+			        ISBLANK ( _prior ), "No prior-year data",
+			        FORMAT ( ( _now - _prior ) * 100, "+0.0;-0.0;0.0" ) & " pts vs last year"
+			    )
+		displayFolder: Report
+		lineageTag: bb155f7c-10fa-4243-a114-4ed006bba982
+
+	/// Title on the customer profile page.
+	measure 'Selected Customer' = IF ( HASONEVALUE ( Customer[Customer] ), VALUES ( Customer[Customer] ), "Pick a customer" )
+		displayFolder: Report
+		lineageTag: e4bddee2-5415-4963-a676-b99b25e0ba4b
+
+	/// First detail line on the customer profile page: the contact and their role.
+	measure 'Selected Customer Detail' =
+			IF (
+			    HASONEVALUE ( Customer[Customer ID] ),
+			    SELECTEDVALUE ( Customer[Contact] ) & ", " & SELECTEDVALUE ( Customer[Contact Title] ),
+			    "Right-click a customer anywhere in the report and choose Drill through."
+			)
+		displayFolder: Report
+		lineageTag: b8915d03-a02a-4aa4-818d-1e70521ea10d
+
+	/// Title on the product profile page.
+	measure 'Selected Product' = IF ( HASONEVALUE ( 'Product'[Product] ), VALUES ( 'Product'[Product] ), "Pick a product" )
+		displayFolder: Report
+		lineageTag: e5c30d29-08fc-4cd0-9e31-04fd9d450ecc
+
+	/// First detail line on the product profile page: category and pack size.
+	measure 'Selected Product Detail' =
+			IF (
+			    HASONEVALUE ( 'Product'[Product ID] ),
+			    SELECTEDVALUE ( 'Product'[Category] ) & "  ·  " & SELECTEDVALUE ( 'Product'[Pack Size] ),
+			    "Right-click a product anywhere in the report and choose Drill through."
+			)
+		displayFolder: Report
+		lineageTag: 57d51627-5865-4ffc-9893-73cf30ccdb08
+
+	/// Net value of the orders in the current filter, from the order header. Use it beside order-level columns such as order ID and shipping status.
+	measure 'Order Value' = SUM ( Orders[Order Value] )
+		formatString: \$#,0.00;-\$#,0.00;\$#,0.00
+		displayFolder: Sales
+		lineageTag: 42101dec-6f1b-449b-b3b1-0ed25ef6107b
+
+	/// Second detail line on the customer profile page: where the customer is and how long they have bought. Empty until one customer is selected.
+	measure 'Selected Customer Place' =
+			IF (
+			    HASONEVALUE ( Customer[Customer ID] ),
+			    SELECTEDVALUE ( Customer[City] ) & ", " & SELECTEDVALUE ( Customer[Country] ) & "  ·  Customer since "
+			        & FORMAT ( SELECTEDVALUE ( Customer[First Order Date] ), "mmm yyyy" ),
+			    ""
+			)
+		displayFolder: Report
+		lineageTag: bac2381d-d0b0-4690-9423-25a62d36af2d
+
+	/// Second detail line on the product profile page: list price and whether the product is still sold. Empty until one product is selected.
+	measure 'Selected Product Price' =
+			IF (
+			    HASONEVALUE ( 'Product'[Product ID] ),
+			    "List price " & FORMAT ( SELECTEDVALUE ( 'Product'[List Price] ), "\$#,0.00" ) & "  ·  " & SELECTEDVALUE ( 'Product'[Status] ),
+			    ""
+			)
+		displayFolder: Report
+		lineageTag: daec3399-ddf5-44dc-87a2-cddbd8e3142f
+
+	/// Units sold minus units sold on the same dates last year. Blank when there is no prior year to compare with.
+	measure 'Units Sold YoY' = IF ( NOT ISBLANK ( [Units Sold PY] ), [Units Sold] - [Units Sold PY] )
+		formatString: +#,0;-#,0;0
+		displayFolder: SalesTime comparison
+		lineageTag: 52060c0a-1606-4493-bb0b-18796cb93534
+
+	column Value
+		isHidden
+		lineageTag: b75be57f-33a2-40df-b73b-76c938bf50d1
+		isNameInferred
+		sourceColumn: [Value]
+
+	partition _Measures = calculated
+		mode: import
+		source = { BLANK () }
+

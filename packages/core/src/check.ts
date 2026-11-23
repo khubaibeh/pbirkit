@@ -21,6 +21,7 @@ import { nameProblems } from "./name.ts";
 import { packageItem, samePackageItem } from "./resource.ts";
 import type { Resource } from "./resource.ts";
 import { themeCatalogIssues, visualCatalogIssues } from "./visual-catalog/index.ts";
+import { visualRuleIssues } from "./visual-rules.ts";
 import { isBuiltinVisual } from "./visual-type.ts";
 
 type Page = Config["report"]["pages"][number];
@@ -239,7 +240,7 @@ const visualTypeIssues = (config: Config): ReadonlyArray<string> => {
 const catalogIssues = (config: Config): ReadonlyArray<string> => [
 	...config.report.pages.flatMap((page) =>
 		typedVisuals(page).flatMap((visual) =>
-			visualCatalogIssues(valueAt(visual, "visual")).map(
+			[...visualCatalogIssues(valueAt(visual, "visual")), ...visualRuleIssues(valueAt(visual, "visual"))].map(
 				(issue) => `page "${page.name}" visual "${visual.name}": ${issue}`,
 			),
 		),
@@ -253,8 +254,14 @@ const catalogIssues = (config: Config): ReadonlyArray<string> => [
 	),
 ];
 
-const rawEntries = (owner: "model" | "report", files: { readonly [path: string]: URL } = {}) =>
-	Object.entries(files).map(([path, url]) => ({ where: `${owner}: files "${path}"`, owner, path, url }));
+const rawEntries = (owner: "model" | "report", files: { readonly [path: string]: URL | string } = {}) =>
+	Object.entries(files).map(([path, value]) => ({
+		where: `${owner}: files "${path}"`,
+		owner,
+		path,
+		url: fileOf(value),
+		text: typeof value === "string",
+	}));
 
 const ownedIssues = (config: Config): ReadonlyArray<string> =>
 	[
@@ -324,6 +331,11 @@ const sourceIssues = (config: Config): ReadonlyArray<string> => {
 					({ where, owner }) =>
 						`${where}: path must be a relative path inside the ${owner} folder, with "/" as the separator`,
 				),
+		)
+		.concat(
+			raw
+				.filter(({ path, text }) => text && path.endsWith("/"))
+				.map(({ where }) => `${where}: a folder path takes a file: URL, not text`),
 		);
 };
 
@@ -333,7 +345,7 @@ const packageEntries = (definition: Exclude<Config["report"]["definition"], URL>
 	);
 
 const providedByFiles = (
-	files: { readonly [path: string]: URL },
+	files: { readonly [path: string]: URL | string },
 	entry: ReturnType<typeof packageEntries>[number],
 ): boolean => {
 	const paths = Object.keys(files).map((path) => withoutDot(path));
@@ -444,19 +456,19 @@ const checkFonts = (
 ): { readonly errors: ReadonlyArray<string>; readonly warnings: ReadonlyArray<string> } => {
 	const fonts = config.report.fonts ?? [];
 	const registered = registeredFamilies(fonts);
-	const sources: ReadonlyArray<readonly [string, unknown]> = [
-		["report", config.report.definition],
+	const sources: ReadonlyArray<readonly [string, unknown, boolean]> = [
+		["report", config.report.definition, true],
 		...config.report.pages.flatMap((page) => {
 			const { visuals, ...rest } = page;
 			return [
-				[`page "${page.name}"`, rest] as const,
-				...visuals.map((visual) => [`page "${page.name}" visual "${visual.name}"`, visual] as const),
+				[`page "${page.name}"`, rest, true] as const,
+				...visuals.map((visual) => [`page "${page.name}" visual "${visual.name}"`, visual, true] as const),
 			];
 		}),
-		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item] as const),
+		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item, true] as const),
 		...(config.report.resources ?? []).flatMap((resource) =>
 			resource.kind === "baseTheme" || resource.kind === "customTheme" || resource.kind === "builtInTheme"
-				? [[resourceLabel(resource), resource.theme] as const]
+				? [[resourceLabel(resource), resource.theme, resource.kind === "customTheme"] as const]
 				: [],
 		),
 	];
@@ -477,14 +489,16 @@ const checkFonts = (
 					),
 			),
 		),
-		warnings: sources.flatMap(([where, value]) =>
-			[...new Set(fontSizes(value))]
-				.filter((size) => !isFontSize(size))
-				.map(
-					(size) =>
-						`${where}: font size ${JSON.stringify(size)} is not a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
-				),
-		),
+		warnings: sources
+			.filter(([, , sized]) => sized)
+			.flatMap(([where, value]) =>
+				[...new Set(fontSizes(value))]
+					.filter((size) => !isFontSize(size))
+					.map(
+						(size) =>
+							`${where}: font size ${JSON.stringify(size)} is not a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
+					),
+			),
 	};
 };
 

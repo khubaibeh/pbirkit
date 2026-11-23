@@ -192,6 +192,22 @@ const reportJson = (themeCollection: object, resourcePackages: ReadonlyArray<obj
 	[`${REPORT}/definition/report.json`]: { themeCollection, resourcePackages },
 });
 
+const fill = (color: string) => ({ solid: { color } });
+
+const baseJson = {
+	$schema: "https://example.com/theme.json",
+	name: "Base",
+	textClasses: { label: { fontSize: 10.5 } },
+	visualStyles: { "*": { "*": { categoryAxis: [{ fontSize: 10.5 }] } } },
+};
+
+const brandJson = {
+	name: "Brand",
+	visualStyles: {
+		"*": { "*": { outspacePane: [{ backgroundColor: fill("background"), borderColor: fill("#FFFFFF00") }] } },
+	},
+};
+
 describe("resources", () => {
 	it("maps each resource package item to a typed resource or explains why not", () => {
 		const tree = indexOf({
@@ -216,8 +232,8 @@ describe("resources", () => {
 					items: [{ name: "Visual1.pbiviz.json", path: "Visual1.pbiviz.json", type: "CustomVisualMetadata" }],
 				},
 			]),
-			[`${REPORT}/StaticResources/SharedResources/BaseThemes/Base.json`]: { name: "Base" },
-			[`${REPORT}/StaticResources/RegisteredResources/Brand.json`]: { name: "Brand" },
+			[`${REPORT}/StaticResources/SharedResources/BaseThemes/Base.json`]: baseJson,
+			[`${REPORT}/StaticResources/RegisteredResources/Brand.json`]: brandJson,
 			[`${REPORT}/StaticResources/RegisteredResources/logo.png`]: "png",
 			[`${REPORT}/CustomVisuals/Visual1/resources/Visual1.pbiviz.json`]: "{}",
 		});
@@ -229,11 +245,11 @@ describe("resources", () => {
 				Result.isSuccess(node.content) ? node.content.success : node.content.failure,
 			]),
 		).toEqual([
-			["theme", "Base", { kind: "baseTheme", name: "Base", theme: { name: "Base" } }],
+			["theme", "Base", { kind: "baseTheme", name: "Base", theme: baseJson }],
 			[
 				"theme",
 				"Brand.json",
-				{ kind: "customTheme", name: "Brand.json", itemType: "Image", theme: { name: "Brand" } },
+				{ kind: "customTheme", name: "Brand.json", itemType: "Image", theme: brandJson },
 			],
 			["image", "logo.png", { kind: "image", name: "logo.png" }],
 			["theme", "other.json", "Unsupported resource package item"],

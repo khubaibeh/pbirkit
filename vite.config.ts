@@ -1,7 +1,7 @@
 import { recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "vite-plus";
 
-const ignorePatterns = ["dist", "playground", ".local", "archive"];
+const ignorePatterns = ["dist", "playground", "examples", ".local", "archive"];
 
 const effect = process.env.NODE_OPTIONS?.includes("@effect/tsgo/lib/oxlint-bridge") ?? false;
 const effectPlugins = effect ? (recommended.plugins ?? []) : [];
@@ -71,10 +71,10 @@ export default defineConfig({
 		],
 	},
 	test: {
-		exclude: ["**/node_modules/**", "**/.git/**", "**/dist/**"],
+		exclude: ["**/node_modules/**", "**/.git/**", "**/dist/**", "examples/**"],
 	},
 	staged: {
-		"*.{ts,mts,cts,js,mjs,cjs}": "effect-tsgo vp check --fix",
-		"*.json": "vp fmt",
+		"*.{ts,mts,cts,js,mjs,cjs}": "effect-tsgo vp check --fix --no-error-on-unmatched-pattern",
+		"*.json": "vp fmt --no-error-on-unmatched-pattern",
 	},
 });

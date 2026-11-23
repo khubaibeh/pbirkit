@@ -1,4 +1,4 @@
-import { Console, Effect, FileSystem, Option, Path } from "effect";
+import { Clock, Console, Duration, Effect, FileSystem, Option, Path, Schedule } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
 import { reportFolder } from "@pbirkit/core/build";
@@ -7,6 +7,7 @@ import { loadConfig } from "../build/config.ts";
 import { onFileSystem } from "../build/errors.ts";
 import { DEFAULT_OUT, fromCwd, projectPaths } from "../build/paths.ts";
 import { prepareState } from "../build/snapshot.ts";
+import { setExitCode } from "../messages.ts";
 import {
 	findMsCli,
 	capture,
@@ -28,7 +29,14 @@ const SHOT_WAIT_MS = 15_000;
 
 const POLL = "1 second";
 
+const NOT_READY_CODE = "HostNotReady";
+
+const NOT_READY = /not ready/iu;
+
 const SHOTS_FOLDER = "shots";
+
+const THEME_NOTE =
+	"Desktop reads theme files only when it opens the project. To apply a theme change, close Desktop and run pbirkit desktop open";
 
 const MIN_SCALE = 1;
 
@@ -94,12 +102,7 @@ const requireOurs = Effect.fnUntraced(function* (project: Project) {
 });
 
 const reportError = (error: DesktopCommandError) =>
-	Effect.andThen(
-		Console.error(errorMessage(error)),
-		Effect.sync(() => {
-			process.exitCode = 1;
-		}),
-	);
+	Effect.andThen(Console.error(errorMessage(error)), setExitCode(1));
 
 const status = Command.make("status", { config: configFlag }, ({ config }) =>
 	Effect.gen(function* () {
@@ -117,21 +120,30 @@ const status = Command.make("status", { config: configFlag }, ({ config }) =>
 	),
 );
 
-const waitForOurs = (project: Project, deadline: number): Effect.Effect<Instance, DesktopError> =>
+const OPENING_CODE = "OPENING";
+
+const waitForOurs = (project: Project, wait: number): Effect.Effect<Instance, DesktopError> =>
 	Effect.gen(function* () {
 		const { match } = yield* findOurs(project);
 		if (match.status === "matched") return match.instance;
-		if (Date.now() > deadline) {
-			return yield* new DesktopError({
-				code: "OPEN_TIMEOUT",
-				detail: `Desktop did not open ${project.shown} in time. Check the Desktop window, then run pbirkit desktop status`,
-			});
-		}
 
-		yield* Effect.sleep(POLL);
-
-		return yield* waitForOurs(project, deadline);
-	});
+		return yield* new DesktopError({
+			code: OPENING_CODE,
+			detail: `Desktop has not opened ${project.shown} yet`,
+		});
+	}).pipe(
+		Effect.retry({ schedule: Schedule.spaced(POLL), while: (error) => error.code === OPENING_CODE }),
+		Effect.timeoutOrElse({
+			duration: Duration.seconds(wait),
+			orElse: () =>
+				Effect.fail(
+					new DesktopError({
+						code: "OPEN_TIMEOUT",
+						detail: `Desktop did not open ${project.shown} in time. Check the Desktop window, then run pbirkit desktop status`,
+					}),
+				),
+		}),
+	);
 
 const openFlags = {
 	config: configFlag,
@@ -161,10 +173,10 @@ const open = Command.make("open", openFlags, ({ config, wait }) =>
 			});
 		}
 
-		const started = Date.now();
+		const started = yield* Clock.currentTimeMillis;
 		yield* launchDesktop(project.pbip);
-		const instance = yield* waitForOurs(project, started + wait * 1000);
-		const seconds = Math.round((Date.now() - started) / 1000);
+		const instance = yield* waitForOurs(project, wait);
+		const seconds = Math.round(((yield* Clock.currentTimeMillis) - started) / 1000);
 
 		return yield* Console.log(`desktop: pid ${instance.pid} opened ${project.shown} in ${seconds} s`);
 	}).pipe(Effect.catch(reportError)),
@@ -182,16 +194,41 @@ const reloadFlags = {
 	),
 };
 
-const reload = Command.make("reload", reloadFlags, ({ config, model }) =>
+const isNotReady = (error: DesktopError): boolean =>
+	error.code === NOT_READY_CODE || NOT_READY.test(error.detail);
+
+const reloadUntilReady = (project: Project, model: boolean): Effect.Effect<Instance, DesktopError> =>
 	Effect.gen(function* () {
-		const project = yield* loadProject(config);
 		const instance = yield* requireOurs(project);
 		yield* withReport(instance, project.report, RELOAD_WAIT_MS, (session) =>
 			reloadReport(session, model, RELOAD_WAIT_MS),
 		);
 
+		return instance;
+	}).pipe(
+		Effect.retry({ schedule: Schedule.spaced(POLL), while: isNotReady }),
+		Effect.timeoutOrElse({
+			duration: Duration.millis(RELOAD_WAIT_MS),
+			orElse: () =>
+				Effect.fail(
+					new DesktopError({
+						code: "RELOAD_TIMEOUT",
+						detail: `Desktop did not reload ${project.shown} within ${RELOAD_WAIT_MS / 1000} s. Check the Desktop window, then run pbirkit desktop reload again`,
+					}),
+				),
+		}),
+	);
+
+const reload = Command.make("reload", reloadFlags, ({ config, model }) =>
+	Effect.gen(function* () {
+		const project = yield* loadProject(config);
+		const instance = yield* reloadUntilReady(project, model);
+
 		return yield* Console.log(
-			`desktop: pid ${instance.pid} reloaded ${project.shown}${model ? " and its model definition" : ""}`,
+			[
+				`desktop: pid ${instance.pid} reloaded ${project.shown}${model ? " and its model definition" : ""}`,
+				THEME_NOTE,
+			].join("\n"),
 		);
 	}).pipe(Effect.catch(reportError)),
 ).pipe(
@@ -282,9 +319,7 @@ const shot = Command.make("shot", shotFlags, ({ config, pages, scale, dir }) =>
 
 		yield* Console.log(shotMessage(instance.pid, shots));
 
-		return yield* Effect.sync(() => {
-			if (shots.some((outcome) => outcome.error !== null)) process.exitCode = 1;
-		});
+		if (shots.some((outcome) => outcome.error !== null)) yield* setExitCode(1);
 	}).pipe(Effect.catch(reportError)),
 ).pipe(Command.withDescription("Save pages of the open project as PNG images, as Desktop shows them now"));
 

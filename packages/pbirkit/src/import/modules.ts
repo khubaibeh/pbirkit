@@ -644,7 +644,7 @@ const SUPPORT_FILES = {
 	[Layout.packageJson]: {
 		type: "module",
 		imports: Layout.aliases,
-		devDependencies: { [CORE_PACKAGE]: `^${VERSION}` },
+		devDependencies: { [CORE_PACKAGE]: `^${VERSION}`, "@types/node": ">=24" },
 	},
 	[Layout.tsconfig]: {
 		extends: `./${Layout.localTsconfig}`,

@@ -25,13 +25,10 @@ export const indexTree = (
 		...(raw === undefined ? {} : { raw }),
 	});
 
-export const fileJson = (tree: Tree, path: string): unknown => {
-	const text = fileText(tree, path);
-	if (text === undefined) return undefined;
-	try {
-		const value: unknown = JSON.parse(text);
-		return value;
-	} catch {
-		return undefined;
-	}
-};
+export const fileJson = (tree: Tree, path: string): unknown =>
+	Option.getOrUndefined(
+		Option.flatMap(
+			Option.fromUndefinedOr(fileText(tree, path)),
+			Option.liftThrowable((text: string): unknown => JSON.parse(text)),
+		),
+	);

@@ -2,7 +2,7 @@ import { Effect, FileSystem, Path } from "effect";
 
 import { GitRepoError } from "./errors.ts";
 
-const hasGit = (folder: string): Effect.Effect<boolean, never, FileSystem.FileSystem | Path.Path> =>
+export const hasGit = (folder: string): Effect.Effect<boolean, never, FileSystem.FileSystem | Path.Path> =>
 	Effect.gen(function* () {
 		const fs = yield* FileSystem.FileSystem;
 		const path = yield* Path.Path;

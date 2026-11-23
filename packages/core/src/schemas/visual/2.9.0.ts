@@ -29,8 +29,8 @@ export const Visual = Union([
 
 export type Visual = typeof Visual.Type;
 
-export const defineVisual = <T extends string, const O, S>(
-	visual: CheckedVisual<WithoutSchema<Visual>, T, O, S>,
+export const defineVisual = <Type extends string, const Objects, QueryState>(
+	visual: CheckedVisual<WithoutSchema<Visual>, Type, Objects, QueryState>,
 ): Visual => ({
 	$schema: fields.$schema.literal,
 	...visual,

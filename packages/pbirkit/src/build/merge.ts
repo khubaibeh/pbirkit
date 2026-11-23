@@ -1,9 +1,9 @@
 import { Data, HashMap, Option } from "effect";
 
 import type { Conflict, ConflictReason } from "./errors.ts";
-import { mergeText } from "./text.ts";
+import { mergeText, sameJson } from "./text.ts";
 import type { Tree, TreeFile } from "./tree.ts";
-import { fileKey, isOwned, parentKeys, sameFile, treeOf } from "./tree.ts";
+import { fileKey, isOwned, parentKeys, sameFile, sameText, treeOf } from "./tree.ts";
 
 export type Prefer = "src" | "desktop";
 
@@ -21,7 +21,7 @@ export type Change = Data.TaggedEnum<{
 
 export const Change = Data.taggedEnum<Change>();
 
-export type PendingKind = "added" | "changed" | "deleted";
+export type PendingKind = "added" | "changed" | "reformatted" | "deleted";
 
 export interface Pending {
 	readonly path: string;
@@ -146,6 +146,39 @@ export const mergeTrees = ({
 	return { result: tree, conflicts: [...conflicts, ...folderClashes(tree)], merged };
 };
 
+export interface DiscardInput {
+	readonly snapshot: Option.Option<Tree>;
+	readonly next: Tree;
+	readonly project: Option.Option<Tree>;
+	readonly owned: ReadonlyArray<string>;
+	readonly scope: ReadonlyArray<string>;
+}
+
+export interface DiscardResult {
+	readonly result: Tree;
+	readonly conflicts: ReadonlyArray<Conflict>;
+	readonly discarded: ReadonlyArray<string>;
+}
+
+export const discardTrees = ({ snapshot, next, project, owned, scope }: DiscardInput): DiscardResult => {
+	const result: Array<TreeFile> = [];
+	const discarded: Array<string> = [];
+
+	for (const key of keysOf(Option.some(next), project)) {
+		const built = HashMap.get(next, key);
+		const found = lookup(project, key);
+		const kept = isOwned(owned, key) || (Option.isNone(built) && !isOwned(scope, key)) ? found : built;
+		const touched = Option.isSome(snapshot) ? !sameFile(lookup(snapshot, key), found) : Option.isSome(found);
+
+		if (touched && !sameFile(kept, found)) discarded.push(displayPath(key, found, built));
+		result.push(...Option.toArray(kept));
+	}
+
+	const tree = treeOf(result);
+
+	return { result: tree, conflicts: folderClashes(tree), discarded: discarded.toSorted() };
+};
+
 export const changesBetween = (project: Option.Option<Tree>, result: Tree): ReadonlyArray<Change> => {
 	const before = Option.getOrElse(project, () => HashMap.empty<string, TreeFile>());
 
@@ -169,9 +202,10 @@ export const pendingPorts = (
 	next: Tree,
 	result: Tree,
 	owned: ReadonlyArray<string>,
+	scope: ReadonlyArray<string>,
 ): ReadonlyArray<Pending> =>
 	keysOf(Option.some(next), Option.some(result))
-		.filter((key) => !isOwned(owned, key))
+		.filter((key) => !isOwned(owned, key) && (HashMap.has(next, key) || isOwned(scope, key)))
 		.toSorted()
 		.flatMap((key): ReadonlyArray<Pending> => {
 			const built = HashMap.get(next, key);
@@ -182,7 +216,10 @@ export const pendingPorts = (
 				return Option.toArray(Option.map(kept, (file) => ({ path: file.path, kind: "added" })));
 			}
 
-			return [{ path: built.value.path, kind: Option.isNone(kept) ? "deleted" : "changed" }];
+			if (Option.isNone(kept)) return [{ path: built.value.path, kind: "deleted" }];
+			const reformatted = sameText(built.value, kept.value) || sameJson(built.value, kept.value);
+
+			return [{ path: built.value.path, kind: reformatted ? "reformatted" : "changed" }];
 		});
 
 export const changedUnder = (folder: string, before: Tree, after: Tree): boolean => {

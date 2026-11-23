@@ -208,7 +208,7 @@ it("imports split modules, model assets and unmapped files without local depende
 	expect(JSON.parse(readFileSync(join(out, "package.json"), "utf8"))).toEqual({
 		type: "module",
 		imports: { "#/*": "./src/*", "#static/*": "./static/*" },
-		devDependencies: { "@pbirkit/core": `^${VERSION}` },
+		devDependencies: { "@pbirkit/core": `^${VERSION}`, "@types/node": ">=24" },
 	});
 	const settings = readFileSync(join(out, "tsconfig.json"), "utf8");
 	expect(settings).toContain('"extends": "./.pbirkit/tsconfig.json"');
@@ -252,6 +252,17 @@ it("imports split modules, model assets and unmapped files without local depende
 	);
 	tree("-c", config);
 	expect(typecheck().status, typecheck().stdout).toBe(0);
+	expect(readFileSync(join(out, ".pbirkit", "tsconfig.json"), "utf8")).not.toContain('"types"');
+	const nodeTypes = join(out, "node_modules", "@types", "node");
+	mkdirSync(nodeTypes, { recursive: true });
+	writeFileSync(join(nodeTypes, "package.json"), '{"name":"@types/node","types":"index.d.ts"}');
+	writeFileSync(join(nodeTypes, "index.d.ts"), "");
+	tree("-c", config);
+	expect(readFileSync(join(out, ".pbirkit", "tsconfig.json"), "utf8")).toContain(
+		'"types": [\n\t\t\t"node"\n\t\t]',
+	);
+	expect(typecheck().status, typecheck().stdout).toBe(0);
+	rmSync(join(out, "node_modules"), { recursive: true });
 	const diff = run(root, ["diff", "-c", config, "--target", project]);
 	expect(diff.status, diff.stderr).toBe(0);
 	expect(diff.stdout).toContain("No differences in 23 files.");
