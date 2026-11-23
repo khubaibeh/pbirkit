@@ -1,4 +1,4 @@
-import { asc, desc, double, entry, forField, obj, project, role, solid, sort } from "pbirkit/expr";
+import { asc, desc, double, entry, forField, long, obj, project, role, solid, sort } from "pbirkit/expr";
 import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, size } from "#/design.ts";
@@ -79,7 +79,7 @@ const barParts = (
 			enableBackground: false,
 		}),
 		valueAxis: obj({ show: false, gridlineShow: false }),
-		categoryAxis: obj({ show: true, innerPadding: padding }),
+		categoryAxis: obj({ show: true, innerPadding: long(padding) }),
 		legend: obj({ show: false }),
 		...(target === undefined ? {} : { y1AxisReferenceLine: referenceLine(target.value, target.label) }),
 	},

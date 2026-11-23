@@ -1,4 +1,4 @@
-import { obj, project, role, solid } from "pbirkit/expr";
+import { long, obj, project, role, solid } from "pbirkit/expr";
 import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, font, size } from "#/design.ts";
@@ -86,7 +86,7 @@ export const dynamicText = ({
 				layout: obj(
 					{
 						alignment: "left",
-						paddingUniform: 0,
+						paddingUniform: long(0),
 						backgroundShow: true,
 						backgroundFillColor: solid(background),
 						backgroundTransparency: 0,
@@ -94,7 +94,7 @@ export const dynamicText = ({
 					},
 					state.default,
 				),
-				padding: obj({ paddingSelection: "Custom", paddingUniform: 0 }, state.default),
+				padding: obj({ paddingSelection: "Custom", paddingUniform: long(0) }, state.default),
 				outline: obj({ show: false }, state.default),
 				accentBar: obj({ show: false }, state.default),
 				fillCustom: obj({ show: true, fillColor: solid(background), transparency: 0 }, state.default),

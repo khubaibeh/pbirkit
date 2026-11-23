@@ -1,4 +1,4 @@
-import { entry, obj, solid } from "pbirkit/expr";
+import { entry, long, obj, solid } from "pbirkit/expr";
 import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, font, size } from "#/design.ts";
@@ -40,7 +40,7 @@ export const button = ({ name, at, label, action, tone, align = "left", bold = f
 		visual: {
 			visualType: "actionButton",
 			objects: {
-				shape: obj({ tileShape: "rectangleRoundedByPixel", rectangleRoundedCurve: 4 }),
+				shape: obj({ tileShape: "rectangleRoundedByPixel", rectangleRoundedCurve: long(4) }),
 				fill: [
 					entry({ show: true }),
 					entry({ fillColor: solid(tone.fill), transparency: 0 }, state.default),
@@ -57,7 +57,7 @@ export const button = ({ name, at, label, action, tone, align = "left", bold = f
 							fontColor: solid(tone.text),
 							horizontalAlignment: align,
 							verticalAlignment: "middle",
-							leftMargin: align === "left" ? 14 : 0,
+							leftMargin: long(align === "left" ? 14 : 0),
 						},
 						state.default,
 					),

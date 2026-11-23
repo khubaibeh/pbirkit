@@ -1,4 +1,4 @@
-import { inValues, obj, project, role, solid } from "pbirkit/expr";
+import { inValues, long, obj, project, role, solid } from "pbirkit/expr";
 import type { Value } from "pbirkit/expr";
 import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
@@ -38,7 +38,7 @@ export const dropdown = ({ name, at, field, label, sync, single = false, selecte
 					background: solid(color.surface),
 				}),
 				dropdown: obj({
-					borderRadius: shape.radius,
+					borderRadius: long(shape.radius),
 					iconColor: solid(color.inkMuted),
 					accentBarShow: false,
 				}),
