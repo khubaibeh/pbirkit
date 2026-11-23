@@ -1,11 +1,10 @@
-import { fileURLToPath } from "node:url";
-
 import { Effect, FileSystem, Path, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import type { BuildFile } from "@pbirkit/core/build";
 
-import { BuildOutputError, SourceReadError } from "./errors.ts";
+import { BuildOutputError, causeDetail, SourceReadError } from "./errors.ts";
+import { hasGit } from "./git.ts";
 import { toPosix } from "./paths.ts";
 import type { TreeFile } from "./tree.ts";
 import { fileKey, isOwned, isTracked, parentKeys, pathClashes, treeFile, treeOf } from "./tree.ts";
@@ -46,20 +45,42 @@ const desktopEndings = (path: string, bytes: Uint8Array): Uint8Array =>
 
 const rawFile = (path: string, bytes: Uint8Array): TreeFile => treeFile(path, desktopEndings(path, bytes));
 
-const ignoredBy = Effect.fnUntraced(function* (root: string, entries: ReadonlyArray<string>) {
+const GIT_MATCHED = 0;
+
+const GIT_NO_MATCH = 1;
+
+const ignoredBy = Effect.fnUntraced(function* (root: string, target: string, entries: ReadonlyArray<string>) {
 	const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
+	const fail = (detail: string) => new SourceReadError({ source: root, target, detail });
 	const ask = (paths: ReadonlyArray<string>) =>
-		spawner
-			.string(
-				ChildProcess.make("git", ["check-ignore", "--stdin", "-z"], {
-					cwd: root,
-					stdin: Stream.make(encoder.encode(paths.map((item) => `./${item}`).join("\0"))),
-				}),
-			)
-			.pipe(Effect.orElseSucceed(() => ""));
+		Effect.scoped(
+			Effect.gen(function* () {
+				const handle = yield* spawner.spawn(
+					ChildProcess.make("git", ["check-ignore", "--stdin", "-z"], {
+						cwd: root,
+						stdin: Stream.make(encoder.encode(paths.map((item) => `./${item}`).join("\0"))),
+					}),
+				);
+				const [stdout, stderr, code] = yield* Effect.all(
+					[
+						Stream.mkString(Stream.decodeText(handle.stdout)),
+						Stream.mkString(Stream.decodeText(handle.stderr)),
+						handle.exitCode,
+					],
+					{ concurrency: "unbounded" },
+				);
+				if (code !== GIT_MATCHED && code !== GIT_NO_MATCH) {
+					return yield* fail(`git check-ignore exited with code ${code}: ${stderr.trim()}`);
+				}
 
-	if (entries.length === 0 || (yield* ask(["."])) !== "") return new Set<string>();
+				return stdout;
+			}),
+		).pipe(
+			Effect.catchTag("PlatformError", (error) => Effect.fail(fail(`cannot run git: ${causeDetail(error)}`))),
+		);
+
+	if (entries.length === 0 || !(yield* hasGit(root)) || (yield* ask(["."])) !== "") return new Set<string>();
 
 	return new Set(
 		(yield* ask(entries))
@@ -69,11 +90,17 @@ const ignoredBy = Effect.fnUntraced(function* (root: string, entries: ReadonlyAr
 	);
 });
 
-export const toFilePath = (url: URL, target: string) =>
-	Effect.try({
-		try: () => fileURLToPath(url),
-		catch: (cause) => new SourceReadError({ source: url.href, target, detail: String(cause) }),
-	});
+export const toFilePath = Effect.fnUntraced(function* (url: URL, target: string) {
+	const path = yield* Path.Path;
+
+	return yield* path
+		.fromFileUrl(url)
+		.pipe(
+			Effect.mapError(
+				(error) => new SourceReadError({ source: url.href, target, detail: causeDetail(error) }),
+			),
+		);
+});
 
 const readSource = Effect.fnUntraced(function* (source: string, target: string) {
 	const fs = yield* FileSystem.FileSystem;
@@ -94,7 +121,7 @@ const readFolder = Effect.fnUntraced(function* (sourceFolder: URL, target: strin
 	const entries = (yield* fs.readDirectory(root, { recursive: true }).pipe(Effect.mapError(fail)))
 		.map((entry) => toPosix(path, entry))
 		.filter((entry) => !entry.split("/").includes(".git"));
-	const ignored = yield* ignoredBy(root, entries);
+	const ignored = yield* ignoredBy(root, target, entries);
 	const files: Array<TreeFile> = [];
 
 	for (const entry of entries.filter((item) => !ignored.has(item))) {

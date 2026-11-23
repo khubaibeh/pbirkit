@@ -1,12 +1,12 @@
 import { Console, Effect, HashMap, Option, Path } from "effect";
 import { Command, Flag } from "effect/cli";
 
-import { buildFiles, desktopOwnedPaths, modelCache, modelFolderOf, reportFolder } from "@pbirkit/core/build";
+import { desktopOwnedPaths, modelCache, modelFolderOf, reportFolder } from "@pbirkit/core/build";
 
 import { errorMessage, exitWith } from "../messages.ts";
 import { applyChanges } from "./apply.ts";
 import { checkSeed, keepCache, restoreCache } from "./cache.ts";
-import { loadConfig } from "./config.ts";
+import { configFiles, loadConfig } from "./config.ts";
 import { requireDesktopClosed, requireInside } from "./discard.ts";
 import { ConflictError, DiscardError } from "./errors.ts";
 import { requireGitRepo } from "./git.ts";
@@ -69,7 +69,7 @@ const runBuild = Effect.fnUntraced(function* ({
 	yield* requireGitRepo(paths.root);
 
 	const owned = desktopOwnedPaths(config);
-	const next = yield* buildTree(buildFiles(config), owned);
+	const next = yield* buildTree(yield* configFiles(config), owned);
 	const project = yield* readTree(paths.out);
 	const cache = modelCache(config);
 	if (Option.isSome(cache)) yield* checkSeed(cache.value);

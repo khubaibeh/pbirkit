@@ -20,6 +20,7 @@ export const errorMessage = (command: string): ((error: CliError) => string) => 
 		ConfigLoadError: ({ file, detail }) => `${prefix} cannot load ${file}: ${detail}`,
 		ConfigShapeError: ({ file, detail }) => `${prefix} ${file} is not a valid config\n${detail}`,
 		ConfigCheckError: ({ issues }) => issues.join("\n"),
+		ConfigBuildError: ({ detail }) => `${prefix} cannot build the config: ${detail}`,
 		BuildOutputError: ({ issues }) => issues.map((issue) => `${prefix} ${issue}`).join("\n"),
 		SourceReadError: ({ source, target, detail }) =>
 			`${prefix} cannot read ${source} for ${target}: ${detail}`,
@@ -44,12 +45,12 @@ export const errorMessage = (command: string): ((error: CliError) => string) => 
 	});
 };
 
+export const setExitCode = (code: number): Effect.Effect<void> =>
+	Effect.sync(() => {
+		process.exitCode = code;
+	});
+
 export const exitWith =
 	(code: number) =>
 	(message: string): Effect.Effect<void> =>
-		Effect.andThen(
-			Console.error(message),
-			Effect.sync(() => {
-				process.exitCode = code;
-			}),
-		);
+		Effect.andThen(Console.error(message), setExitCode(code));

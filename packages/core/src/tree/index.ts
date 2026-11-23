@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { Literals } from "effect/Schema";
 
 import type { BookmarksMetadata } from "#schemas/bookmarks-metadata/1.0.0.ts";
@@ -38,15 +39,13 @@ export interface ReportIndexInput {
 	readonly raw?: (path: string) => boolean;
 }
 
-const parseJson = (text: string | undefined): unknown => {
-	if (text === undefined) return undefined;
-	try {
-		const value: unknown = JSON.parse(text.replace(/^\uFEFF/u, ""));
-		return value;
-	} catch {
-		return undefined;
-	}
-};
+const parseJson = (text: string | undefined): unknown =>
+	Option.getOrUndefined(
+		Option.flatMap(
+			Option.fromUndefinedOr(text),
+			Option.liftThrowable((value: string): unknown => JSON.parse(value.replace(/^\uFEFF/u, ""))),
+		),
+	);
 
 const reportFiles = ({ report, paths, text, raw = () => false }: ReportIndexInput): ReportFiles => {
 	const known = new Set(paths);

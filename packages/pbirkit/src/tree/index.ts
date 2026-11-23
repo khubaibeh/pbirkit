@@ -1,9 +1,9 @@
 import { Console, Effect, Option, Path } from "effect";
 import { Command, Flag } from "effect/cli";
 
-import { buildFiles, reportFolder } from "@pbirkit/core/build";
+import { reportFolder } from "@pbirkit/core/build";
 
-import { readConfig } from "../build/config.ts";
+import { configFiles, readConfig } from "../build/config.ts";
 import { buildTree } from "../build/outputs.ts";
 import { fileKey, isOwned } from "../build/tree.ts";
 import { errorMessage, exitWith } from "../messages.ts";
@@ -63,7 +63,7 @@ const projectIndex = Effect.fnUntraced(function* (source: string) {
 const configIndex = Effect.fnUntraced(function* (file: string) {
 	const config = yield* readConfig(file);
 	const report = reportFolder(config);
-	const files = buildFiles(config).filter((entry) => isOwned([`${report}/`], entry.path));
+	const files = (yield* configFiles(config)).filter((entry) => isOwned([`${report}/`], entry.path));
 	const raw = new Set(files.flatMap((entry) => ("source" in entry ? [fileKey(entry.path)] : [])));
 	return indexTree(config.name, report, yield* buildTree(files, []), (path) => raw.has(fileKey(path)));
 });

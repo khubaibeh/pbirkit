@@ -1,15 +1,21 @@
 import type { ResolveHookSync } from "node:module";
-import { pathToFileURL } from "node:url";
 
 import { Console, Effect, Path, Predicate } from "effect";
 import { decodeUnknownEffect, is } from "effect/Schema";
 
+import { buildFiles } from "@pbirkit/core/build";
 import { checkConfig } from "@pbirkit/core/check";
 import { Config } from "@pbirkit/core/config";
 
 import { CORE_PACKAGE } from "../core-package.ts";
 import { refreshCoreTypes } from "./core-types.ts";
-import { ConfigCheckError, ConfigLoadError, ConfigShapeError } from "./errors.ts";
+import {
+	causeDetail,
+	ConfigBuildError,
+	ConfigCheckError,
+	ConfigLoadError,
+	ConfigShapeError,
+} from "./errors.ts";
 
 const isCore = (specifier: string): boolean =>
 	specifier === CORE_PACKAGE || specifier.startsWith(`${CORE_PACKAGE}/`);
@@ -18,8 +24,13 @@ export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextReso
 	nextResolve(specifier, isCore(specifier) ? { ...context, parentURL: import.meta.url } : context);
 
 const importDefault = Effect.fnUntraced(function* (file: string) {
+	const path = yield* Path.Path;
+
+	const url = yield* path
+		.toFileUrl(file)
+		.pipe(Effect.mapError((error) => new ConfigLoadError({ file, detail: causeDetail(error) })));
 	const module: unknown = yield* Effect.tryPromise({
-		try: () => import(pathToFileURL(file).href),
+		try: () => import(url.href),
 		catch: (cause) => new ConfigLoadError({ file, detail: String(cause) }),
 	});
 
@@ -40,6 +51,12 @@ const asConfig = Effect.fnUntraced(function* (file: string, input: unknown) {
 
 	return input;
 });
+
+export const configFiles = (config: Config) =>
+	Effect.try({
+		try: () => buildFiles(config),
+		catch: (cause) => new ConfigBuildError({ detail: String(cause) }),
+	});
 
 export const readConfig = Effect.fnUntraced(function* (file: string) {
 	const path = yield* Path.Path;

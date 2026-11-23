@@ -12,15 +12,8 @@ const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const encoder = new TextEncoder();
 
-const asText = (file: TreeFile): Option.Option<string> => {
-	if (file.bytes.includes(0)) return Option.none();
-
-	try {
-		return Option.some(decoder.decode(file.bytes));
-	} catch {
-		return Option.none();
-	}
-};
+const asText = (file: TreeFile): Option.Option<string> =>
+	file.bytes.includes(0) ? Option.none() : Option.liftThrowable(() => decoder.decode(file.bytes))();
 
 const isJsonFile = (path: string): boolean =>
 	JSON_FILES.some((extension) => fileKey(path).endsWith(extension));
@@ -53,16 +46,14 @@ const isStrictJson = (text: string): boolean => {
 	return valid;
 };
 
-const mergeLines = (original: string, desktop: string, src: string): Option.Option<string> => {
-	try {
-		const regions = diff3Merge(desktop.split("\n"), original.split("\n"), src.split("\n"));
-		if (regions.some((region) => region.conflict !== undefined)) return Option.none();
-
-		return Option.some(regions.flatMap((region) => region.ok ?? []).join("\n"));
-	} catch {
-		return Option.none();
-	}
-};
+const mergeLines = (original: string, desktop: string, src: string): Option.Option<string> =>
+	Option.map(
+		Option.filter(
+			Option.liftThrowable(() => diff3Merge(desktop.split("\n"), original.split("\n"), src.split("\n")))(),
+			(regions) => regions.every((region) => region.conflict === undefined),
+		),
+		(regions) => regions.flatMap((region) => region.ok ?? []).join("\n"),
+	);
 
 export const mergeText = (base: TreeFile, desktop: TreeFile, src: TreeFile): Option.Option<TreeFile> =>
 	Option.flatMap(Option.all([asText(base), asText(desktop), asText(src)]), ([original, ours, theirs]) =>

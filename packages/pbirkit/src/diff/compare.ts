@@ -1,8 +1,9 @@
 import { Array as Arr, Effect, HashMap, Option, Path, Predicate } from "effect";
 
-import { buildFiles, desktopOwnedPaths, modelFolderOf, reportFolder } from "@pbirkit/core/build";
+import { desktopOwnedPaths, modelFolderOf, reportFolder } from "@pbirkit/core/build";
 import type { Config } from "@pbirkit/core/config";
 
+import { configFiles } from "../build/config.ts";
 import { buildTree } from "../build/outputs.ts";
 import { fromCwd } from "../build/paths.ts";
 import { isOwned, projectEntries, readTree, sameText } from "../build/tree.ts";
@@ -45,14 +46,8 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 
 const JSON_PATH = /\.(?:json|pbip|pbir|pbism|platform)$/iu;
 
-export const parseJson = (bytes: Uint8Array): unknown => {
-	try {
-		const value: unknown = JSON.parse(decoder.decode(bytes));
-		return value;
-	} catch {
-		return undefined;
-	}
-};
+export const parseJson = (bytes: Uint8Array): unknown =>
+	Option.getOrUndefined(Option.liftThrowable((): unknown => JSON.parse(decoder.decode(bytes)))());
 
 const renderValue = (value: unknown): string => {
 	const text = JSON.stringify(value) ?? "(absent)";
@@ -158,7 +153,9 @@ export const compareProject = Effect.fnUntraced(function* (
 	const included = (file: string) => isOwned(owned, file) && !isOwned(desktopOwned, file);
 
 	const built = yield* buildTree(
-		buildFiles(config).filter((file) => included("sourceFolder" in file ? `${file.path}/` : file.path)),
+		(yield* configFiles(config)).filter((file) =>
+			included("sourceFolder" in file ? `${file.path}/` : file.path),
+		),
 		[],
 	);
 	const project = yield* readTree(target, owned);

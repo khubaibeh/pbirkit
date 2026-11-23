@@ -32,6 +32,21 @@ export class ConfigShapeError extends TaggedError<ConfigShapeError, { readonly b
 	},
 ) {}
 
+export class ConfigBuildError extends TaggedError<ConfigBuildError, { readonly brand: unique symbol }>()(
+	"ConfigBuildError",
+	{
+		detail: String,
+	},
+) {}
+
+export class CoreTypesError extends TaggedError<CoreTypesError, { readonly brand: unique symbol }>()(
+	"CoreTypesError",
+	{
+		file: String,
+		detail: String,
+	},
+) {}
+
 export class ConfigCheckError extends TaggedError<ConfigCheckError, { readonly brand: unique symbol }>()(
 	"ConfigCheckError",
 	{
@@ -114,6 +129,7 @@ export type BuildError =
 	| ConfigLoadError
 	| ConfigShapeError
 	| ConfigCheckError
+	| ConfigBuildError
 	| BuildOutputError
 	| SourceReadError
 	| OutFolderError
@@ -123,6 +139,9 @@ export type BuildError =
 	| PathClashError
 	| ConflictError
 	| DiscardError;
+
+export const causeDetail = (error: { readonly message: string; readonly cause?: unknown }): string =>
+	error.cause === undefined ? error.message : globalThis.String(error.cause);
 
 export const onFileSystem =
 	(operation: string, path: string) =>
