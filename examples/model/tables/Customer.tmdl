@@ -1,0 +1,173 @@
+/// One row per customer account, with geography.
+table Customer
+	lineageTag: 07ca3811-9478-42a0-a494-4bcefd9e337d
+
+	column 'Customer ID'
+		dataType: string
+		isKey
+		lineageTag: 77a27e7e-c4cf-4eb1-be18-84577f7a0c46
+		summarizeBy: none
+		sourceColumn: Customer ID
+
+	column Customer
+		dataType: string
+		lineageTag: a0798517-4172-4665-bed5-5d435331376e
+		summarizeBy: none
+		sourceColumn: Customer
+
+	column Contact
+		dataType: string
+		lineageTag: 220452ae-684d-42ed-9481-90d686a40ae5
+		summarizeBy: none
+		sourceColumn: Contact
+
+	column 'Contact Title'
+		dataType: string
+		lineageTag: 90ca27ce-4308-4423-bd56-65c9476d475e
+		summarizeBy: none
+		sourceColumn: Contact Title
+
+	column City
+		dataType: string
+		lineageTag: ebf63e2e-74ac-410f-a002-197d1094d5c7
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: City
+
+	column Country
+		dataType: string
+		lineageTag: 039e15d2-aaed-44e7-bbaf-596f68473606
+		dataCategory: Country
+		summarizeBy: none
+		sourceColumn: Country
+
+	column Region
+		dataType: string
+		lineageTag: 0004a312-0b5b-49c3-abbc-e4b20bb3289c
+		dataCategory: Continent
+		summarizeBy: none
+		sourceColumn: Region
+
+	column 'First Order Date' = CALCULATE ( MIN ( Orders[Order Date] ) )
+		dataType: dateTime
+		formatString: d mmm yyyy
+		lineageTag: f6be2ecf-bce6-44cb-9ff7-d3897817a4e6
+		summarizeBy: none
+
+	column 'Last Order Date' = CALCULATE ( MAX ( Orders[Order Date] ) )
+		dataType: dateTime
+		formatString: d mmm yyyy
+		lineageTag: f4f2d782-70ed-4b5c-9772-54cbbed34362
+		summarizeBy: none
+
+	/// Quarter of the customer's first order.
+	column Cohort =
+			VAR _first = Customer[First Order Date]
+			RETURN IF ( ISBLANK ( _first ), "No orders", YEAR ( _first ) & " Q" & QUARTER ( _first ) )
+		dataType: string
+		lineageTag: cdc95584-88a7-4f3e-aab1-e94c9fd5052b
+		summarizeBy: none
+		sortByColumn: 'Cohort Number'
+
+	column 'Cohort Number' =
+			VAR _first = Customer[First Order Date]
+			RETURN IF ( ISBLANK ( _first ), 99999, YEAR ( _first ) * 10 + QUARTER ( _first ) )
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 658f2d8a-26cb-4059-bfd3-c61e1c97ad71
+		summarizeBy: none
+
+	column 'Lifetime Net Sales' = CALCULATE ( SUM ( Sales[Net Amount] ) )
+		dataType: decimal
+		isHidden
+		formatString: \$#,0
+		lineageTag: e4ddd574-3f56-425e-b983-9c63803bdcc8
+		summarizeBy: none
+
+	/// Days between the customer's last order and the last order in the data.
+	column 'Days Since Last Order' =
+			VAR _asOf = MAX ( Orders[Order Date] )
+			VAR _last = Customer[Last Order Date]
+			RETURN IF ( NOT ISBLANK ( _last ), DATEDIFF ( _last, _asOf, DAY ) )
+		dataType: int64
+		formatString: #,0
+		lineageTag: d593e0f4-6689-48ff-b603-504c47333cc6
+		summarizeBy: none
+
+	/// Active: ordered in the last 60 days. Cooling: 61 to 120 days. Lapsed: longer.
+	column Recency = SWITCH ( Customer[Recency Order], 1, "Active", 2, "Cooling", 3, "Lapsed", "No orders" )
+		dataType: string
+		lineageTag: cd719e20-a4c3-4245-bc52-8040ac3d37da
+		summarizeBy: none
+		sortByColumn: 'Recency Order'
+
+	column 'Recency Order' =
+			VAR _days = Customer[Days Since Last Order]
+			RETURN SWITCH ( TRUE (), ISBLANK ( _days ), 4, _days <= 60, 1, _days <= 120, 2, 3 )
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 46eac009-4704-4e80-80f1-c8990022db06
+		summarizeBy: none
+
+	/// ABC class on lifetime net sales: A accounts make the first 70% of sales, B the next 20%, C the last 10%.
+	column 'Value Class' =
+			SWITCH (
+			    Customer[Value Class Order],
+			    1, "A · Top 70%",
+			    2, "B · Next 20%",
+			    3, "C · Last 10%",
+			    "No sales"
+			)
+		dataType: string
+		lineageTag: 609f9e2f-9138-4e54-a747-47f3e3ae68ef
+		summarizeBy: none
+		sortByColumn: 'Value Class Order'
+
+	column 'Value Class Order' =
+			VAR _value = Customer[Lifetime Net Sales]
+			VAR _runningShare =
+			    DIVIDE (
+			        SUMX ( FILTER ( Customer, Customer[Lifetime Net Sales] >= _value ), Customer[Lifetime Net Sales] ),
+			        SUM ( Customer[Lifetime Net Sales] )
+			    )
+			RETURN
+			    SWITCH ( TRUE (), ISBLANK ( _value ), 4, _runningShare <= 0.7, 1, _runningShare <= 0.9, 2, 3 )
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 23b6c9f8-72f4-4eb7-80b9-5d9c0cff402c
+		summarizeBy: none
+
+	partition Customer = m
+		mode: import
+		source =
+				let
+				    Source = ReadCsv(
+				        "customers.csv",
+				        {
+				            {"customerID", type text}, {"companyName", type text}, {"contactName", type text},
+				            {"contactTitle", type text}, {"city", type text}, {"country", type text}
+				        }
+				    ),
+				    NorthAmerica = {"USA", "Canada", "Mexico"},
+				    SouthAmerica = {"Brazil", "Venezuela", "Argentina"},
+				    WithRegion = Table.AddColumn(
+				        Source,
+				        "Region",
+				        each if List.Contains(NorthAmerica, [country]) then "North America"
+				            else if List.Contains(SouthAmerica, [country]) then "South America"
+				            else "Europe",
+				        type text
+				    ),
+				    Renamed = Table.RenameColumns(
+				        WithRegion,
+				        {
+				            {"customerID", "Customer ID"}, {"companyName", "Customer"}, {"contactName", "Contact"},
+				            {"contactTitle", "Contact Title"}, {"city", "City"}, {"country", "Country"}
+				        }
+				    )
+				in
+				    Renamed
+

@@ -1,0 +1,124 @@
+/// Calendar covering every full year with orders. Marked as the model's date table.
+table Date
+	lineageTag: 59e05b8f-147c-4c75-b5de-f765ac2df658
+	dataCategory: Time
+
+	column Date
+		isUnique
+		isKey
+		formatString: d mmm yyyy
+		lineageTag: a64d91e3-676c-4bed-8103-d50b18509382
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Date]
+
+	column Year
+		formatString: 0
+		lineageTag: c3895a77-142b-4eb6-88a6-65d133caa236
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year]
+
+	column Quarter
+		lineageTag: db204023-82a2-4f65-ac42-6ac75f5a1c72
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Quarter]
+
+	column 'Year Quarter'
+		lineageTag: e1e62cfa-1f52-4e1b-9147-33a14bb63284
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year Quarter]
+		sortByColumn: 'Year Quarter Number'
+
+	column 'Year Quarter Number'
+		isHidden
+		formatString: 0
+		lineageTag: bff3265e-dab8-4672-aa5b-f1a9b1d0151f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Year Quarter Number]
+
+	column Month
+		lineageTag: 91b45bed-9db6-4ef0-a139-634991f093a2
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month]
+		sortByColumn: 'Month Number'
+
+	column 'Month Number'
+		isHidden
+		formatString: 0
+		lineageTag: b6ef7ce5-2948-4331-8c3d-cda4c456a31d
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Number]
+
+	column 'Month Year'
+		lineageTag: ce22281b-a9f3-4f6c-a95d-f426f5c1ad4c
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Year]
+		sortByColumn: 'Month Year Number'
+
+	column 'Month Year Number'
+		isHidden
+		formatString: 0
+		lineageTag: 2a72d0d7-0465-463e-9f7e-f28e30efc6a1
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Year Number]
+
+	column 'Month Start'
+		formatString: mmm yyyy
+		lineageTag: a6c67c11-6bbe-41e1-b081-f21b503c2e1b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Month Start]
+
+	column Weekday
+		lineageTag: ff3f02d5-cd2e-4aa3-81cc-8691fe81578b
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Weekday]
+		sortByColumn: 'Weekday Number'
+
+	column 'Weekday Number'
+		isHidden
+		formatString: 0
+		lineageTag: 84d7302a-ba26-4e35-a3df-5174be849989
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Weekday Number]
+
+	column 'Is Past'
+		isHidden
+		lineageTag: a55b4253-c51d-4006-b012-11abb4c73566
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Is Past]
+
+	partition Date = calculated
+		mode: import
+		source =
+				VAR _firstYear = YEAR ( MIN ( Orders[Order Date] ) )
+				VAR _lastYear = YEAR ( MAX ( Orders[Order Date] ) )
+				VAR _lastOrder = MAX ( Orders[Order Date] )
+				RETURN
+				    ADDCOLUMNS (
+				        CALENDAR ( DATE ( _firstYear, 1, 1 ), DATE ( _lastYear, 12, 31 ) ),
+				        "Year", YEAR ( [Date] ),
+				        "Quarter", "Q" & QUARTER ( [Date] ),
+				        "Year Quarter", YEAR ( [Date] ) & " Q" & QUARTER ( [Date] ),
+				        "Year Quarter Number", YEAR ( [Date] ) * 10 + QUARTER ( [Date] ),
+				        "Month", FORMAT ( [Date], "mmm" ),
+				        "Month Number", MONTH ( [Date] ),
+				        "Month Year", FORMAT ( [Date], "mmm yyyy" ),
+				        "Month Year Number", YEAR ( [Date] ) * 100 + MONTH ( [Date] ),
+				        "Month Start", DATE ( YEAR ( [Date] ), MONTH ( [Date] ), 1 ),
+				        "Weekday", FORMAT ( [Date], "ddd" ),
+				        "Weekday Number", WEEKDAY ( [Date], 2 ),
+				        "Is Past", [Date] <= _lastOrder
+				    )
+

@@ -1,0 +1,41 @@
+relationship 'Sales_Order Date_Date_Date'
+	fromColumn: Sales.'Order Date'
+	toColumn: Date.Date
+
+relationship 'Sales_Product ID_Product_Product ID'
+	fromColumn: Sales.'Product ID'
+	toColumn: Product.'Product ID'
+
+relationship 'Sales_Customer ID_Customer_Customer ID'
+	fromColumn: Sales.'Customer ID'
+	toColumn: Customer.'Customer ID'
+
+relationship 'Sales_Employee ID_Employee_Employee ID'
+	fromColumn: Sales.'Employee ID'
+	toColumn: Employee.'Employee ID'
+
+relationship 'Sales_Shipper ID_Shipper_Shipper ID'
+	fromColumn: Sales.'Shipper ID'
+	toColumn: Shipper.'Shipper ID'
+
+relationship 'Orders_Order Date_Date_Date'
+	fromColumn: Orders.'Order Date'
+	toColumn: Date.Date
+
+relationship 'Orders_Customer ID_Customer_Customer ID'
+	fromColumn: Orders.'Customer ID'
+	toColumn: Customer.'Customer ID'
+
+relationship 'Orders_Employee ID_Employee_Employee ID'
+	fromColumn: Orders.'Employee ID'
+	toColumn: Employee.'Employee ID'
+
+relationship 'Orders_Shipper ID_Shipper_Shipper ID'
+	fromColumn: Orders.'Shipper ID'
+	toColumn: Shipper.'Shipper ID'
+
+relationship 'Orders_Shipped Date_Date_Date'
+	isActive: false
+	fromColumn: Orders.'Shipped Date'
+	toColumn: Date.Date
+

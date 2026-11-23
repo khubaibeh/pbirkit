@@ -1,0 +1,60 @@
+/// One row per member of the sales team, with their manager.
+table Employee
+	lineageTag: cc56ff34-5cca-4349-85c7-53c45377131a
+
+	column 'Employee ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		lineageTag: 97ec3f16-e4fa-4714-8f50-3004e183bbf4
+		summarizeBy: none
+		sourceColumn: Employee ID
+
+	column Employee
+		dataType: string
+		lineageTag: ca9562c8-0b7b-41cc-9ec7-e8670da7cafe
+		summarizeBy: none
+		sourceColumn: Employee
+
+	column Title
+		dataType: string
+		lineageTag: 1929bded-b4bd-4a25-a067-bf33b8ae5904
+		summarizeBy: none
+		sourceColumn: Title
+
+	column Office
+		dataType: string
+		lineageTag: b09495af-3595-4afb-b6c3-477c0596c4de
+		summarizeBy: none
+		sourceColumn: Office
+
+	column Manager
+		dataType: string
+		lineageTag: bd9b9fba-eafc-4936-a67e-9d035a823030
+		summarizeBy: none
+		sourceColumn: Manager
+
+	partition Employee = m
+		mode: import
+		source =
+				let
+				    Source = ReadCsv(
+				        "employees.csv",
+				        {
+				            {"employeeID", Int64.Type}, {"employeeName", type text}, {"title", type text},
+				            {"city", type text}, {"country", type text}, {"reportsTo", Int64.Type}
+				        }
+				    ),
+				    Managers = Table.SelectColumns(Source, {"employeeID", "employeeName"}),
+				    Joined = Table.NestedJoin(Source, {"reportsTo"}, Managers, {"employeeID"}, "manager", JoinKind.LeftOuter),
+				    Expanded = Table.ExpandTableColumn(Joined, "manager", {"employeeName"}, {"Manager"}),
+				    TopOfTree = Table.ReplaceValue(Expanded, null, "(Top of team)", Replacer.ReplaceValue, {"Manager"}),
+				    Removed = Table.RemoveColumns(TopOfTree, {"reportsTo", "country"}),
+				    Renamed = Table.RenameColumns(
+				        Removed,
+				        {{"employeeID", "Employee ID"}, {"employeeName", "Employee"}, {"title", "Title"}, {"city", "Office"}}
+				    )
+				in
+				    Renamed
+

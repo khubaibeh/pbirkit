@@ -1,0 +1,50 @@
+/// Reads one CSV extract from DataFolder: promotes headers, turns empty fields into nulls and applies the column types.
+expression ReadCsv =
+		(fileName as text, columnTypes as list) as table =>
+		let
+		    Source = Csv.Document(
+		        File.Contents(DataFolder & fileName),
+		        [Delimiter = ",", Encoding = 1252, QuoteStyle = QuoteStyle.Csv]
+		    ),
+		    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+		    EmptyAsNull = Table.TransformColumns(Promoted, {}, each if _ = "" then null else _),
+		    Typed = Table.TransformColumnTypes(EmptyAsNull, columnTypes, "en-US")
+		in
+		    Typed
+	lineageTag: 582329bb-22a7-47e9-84aa-05599ba15327
+
+/// Staging: one row per order, typed. Feeds Orders and Sales.
+expression OrderHeaders =
+		let
+		    Source = ReadCsv(
+		        "orders.csv",
+		        {
+		            {"orderID", Int64.Type}, {"customerID", type text}, {"employeeID", Int64.Type},
+		            {"orderDate", type date}, {"requiredDate", type date}, {"shippedDate", type date},
+		            {"shipperID", Int64.Type}, {"freight", Currency.Type}
+		        }
+		    )
+		in
+		    Source
+	lineageTag: e2842edd-406e-4357-bc6b-bf03aff698a1
+
+/// Staging: one row per order line with gross and net amounts. Feeds Orders and Sales.
+expression OrderLines =
+		let
+		    Source = ReadCsv(
+		        "order_details.csv",
+		        {
+		            {"orderID", Int64.Type}, {"productID", Int64.Type}, {"unitPrice", Currency.Type},
+		            {"quantity", Int64.Type}, {"discount", type number}
+		        }
+		    ),
+		    Gross = Table.AddColumn(Source, "grossAmount", each [unitPrice] * [quantity], Currency.Type),
+		    Net = Table.AddColumn(Gross, "netAmount", each [unitPrice] * [quantity] * (1 - [discount]), Currency.Type)
+		in
+		    Net
+	lineageTag: ab68d7ab-f726-4351-800b-95305ae5c7e4
+
+/// Folder that holds the Northwind CSV extracts. Use forward slashes and end with a slash.
+expression DataFolder = "C:/projects/pbirkit-example-testing/example-02/data/" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 17bd4e1a-0843-40cb-9cb0-55d3c2a6e264
+

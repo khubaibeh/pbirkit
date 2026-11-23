@@ -1,0 +1,38 @@
+{
+	"name": "northwind-traders",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Northwind Traders Power BI report, authored in TypeScript with pbirkit.",
+	"type": "module",
+	"imports": {
+		"#/*": "./src/*"
+	},
+	"scripts": {
+		"build": "pbirkit build",
+		"diff": "pbirkit diff",
+		"tree": "pbirkit tree",
+		"open": "pbirkit desktop open",
+		"reload": "pbirkit desktop reload",
+		"shot": "pbirkit desktop shot --scale 2",
+		"generate": "node scripts/generate-fields.ts",
+		"check": "vp check",
+		"typecheck": "pbirkit tree && tsc --noEmit -p .",
+		"ready": "vp check && pnpm typecheck && pnpm build"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.0",
+		"pbirkit": "0.2.0",
+		"typescript": "^7.0.2",
+		"vite-plus": "1.6.0"
+	},
+	"devEngines": {
+		"packageManager": {
+			"name": "pnpm",
+			"version": "12.21.0",
+			"onFail": "download"
+		}
+	},
+	"engines": {
+		"node": ">=24"
+	}
+}

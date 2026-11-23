@@ -1,0 +1,112 @@
+/// One row per product, with its category.
+table Product
+	lineageTag: 77c136f2-72fe-4be4-a699-de8133ea67c7
+
+	column 'Product ID'
+		dataType: int64
+		isHidden
+		isKey
+		formatString: 0
+		lineageTag: 08628b08-fe0c-4117-be74-aabd0fdeeb68
+		summarizeBy: none
+		sourceColumn: Product ID
+
+	column Product
+		dataType: string
+		lineageTag: 3cc8a4c5-d710-4227-95a6-25ae99f86ec0
+		summarizeBy: none
+		sourceColumn: Product
+
+	column 'Pack Size'
+		dataType: string
+		lineageTag: 9f19b262-281d-4401-a2c0-dc165b64d34b
+		summarizeBy: none
+		sourceColumn: Pack Size
+
+	column 'List Price'
+		dataType: decimal
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: d059a5d1-5304-43a2-b7bb-6641e87c8911
+		summarizeBy: none
+		sourceColumn: List Price
+
+	column Category
+		dataType: string
+		lineageTag: 32e580f4-8ccd-4e61-9e7c-48dd746c941e
+		summarizeBy: none
+		sourceColumn: Category
+
+	column 'Category Description'
+		dataType: string
+		lineageTag: 9b3fe926-67d5-4910-8721-f8f5eceffdb6
+		summarizeBy: none
+		sourceColumn: Category Description
+
+	column Status
+		dataType: string
+		lineageTag: 212d1950-ef4d-4942-9bf2-c13ecd3d6c8c
+		summarizeBy: none
+		sourceColumn: Status
+
+	column 'Lifetime Net Sales' = CALCULATE ( SUM ( Sales[Net Amount] ) )
+		dataType: decimal
+		isHidden
+		formatString: \$#,0
+		lineageTag: 29830928-4679-46a6-b275-f4a03a19b609
+		summarizeBy: none
+
+	/// ABC class on lifetime net sales: A products make the first 70% of sales, B the next 20%, C the last 10%.
+	column 'Value Class' =
+			SWITCH (
+			    'Product'[Value Class Order],
+			    1, "A · Top 70%",
+			    2, "B · Next 20%",
+			    3, "C · Last 10%",
+			    "No sales"
+			)
+		dataType: string
+		lineageTag: 79f105ba-f29d-4436-aa20-479bbe02b0c6
+		summarizeBy: none
+		sortByColumn: 'Value Class Order'
+
+	column 'Value Class Order' =
+			VAR _value = 'Product'[Lifetime Net Sales]
+			VAR _runningShare =
+			    DIVIDE (
+			        SUMX ( FILTER ( 'Product', 'Product'[Lifetime Net Sales] >= _value ), 'Product'[Lifetime Net Sales] ),
+			        SUM ( 'Product'[Lifetime Net Sales] )
+			    )
+			RETURN
+			    SWITCH ( TRUE (), ISBLANK ( _value ), 4, _runningShare <= 0.7, 1, _runningShare <= 0.9, 2, 3 )
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 4610e5cd-22d6-45ae-9088-b925c07b9438
+		summarizeBy: none
+
+	partition Product = m
+		mode: import
+		source =
+				let
+				    Products = ReadCsv(
+				        "products.csv",
+				        {
+				            {"productID", Int64.Type}, {"productName", type text}, {"quantityPerUnit", type text},
+				            {"unitPrice", Currency.Type}, {"discontinued", Int64.Type}, {"categoryID", Int64.Type}
+				        }
+				    ),
+				    Categories = ReadCsv(
+				        "categories.csv",
+				        {{"categoryID", Int64.Type}, {"categoryName", type text}, {"description", type text}}
+				    ),
+				    Joined = Table.NestedJoin(Products, {"categoryID"}, Categories, {"categoryID"}, "category", JoinKind.LeftOuter),
+				    Expanded = Table.ExpandTableColumn(Joined, "category", {"categoryName", "description"}, {"Category", "Category Description"}),
+				    WithStatus = Table.AddColumn(Expanded, "Status", each if [discontinued] = 1 then "Discontinued" else "Active", type text),
+				    Removed = Table.RemoveColumns(WithStatus, {"discontinued", "categoryID"}),
+				    Renamed = Table.RenameColumns(
+				        Removed,
+				        {{"productID", "Product ID"}, {"productName", "Product"}, {"quantityPerUnit", "Pack Size"}, {"unitPrice", "List Price"}}
+				    )
+				in
+				    Renamed
+
