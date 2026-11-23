@@ -35,11 +35,13 @@ export const state = {
 	selected: { id: "selected" },
 } as const;
 
-export const bare = {
+export const hiddenTitle = (label: string) => obj({ show: false, text: label });
+
+export const bare = (label: string) => ({
 	background: obj({ show: false }),
 	border: obj({ show: false }),
-	title: obj({ show: false }),
+	title: hiddenTitle(label),
 	subTitle: obj({ show: false }),
 	visualHeader: obj({ show: false }),
 	padding: obj({ top: 0, bottom: 0, left: 0, right: 0 }),
-};
+});

@@ -14,6 +14,7 @@ export interface Run {
 }
 
 export interface TextProps extends Placed {
+	readonly label: string;
 	readonly paragraphs: ReadonlyArray<ReadonlyArray<Run>>;
 }
 
@@ -22,7 +23,7 @@ const run = ({ text, font: face = font.body, size: points = size.body, color: ti
 	textStyle: { fontFamily: face, fontSize: `${points}pt`, color: tint },
 });
 
-export const textBlock = ({ name, at, paragraphs }: TextProps) =>
+export const textBlock = ({ name, label, at, paragraphs }: TextProps) =>
 	defineVisual({
 		name,
 		position: position(at),
@@ -40,12 +41,13 @@ export const textBlock = ({ name, at, paragraphs }: TextProps) =>
 					},
 				],
 			},
-			visualContainerObjects: bare,
+			visualContainerObjects: bare(label),
 			drillFilterOtherVisuals: true,
 		},
 	});
 
 export interface DynamicTextProps extends Placed {
+	readonly label: string;
 	readonly value: Field;
 	readonly font?: FontFace;
 	readonly size?: TypeSize;
@@ -55,6 +57,7 @@ export interface DynamicTextProps extends Placed {
 
 export const dynamicText = ({
 	name,
+	label,
 	at,
 	value,
 	font: face = font.body,
@@ -96,7 +99,7 @@ export const dynamicText = ({
 				accentBar: obj({ show: false }, state.default),
 				fillCustom: obj({ show: true, fillColor: solid(background), transparency: 0 }, state.default),
 			},
-			visualContainerObjects: bare,
+			visualContainerObjects: bare(label),
 			drillFilterOtherVisuals: true,
 		},
 	});

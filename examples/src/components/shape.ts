@@ -6,11 +6,12 @@ import { bare, position, state } from "#/lib/frame.ts";
 import type { Placed } from "#/lib/frame.ts";
 
 export interface RectProps extends Placed {
+	readonly label: string;
 	readonly fill: Hex;
 	readonly radius?: number;
 }
 
-export const rect = ({ name, at, fill, radius = 0 }: RectProps) =>
+export const rect = ({ name, label, at, fill, radius = 0 }: RectProps) =>
 	defineVisual({
 		name,
 		position: position(at),
@@ -25,6 +26,6 @@ export const rect = ({ name, at, fill, radius = 0 }: RectProps) =>
 				fill: obj({ show: true, fillColor: solid(fill), transparency: 0 }, state.default),
 				outline: obj({ show: false }),
 			},
-			visualContainerObjects: bare,
+			visualContainerObjects: bare(label),
 		},
 	});

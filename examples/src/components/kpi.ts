@@ -3,7 +3,7 @@ import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, font, shape, size } from "#/design.ts";
 import { bySign } from "#/lib/format.ts";
-import { position, state } from "#/lib/frame.ts";
+import { hiddenTitle, position, state } from "#/lib/frame.ts";
 import type { Field, Placed } from "#/lib/frame.ts";
 
 export interface Tile {
@@ -15,6 +15,7 @@ export interface Tile {
 }
 
 export interface KpiStripProps extends Placed {
+	readonly label: string;
 	readonly tiles: ReadonlyArray<Tile>;
 }
 
@@ -23,7 +24,7 @@ const NOTE = "note";
 const toneColor = (tone: NonNullable<Tile["tone"]>) =>
 	"inverse" in tone ? bySign(tone.field, { up: color.bad, down: color.good }) : bySign(tone);
 
-export const kpiStrip = ({ name, at, tiles }: KpiStripProps) => {
+export const kpiStrip = ({ name, label, at, tiles }: KpiStripProps) => {
 	if (tiles.length === 0 || tiles.length > 6) throw new RangeError("kpiStrip: give between 1 and 6 tiles");
 	const notes = tiles.flatMap((tile) =>
 		tile.note === undefined ? [] : [entry({ value: tile.note }, { ...wildcard(tile.value, 0), id: NOTE })],
@@ -126,7 +127,7 @@ export const kpiStrip = ({ name, at, tiles }: KpiStripProps) => {
 						}),
 			},
 			visualContainerObjects: {
-				title: obj({ show: false }),
+				title: hiddenTitle(label),
 				subTitle: obj({ show: false }),
 				background: obj({ show: true, color: solid(color.surface), transparency: 0 }),
 				border: obj({ show: true, color: solid(color.rule), radius: shape.radius, width: shape.hairline }),

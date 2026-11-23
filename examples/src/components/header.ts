@@ -5,6 +5,7 @@ import type { Visual } from "pbirkit/schemas/visual/2.13.0";
 import { color, font, size } from "#/design.ts";
 import { columns } from "#/fields.ts";
 import type { Field } from "#/lib/frame.ts";
+import { group } from "#/lib/group.ts";
 import { band, content } from "#/lib/layout.ts";
 import type { PageEntry } from "#/sitemap.ts";
 import { dropdown } from "./slicer.ts";
@@ -47,21 +48,26 @@ export const pageHeader = (page: PageEntry, filters: ReadonlyArray<Filter>): Arr
 		});
 	});
 	return [
-		textBlock({
-			name: "header-audience",
-			at: { x: content.x, ...EYEBROW, width: TITLE_WIDTH },
-			paragraphs: [[{ text: page.audience.toUpperCase(), font: font.strong, size: size.eyebrow, color: color.data }]],
-		}),
-		textBlock({
-			name: "header-title",
-			at: { x: content.x, ...TITLE, width: TITLE_WIDTH },
-			paragraphs: [[{ text: page.title, font: font.display, size: size.pageTitle, color: color.ink }]],
-		}),
-		textBlock({
-			name: "header-question",
-			at: { x: content.x, ...QUESTION, width: TITLE_WIDTH },
-			paragraphs: [[{ text: page.question, size: size.subtitle, color: color.inkMuted }]],
-		}),
-		...slicers,
+		...group("header", "Header", [
+			textBlock({
+				name: "header-audience",
+				label: "Audience",
+				at: { x: content.x, ...EYEBROW, width: TITLE_WIDTH },
+				paragraphs: [[{ text: page.audience.toUpperCase(), font: font.strong, size: size.eyebrow, color: color.data }]],
+			}),
+			textBlock({
+				name: "header-title",
+				label: "Page title",
+				at: { x: content.x, ...TITLE, width: TITLE_WIDTH },
+				paragraphs: [[{ text: page.title, font: font.display, size: size.pageTitle, color: color.ink }]],
+			}),
+			textBlock({
+				name: "header-question",
+				label: "Question",
+				at: { x: content.x, ...QUESTION, width: TITLE_WIDTH },
+				paragraphs: [[{ text: page.question, size: size.subtitle, color: color.inkMuted }]],
+			}),
+		]),
+		...group("slicers", "Slicers", slicers),
 	];
 };

@@ -3,7 +3,7 @@ import type { Value } from "pbirkit/expr";
 import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, font, shape, size } from "#/design.ts";
-import { position } from "#/lib/frame.ts";
+import { hiddenTitle, position } from "#/lib/frame.ts";
 import type { Field, Placed } from "#/lib/frame.ts";
 
 export interface DropdownProps extends Placed {
@@ -47,7 +47,7 @@ export const dropdown = ({ name, at, field, label, sync, single = false, selecte
 			visualContainerObjects: {
 				background: obj({ show: false }),
 				border: obj({ show: false }),
-				title: obj({ show: false }),
+				title: hiddenTitle(label),
 				subTitle: obj({ show: false }),
 				visualHeader: obj({ show: false }),
 				padding: obj({ top: 0, bottom: 0, left: 0, right: 0 }),

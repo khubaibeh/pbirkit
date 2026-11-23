@@ -74,7 +74,7 @@ export const button = ({ name, at, label, action, tone, align = "left", bold = f
 								entry({ lineColor: solid(tone.outline), weight: 1, transparency: 0 }, state.selected),
 							],
 			},
-			visualContainerObjects: { ...bare, visualLink: visualLink(action) },
+			visualContainerObjects: { ...bare(label), visualLink: visualLink(action) },
 		},
 	});
 

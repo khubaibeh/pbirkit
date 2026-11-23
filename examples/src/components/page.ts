@@ -62,7 +62,7 @@ export const reportPage = ({
 		visuals: stack([
 			...navigationRail(id),
 			...pageHeader(entry, slicers),
-			kpiStrip({ name: "kpis", at: { ...columns(1, 12), ...band.kpi }, tiles: kpis }),
+			kpiStrip({ name: "kpis", label: "KPIs", at: { ...columns(1, 12), ...band.kpi }, tiles: kpis }),
 			...visuals,
 		]),
 	});

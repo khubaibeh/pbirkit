@@ -2,6 +2,7 @@ import type { Visual } from "pbirkit/schemas/visual/2.13.0";
 
 import { color, font, size } from "#/design.ts";
 import { measures } from "#/fields.ts";
+import { group } from "#/lib/group.ts";
 import { rail } from "#/lib/layout.ts";
 import { sections, sitemap } from "#/sitemap.ts";
 import type { PageId } from "#/sitemap.ts";
@@ -18,29 +19,34 @@ const SECTION_GAP = 12;
 const FIRST_SECTION = 120;
 
 export const navigationRail = (active: PageId): Array<Visual> => {
-	const visuals: Array<Visual> = [
-		rect({ name: "rail", at: rail, fill: color.surface }),
-		rect({ name: "rail-edge", at: { x: rail.width - 1, y: 0, width: 1, height: rail.height }, fill: color.rule }),
+	const brand = group("navigation-brand", "Brand", [
 		textBlock({
 			name: "rail-brand",
+			label: "Brand name",
 			at: { x: 28, y: 30, width: 196, height: 56 },
 			paragraphs: [
 				[{ text: "Northwind", font: font.display, size: size.brand, color: color.ink }],
 				[{ text: "Traders · Sales analytics", size: size.caption, color: color.inkFaint }],
 			],
 		}),
-		rect({ name: "rail-rule", at: { x: 28, y: 98, width: WIDTH - 24, height: 1 }, fill: color.rule }),
-	];
+		rect({
+			name: "rail-rule",
+			label: "Brand rule",
+			at: { x: 28, y: 98, width: WIDTH - 24, height: 1 },
+			fill: color.rule,
+		}),
+	]);
 
 	let y = FIRST_SECTION;
-	for (const section of sections) {
-		visuals.push(
+	const links = sections.flatMap((section) => {
+		const visuals: Array<Visual> = [
 			textBlock({
 				name: `rail-section-${section.toLowerCase()}`,
+				label: `${section} heading`,
 				at: { x: 28, y, width: WIDTH - 12, height: LABEL },
 				paragraphs: [[{ text: section.toUpperCase(), font: font.strong, size: size.eyebrow, color: color.inkFaint }]],
 			}),
-		);
+		];
 		y += LABEL;
 		for (const page of sitemap.filter((entry) => entry.section === section)) {
 			const at = { x: X, y, width: WIDTH, height: LINK };
@@ -55,13 +61,17 @@ export const navigationRail = (active: PageId): Array<Visual> => {
 					bold: current,
 				}),
 			);
-			if (current) visuals.push(rect({ name: "rail-current", at: { ...at, width: 3 }, fill: color.accent }));
+			if (current)
+				visuals.push(
+					rect({ name: "rail-current", label: "Current page marker", at: { ...at, width: 3 }, fill: color.accent }),
+				);
 			y += LINK + LINK_GAP;
 		}
 		y += SECTION_GAP;
-	}
+		return group(`navigation-${section.toLowerCase()}`, section, visuals);
+	});
 
-	visuals.push(
+	const footer = group("navigation-footer", "Footer", [
 		button({
 			name: "rail-clear",
 			at: { x: X, y: 952, width: WIDTH, height: 32 },
@@ -72,12 +82,25 @@ export const navigationRail = (active: PageId): Array<Visual> => {
 		}),
 		dynamicText({
 			name: "rail-data-through",
+			label: "Data through",
 			at: { x: 28, y: 1000, width: WIDTH - 24, height: 40 },
 			value: measures.dataThroughLabel,
 			size: size.caption,
 			color: color.inkFaint,
 			background: color.surface,
 		}),
-	);
-	return visuals;
+	]);
+
+	return group("navigation", "Navigation", [
+		rect({ name: "rail", label: "Rail background", at: rail, fill: color.surface }),
+		rect({
+			name: "rail-edge",
+			label: "Rail edge",
+			at: { x: rail.width - 1, y: 0, width: 1, height: rail.height },
+			fill: color.rule,
+		}),
+		...brand,
+		...links,
+		...footer,
+	]);
 };
