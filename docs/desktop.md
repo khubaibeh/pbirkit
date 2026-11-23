@@ -19,7 +19,10 @@ The `desktop` commands talk to Power BI Desktop through Microsoft's Desktop brid
 
 - **Reload can lose work:** a reload can drop unsaved Desktop edits. Desktop does not always report unsaved edits, so the command warns but does not block. Ask the person to save first.
 - **Themes need a reopen:** a reload skips theme files, and each reload prints a reminder. Close Desktop and run `desktop open` again.
+- **Busy after a model change:** after a model change through the modeling MCP server, Desktop can answer "Host is not ready". The reload then tries again each second for up to 30 s.
 - **Screenshots match the screen:** a screenshot shows the canvas as it looks now, zoom, clip and filter pane included.
+- **First shots after a model change:** the first shot after a model change can come back blank or half drawn. Take the shot again before you look for a cause.
+- **Resting state only:** a shot cannot show hover, pressed or tooltip states.
 - **The bridge does not reach everything:** it cannot save, close, refresh data, edit the canvas or run DAX.
 - **Rough times:** an open takes 30–60 s, a reload about 3 s, and a shot 1–3 s per page.
 

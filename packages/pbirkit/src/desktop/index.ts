@@ -28,6 +28,12 @@ const SHOT_WAIT_MS = 15_000;
 
 const POLL = "1 second";
 
+const POLL_MS = 1000;
+
+const NOT_READY_CODE = "HostNotReady";
+
+const NOT_READY = /not ready/iu;
+
 const SHOTS_FOLDER = "shots";
 
 const THEME_NOTE =
@@ -185,13 +191,31 @@ const reloadFlags = {
 	),
 };
 
+const isNotReady = (error: DesktopError): boolean =>
+	error.code === NOT_READY_CODE || NOT_READY.test(error.detail);
+
+const reloadUntilReady = (
+	project: Project,
+	model: boolean,
+	deadline: number,
+): Effect.Effect<Instance, DesktopError> =>
+	Effect.gen(function* () {
+		const instance = yield* requireOurs(project);
+		const waitMs = Math.max(0, deadline - Date.now());
+		yield* withReport(instance, project.report, waitMs, (session) => reloadReport(session, model, waitMs));
+
+		return instance;
+	}).pipe(
+		Effect.catchIf(
+			(error) => isNotReady(error) && Date.now() + POLL_MS < deadline,
+			() => Effect.andThen(Effect.sleep(POLL), reloadUntilReady(project, model, deadline)),
+		),
+	);
+
 const reload = Command.make("reload", reloadFlags, ({ config, model }) =>
 	Effect.gen(function* () {
 		const project = yield* loadProject(config);
-		const instance = yield* requireOurs(project);
-		yield* withReport(instance, project.report, RELOAD_WAIT_MS, (session) =>
-			reloadReport(session, model, RELOAD_WAIT_MS),
-		);
+		const instance = yield* reloadUntilReady(project, model, Date.now() + RELOAD_WAIT_MS);
 
 		return yield* Console.log(
 			[
