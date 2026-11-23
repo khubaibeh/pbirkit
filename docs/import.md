@@ -3,13 +3,14 @@
 Read this when you turn an existing PBIP project into a pbirkit TS project.
 
 ```sh
-pbirkit import [SOURCE] [-o DIR] [--force] [--idiomatic]
+pbirkit import [SOURCE] [-o DIR] [--force] [--idiomatic] [--grouped]
 ```
 
 - `SOURCE`: a PBIP project folder or a `.pbip` file.
 - `-o DIR`: output folder for the new project.
 - `--force`: replace the files that an earlier import wrote. It never touches files that the import did not write (see `.pbirkit-import.json`).
 - `--idiomatic`: write helper calls like `col`, `measure`, `solid` and `filterOn`. Each call appears only where it rebuilds the exact same JSON. The output shrinks to about a fifth of the plain lines.
+- `--grouped`: write one module per visual under `src/pages/<page>/visuals/`, with groups as folders. Without it, each page module holds its visuals.
 
 After it writes the files, the import builds the new project in memory and compares it with the source. It writes the output even when that check fails, so that you can fix the rest by hand.
 
@@ -26,8 +27,8 @@ my-report/
   .pbirkit-import.json     list of generated files, for --force
   src/
     pages/index.ts         page list, in report order
-    pages/<page>/index.ts  definePage
-    pages/<page>/visuals/  one module per visual; groups become folders, two levels deep at most
+    pages/<page>/index.ts  definePage, with the visuals of the page
+    pages/<page>/visuals/  one module per visual (--grouped); groups become folders, two levels deep at most
     bookmarks/index.ts     bookmark list
     bookmarks/<name>.ts    defineBookmark
     themes/<name>.ts       theme JSON as TS
@@ -44,12 +45,14 @@ File names come from the visual title, then the first field, then the Desktop id
 
 Modules import each other where that leads to no cycle:
 
-- a group child imports its group and uses `group.name`
-- page interactions import their visuals
-- bookmarks import their pages and visuals
+- with `--grouped`, a group child imports its group and uses `group.name`
+- with `--grouped`, page interactions import their visuals
+- bookmarks import their pages, and their visuals with `--grouped`
 - the config's `activePageName` uses `page.name`
 
 Where an import would make a cycle, the module uses a string id from `ids.ts`.
+
+Without `--grouped`, a visual has no module of its own. Links to it use its name, or the matching id from `ids.ts`.
 
 ## Raw fallback
 

@@ -154,7 +154,7 @@ const edit = (file: string, update: (contents: string) => string) => {
 };
 
 const importProject = (...flags: ReadonlyArray<string>) => {
-	const result = run(root, ["import", project, "-o", out, ...flags]);
+	const result = run(root, ["import", project, "-o", out, "--grouped", ...flags]);
 	expect(result.status, result.stderr + result.stdout).toBe(0);
 	expect(result.stderr).toBe("");
 	expect(result.stdout).toMatch(/import: verified \d+ files/u);
@@ -601,7 +601,7 @@ it("keeps the id for a group that names itself as its parent", () => {
 	edit(visual("box", "visual.json"), (value) =>
 		value.replace('"position"', '"parentGroupName": "box",\n  "position"'),
 	);
-	const result = run(root, ["import", project, "-o", out]);
+	const result = run(root, ["import", project, "-o", out, "--grouped"]);
 	expect(result.status).toBe(2);
 	expect(result.stderr).toContain("parent groups form a cycle");
 	const box = readFileSync(join(out, "src", "pages", "first", "visuals", "box", "index.ts"), "utf8");

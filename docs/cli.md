@@ -17,7 +17,7 @@ Builds the PBIP project and merges it with Desktop edits. `--discard-desktop` th
 ## import
 
 ```sh
-pbirkit import [SOURCE] [-o DIR] [--force] [--idiomatic]
+pbirkit import [SOURCE] [-o DIR] [--force] [--idiomatic] [--grouped]
 ```
 
 Turns a PBIP project into a TS project. See [import.md](import.md).

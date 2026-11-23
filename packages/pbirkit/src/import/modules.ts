@@ -439,6 +439,7 @@ const groupTree = (visuals: ReadonlyArray<Visual>) => {
 const projectModules = (
 	config: Config,
 	names: Names,
+	grouped: boolean,
 ): {
 	readonly modules: ReadonlyArray<Module>;
 	readonly root: unknown;
@@ -483,18 +484,23 @@ const projectModules = (
 			return { ...visual, parentGroupName: new ModuleMember(visualFile(parent), ["name"]) };
 		};
 
+		const file = Layout.page(folder);
 		const visuals = page.visuals.map((visual) => {
 			if (isRaw(visual)) return visual;
+			if (!grouped) {
+				located.set(visual, file);
+				return visual;
+			}
 
-			const file = visualFile(visual.name);
-			located.set(visual, file);
-			targets.set(visual.name, file);
-			return add(file, withParent(visual));
+			const visualPath = visualFile(visual.name);
+			located.set(visual, visualPath);
+			targets.set(visual.name, visualPath);
+			return add(visualPath, withParent(visual));
 		});
 
 		const interactions = "visualInteractions" in page ? page.visualInteractions : undefined;
 		const linked =
-			interactions === undefined
+			interactions === undefined || !grouped
 				? {}
 				: {
 						visualInteractions: interactions.map((entry) =>
@@ -507,7 +513,6 @@ const projectModules = (
 						),
 					};
 
-		const file = Layout.page(folder);
 		located.set(page, file);
 		pageFiles.set(page.name, file);
 		targets.set(page.name, file);
@@ -673,10 +678,11 @@ export const importFiles = (
 	config: Config,
 	fallbacks: ReadonlyArray<Fallback>,
 	idiomatic: boolean,
+	grouped: boolean,
 ): ImportFiles => {
 	const assetOf = (url: URL) => assetPath(project, projectPath(project, url));
 	const names = namesOf(index, (path) => fileJson(project.tree, path));
-	const { modules, root, images, located, targets } = projectModules(config, names);
+	const { modules, root, images, located, targets } = projectModules(config, names, grouped);
 	const ids = idsOf(index, names);
 	const roles = colorRoles(themesOf(config));
 	const used = new Set<string>();

@@ -37,6 +37,12 @@ const flags = {
 		Flag.withDefault(false),
 		Flag.withDescription("Write pbirkit helper calls such as col and solid where they rebuild the same JSON"),
 	),
+	grouped: Flag.Boolean("grouped").pipe(
+		Flag.withDefault(false),
+		Flag.withDescription(
+			"Write one module per visual, with groups as folders, instead of one module per page",
+		),
+	),
 };
 
 const REPORT_FILES = [
@@ -70,6 +76,7 @@ const runImport = Effect.fnUntraced(function* ({
 	out: outFlag,
 	force,
 	idiomatic,
+	grouped,
 }: Command.Command.Config.Infer<typeof flags>) {
 	const path = yield* Path.Path;
 
@@ -81,7 +88,7 @@ const runImport = Effect.fnUntraced(function* ({
 		catch: (cause) => new ConfigBuildError({ detail: String(cause) }),
 	});
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
-	const files = importFiles(project, index, config, fallbacks, idiomatic);
+	const files = importFiles(project, index, config, fallbacks, idiomatic, grouped);
 	yield* checkOutput(out, project, files, force);
 	yield* writeImport(out, files, supportFiles());
 
