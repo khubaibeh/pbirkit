@@ -124,6 +124,17 @@ const literalOf = (value: unknown): unknown => {
 	return literal;
 };
 
+const integerIssues = (where: string, name: string, type: PropertyType | undefined, value: unknown) => {
+	const literal = at(at(at(value, "expr"), "Literal"), "Value");
+	if (type?.integer !== true || typeof literal !== "string" || !literal.endsWith("D")) return [];
+	const number = Number(literal.slice(0, -1));
+	return [
+		Number.isSafeInteger(number)
+			? `${where}: ${name} takes an integer, so write long(${number}) (${number}L), not ${literal}`
+			: `${where}: ${name} takes an integer, and ${literal} is not one`,
+	];
+};
+
 const propertyIssues = (
 	where: string,
 	objectName: string,
@@ -133,6 +144,8 @@ const propertyIssues = (
 	Object.entries(properties).flatMap(([name, value]) => {
 		const property = own(object.properties, name);
 		if (property === undefined) return [`${where}: "${name}" is not a property of ${objectName}`];
+		const integer = integerIssues(where, `${objectName}.${name}`, property.type, value);
+		if (integer.length > 0) return integer;
 		const values = enumValues(property.type);
 		const literal = literalOf(value);
 		return values.length === 0 ||

@@ -103,7 +103,7 @@ visualContainerObjects: {
 pbirkit reads Microsoft's visual catalog (`@microsoft/powerbi-core-visual-schema`). It lists the objects, properties, query roles and states of each built-in visual. Desktop ignores a name that it does not know, so the catalog turns a silent failure into a message.
 
 - **Typecheck:** in `defineVisual`, an object name in `objects`, a property name in an entry, and a role name in `queryState` must be in the catalog for that `visualType`. Property values and `visualContainerObjects` have no catalog typecheck. The error names the bad name and the `pbirkit visual` command that lists the valid ones.
-- **Build warnings:** `pbirkit build` also checks `visualContainerObjects`, enum values, selector state ids, the number of fields per role, and the visual styles of custom themes. A query must fit one of the field limits that the visual lists, so a pie chart with a `Series` field takes one `Y` field.
+- **Build warnings:** `pbirkit build` also checks `visualContainerObjects`, enum values, integer values, selector state ids, the number of fields per role, and the visual styles of custom themes. A query must fit one of the field limits that the visual lists, so a pie chart with a `Series` field takes one `Y` field.
 - **Lookup:** run `pbirkit visual cardVisual referenceLabel` to list the properties of one object (see [cli.md](cli.md#visual)).
 
 The typecheck skips a custom visual, a `visualType` that is a union of types or a plain `string`, and an `objects` or `queryState` value typed as a plain record. A shared builder hits these cases easily, so read the next section before you write one.

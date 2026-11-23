@@ -21,6 +21,7 @@ Read this before you change a report. Each rule comes from a real break.
 - Colors: `#` plus 6 hex digits.
 - Fonts: built-in names, Desktop font stacks or registered families. No quotes or semicolons in other forms.
 - Font sizes: whole numbers 8–60.
+- A plain number becomes a double (`0D`). Desktop ignores a double in a property that takes an integer, such as `labelPrecision`. Write `long(0)` from `pbirkit/expr` there. `pbirkit build` warns about a double in an integer property.
 - Keep long decimals like `153.00003051757813` as they are. Rounding changes the bytes.
 
 ## Visual settings
