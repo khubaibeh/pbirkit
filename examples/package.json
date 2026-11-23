@@ -21,7 +21,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.0",
-		"pbirkit": "0.3.0",
+		"pbirkit": "0.3.1",
 		"typescript": "^7.0.2",
 		"vite-plus": "1.6.0"
 	},

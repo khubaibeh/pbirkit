@@ -208,8 +208,8 @@ importers:
         specifier: ^24.10.0
         version: 24.19.2
       pbirkit:
-        specifier: 0.3.0
-        version: 0.3.0(redis@6.3.1)
+        specifier: 0.3.1
+        version: 0.3.1(redis@6.3.1)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1176,8 +1176,8 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pbirkit@0.3.0:
-    resolution: {integrity: sha512-HWEjqV1KluCyO/zB/bf2oeOTIL353jgV9lXjCYlSePY8TOPOIUS2InHLm+izc9S4owoJ6FFAtgNG4O1whmF5cg==}
+  pbirkit@0.3.1:
+    resolution: {integrity: sha512-hDTinzC7lNSj+yOKs2mAAwlIIs2zlzk8ebeYwDOaHA9zyBtBFphDtdlsp1lHjmArUkXZoQ8hGIkrFHCQO/gogQ==}
     engines: {node: '>=24'}
     hasBin: true
 
@@ -1963,7 +1963,7 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pbirkit@0.3.0(redis@6.3.1):
+  pbirkit@0.3.1(redis@6.3.1):
     dependencies:
       '@effect/platform-node': 4.1.4(effect@4.1.4)(redis@6.3.1)
       '@microsoft/powerbi-core-visual-schema': 0.1.3

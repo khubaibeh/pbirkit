@@ -8,4 +8,4 @@ peerDependencyRules:
     vite: "*"
 
 minimumReleaseAgeExclude:
-  - pbirkit@0.3.0
+  - pbirkit@0.3.1
