@@ -45,9 +45,58 @@ export default defineVisual({
 ```
 
 - `name` is the id of the visual and its folder name. It must be unique on the page, use only `[A-Za-z0-9_-]`, and stay within 50 characters.
-- `z` sets the stack order. A higher `z` draws on top.
+- `z` sets the stack order among visuals with the same parent. A higher `z` draws on top.
 - `visualType` takes a built-in type (49 known names) or a custom visual that you registered. A typo fails the typecheck.
-- A group is a visual with `visualGroup` in place of `visual`. Children point at it with `parentGroupName: group.name`.
+- A group is a visual with `visualGroup` in place of `visual`. See [Groups](#groups).
+
+## Groups
+
+A group is a visual with `visualGroup` in place of `visual`. Each child points at it with `parentGroupName`:
+
+```ts
+import { obj } from "pbirkit/expr";
+import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
+
+const header = defineVisual({
+	name: "header",
+	position: { x: 272, y: 20, z: 1000, width: 1040, height: 92, tabOrder: 1000 },
+	visualGroup: {
+		displayName: "Header",
+		groupMode: "ScaleMode",
+		objects: { background: obj({ show: false }) },
+	},
+});
+
+const title = defineVisual({
+	name: "header-title",
+	parentGroupName: header.name,
+	position: { x: 0, y: 22, z: 1000, width: 1040, height: 46, tabOrder: 2000 },
+	visual: { visualType: "textbox" /* ... */ },
+});
+```
+
+- A child's `x` and `y` count from the top left corner of its group, not of the page. Here the title draws at 272, 42 on the page.
+- In a nested group, a child counts from its closest group. Desktop adds the corner of every group above it.
+- The group's `position` is the box around its direct children. A top-level group uses page positions. A nested group uses positions inside its parent.
+- Each group has its own `z` order for its children. Desktop numbers it from 0. `tabOrder` stays one order for the whole page.
+- The selection pane shows `displayName` as the group's name.
+- To draw no group background, set `objects.background` to `obj({ show: false })`.
+
+A child that keeps its page position draws too far right and down, by the corner of its group. Desktop shows no error, and the build does not check it.
+
+A shared builder can stay free of group props. Build the children at page positions, then pass them to one helper. The helper adds the group, sets `parentGroupName` on each direct child, and subtracts the group's corner from each one.
+
+## Selection pane names
+
+The selection pane names a visual by its title text, even when the title is hidden. A visual with no title text shows its type, such as "Text box" or "Shape". To name it without a visible title, set the text and hide the title:
+
+```ts
+visualContainerObjects: {
+	title: obj({ show: false, text: "Page title" }),
+},
+```
+
+`pbirkit tree` prints the same name.
 
 ## Visual catalog
 

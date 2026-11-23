@@ -30,6 +30,10 @@ These rules come from Desktop's behavior, not from Microsoft's visual catalog. D
 - A `cardVisual` `referenceLabel` entry that sets `value` to a field needs `data: [{ dataViewWildcard: { matchingOption: 0 } }]` in its selector, next to `id` and `metadata`. Without it, the label draws but the value stays empty, and the card shows the `showBlankAs` text. `wildcard(field, 0)` from `pbirkit/expr` builds that selector.
 - In an `actionButton`, put `show` for `text`, `icon`, `fill` and `outline` in an entry with no selector. Desktop ignores a `show` that only appears in a state entry such as `{ id: "default" }`. Other button-like visuals may follow the same rule, but the build checks only `actionButton`. Test the others in Desktop.
 
+## Groups
+
+- A group child's `x` and `y` count from its group's top left corner, not the page's. Desktop shows no error for a child at page positions. It draws the child in the wrong place, and the build does not warn. See [authoring.md](authoring.md#groups).
+
 ## Files
 
 - Never edit `.pbi/localSettings.json` or `.pbi/cache.abf`.

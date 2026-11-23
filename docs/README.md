@@ -4,23 +4,24 @@ Start here. Find your task in the table, then open that page. Each page starts w
 
 ## Task map
 
-| I want to...                                                                     | Read                             |
-| -------------------------------------------------------------------------------- | -------------------------------- |
-| Do a common job step by step (port a Desktop edit, add a page, migrate a report) | [playbook.md](playbook.md)       |
-| Install pbirkit; set up Node, git and Windows                                    | [setup.md](setup.md)             |
-| Turn an existing PBIP project into TS                                            | [import.md](import.md)           |
-| Know what each config field does                                                 | [config.md](config.md)           |
-| Write pages, visuals, bookmarks and themes                                       | [authoring.md](authoring.md)     |
-| Shorten expressions with helpers (`col`, `measure`, `solid`...)                  | [expressions.md](expressions.md) |
-| Add themes, images, custom visuals and fonts                                     | [resources.md](resources.md)     |
-| Know how the build keeps Desktop edits                                           | [build.md](build.md)             |
-| Compare TS with a PBIP folder                                                    | [cli.md#diff](cli.md#diff)       |
-| Look at the report structure fast                                                | [cli.md#tree](cli.md#tree)       |
-| Open, reload or screenshot the report in Desktop                                 | [desktop.md](desktop.md)         |
-| Look up the objects, properties and enum values of a visual                      | [cli.md#visual](cli.md#visual)   |
-| Look up every command and flag                                                   | [cli.md](cli.md)                 |
-| Avoid the known traps (date tables, culture files, fonts, names)                 | [rules.md](rules.md)             |
-| Know what pbirkit cannot do yet                                                  | [limits.md](limits.md)           |
+| I want to...                                                                     | Read                                       |
+| -------------------------------------------------------------------------------- | ------------------------------------------ |
+| Do a common job step by step (port a Desktop edit, add a page, migrate a report) | [playbook.md](playbook.md)                 |
+| Install pbirkit; set up Node, git and Windows                                    | [setup.md](setup.md)                       |
+| Turn an existing PBIP project into TS                                            | [import.md](import.md)                     |
+| Know what each config field does                                                 | [config.md](config.md)                     |
+| Write pages, visuals, bookmarks and themes                                       | [authoring.md](authoring.md)               |
+| Group visuals and name them in the selection pane                                | [authoring.md#groups](authoring.md#groups) |
+| Shorten expressions with helpers (`col`, `measure`, `solid`...)                  | [expressions.md](expressions.md)           |
+| Add themes, images, custom visuals and fonts                                     | [resources.md](resources.md)               |
+| Know how the build keeps Desktop edits                                           | [build.md](build.md)                       |
+| Compare TS with a PBIP folder                                                    | [cli.md#diff](cli.md#diff)                 |
+| Look at the report structure fast                                                | [cli.md#tree](cli.md#tree)                 |
+| Open, reload or screenshot the report in Desktop                                 | [desktop.md](desktop.md)                   |
+| Look up the objects, properties and enum values of a visual                      | [cli.md#visual](cli.md#visual)             |
+| Look up every command and flag                                                   | [cli.md](cli.md)                           |
+| Avoid the known traps (date tables, culture files, fonts, names)                 | [rules.md](rules.md)                       |
+| Know what pbirkit cannot do yet                                                  | [limits.md](limits.md)                     |
 
 ## Facts to keep in mind
 
