@@ -21,10 +21,13 @@ pbirkit does not ship Desktop's own themes. To get one as TS, run `pbirkit impor
 `defineTheme` (from `pbirkit/schemas/theme`) types the top level of a theme and all 64 options of Desktop's Customize theme dialog. `visualStyles` per visual type stays loose.
 
 - Colors: `#` plus exactly 6 hex digits.
+- Fill colors inside `visualStyles`, such as `{ solid: { color } }`, also take 8 hex digits or the name of a theme color, such as `"background"`.
 - Fonts: one of 26 built-in names, a Desktop font stack, or a custom family that you registered.
-- Font sizes: whole numbers from 8 to 60. A fraction gives a warning, not an error.
+- Font sizes: whole numbers from 8 to 60. A fraction in a custom theme fails the config load. In a visual, a fraction gives a warning, not an error.
 
-Desktop rejects themes that break these rules, so `checkConfig` checks them before the build.
+Desktop rejects custom themes that break these rules, so pbirkit checks them before the build.
+
+These rules apply to `customTheme` only. `baseTheme` and `builtInTheme` take a theme file from Desktop as it is, for example `import base from "./base-theme.json" with { type: "json" }`. Desktop's own themes use font sizes such as `10.5`. The check reads their fonts but does not warn about their font sizes. `decodeDesktopTheme` checks only that such a file has a `name`.
 
 ## Custom fonts
 

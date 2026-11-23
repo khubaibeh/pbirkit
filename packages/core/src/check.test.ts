@@ -2,6 +2,7 @@ import { expect, it } from "vite-plus/test";
 
 import { checkConfig } from "./check.ts";
 import { defineConfig } from "./config.ts";
+import { baseTheme } from "./resource.ts";
 import { SchemaUrl } from "./schemas/schema-url.ts";
 
 it("warns about unsupported font sizes without rejecting the config", () => {
@@ -38,6 +39,9 @@ it("warns about unsupported font sizes without rejecting the config", () => {
 						},
 					],
 				},
+			],
+			resources: [
+				baseTheme({ name: "Base", theme: { name: "Base", textClasses: { label: { fontSize: 10.5 } } } }),
 			],
 		},
 	});

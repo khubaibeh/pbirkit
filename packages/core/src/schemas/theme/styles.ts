@@ -12,6 +12,7 @@ import {
 	Struct,
 	StructWithRest,
 	TemplateLiteral,
+	Union,
 	Unknown,
 } from "effect/Schema";
 
@@ -21,7 +22,54 @@ export const ThemeColor = TemplateLiteral(["#", String]).check(isPattern(/^#[0-9
 
 export type ThemeColor = typeof ThemeColor.Type;
 
-export const ThemeFill = Struct({ solid: Struct({ color: ThemeColor }) });
+export const ThemeColorName = Literals([
+	"foreground",
+	"firstLevelElements",
+	"secondLevelElements",
+	"thirdLevelElements",
+	"fourthLevelElements",
+	"background",
+	"secondaryBackground",
+	"good",
+	"neutral",
+	"bad",
+	"maximum",
+	"center",
+	"minimum",
+	"null",
+	"accent",
+	"tableAccent",
+	"foregroundLight",
+	"foregroundDark",
+	"foregroundNeutralLight",
+	"foregroundNeutralDark",
+	"foregroundNeutralSecondary",
+	"foregroundNeutralSecondaryAlt",
+	"foregroundNeutralSecondaryAlt2",
+	"foregroundNeutralTertiary",
+	"foregroundNeutralTertiaryAlt",
+	"foregroundSelected",
+	"foregroundButton",
+	"backgroundLight",
+	"backgroundNeutral",
+	"backgroundDark",
+	"hyperlink",
+	"visitedHyperlink",
+	"shapeStroke",
+	"disabledText",
+	"mapPushpin",
+]);
+
+export type ThemeColorName = typeof ThemeColorName.Type;
+
+export const FillColor = Union([
+	TemplateLiteral(["#", String]).check(isPattern(/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u)),
+	ThemeColorName,
+]);
+
+export type FillColor = typeof FillColor.Type;
+
+export const ThemeFill = Struct({ solid: Struct({ color: FillColor }) });
 
 export type ThemeFill = typeof ThemeFill.Type;
 

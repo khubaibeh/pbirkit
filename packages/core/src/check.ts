@@ -456,19 +456,19 @@ const checkFonts = (
 ): { readonly errors: ReadonlyArray<string>; readonly warnings: ReadonlyArray<string> } => {
 	const fonts = config.report.fonts ?? [];
 	const registered = registeredFamilies(fonts);
-	const sources: ReadonlyArray<readonly [string, unknown]> = [
-		["report", config.report.definition],
+	const sources: ReadonlyArray<readonly [string, unknown, boolean]> = [
+		["report", config.report.definition, true],
 		...config.report.pages.flatMap((page) => {
 			const { visuals, ...rest } = page;
 			return [
-				[`page "${page.name}"`, rest] as const,
-				...visuals.map((visual) => [`page "${page.name}" visual "${visual.name}"`, visual] as const),
+				[`page "${page.name}"`, rest, true] as const,
+				...visuals.map((visual) => [`page "${page.name}" visual "${visual.name}"`, visual, true] as const),
 			];
 		}),
-		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item] as const),
+		...(config.report.bookmarks?.items ?? []).map((item) => [`bookmark "${item.name}"`, item, true] as const),
 		...(config.report.resources ?? []).flatMap((resource) =>
 			resource.kind === "baseTheme" || resource.kind === "customTheme" || resource.kind === "builtInTheme"
-				? [[resourceLabel(resource), resource.theme] as const]
+				? [[resourceLabel(resource), resource.theme, resource.kind === "customTheme"] as const]
 				: [],
 		),
 	];
@@ -489,14 +489,16 @@ const checkFonts = (
 					),
 			),
 		),
-		warnings: sources.flatMap(([where, value]) =>
-			[...new Set(fontSizes(value))]
-				.filter((size) => !isFontSize(size))
-				.map(
-					(size) =>
-						`${where}: font size ${JSON.stringify(size)} is not a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
-				),
-		),
+		warnings: sources
+			.filter(([, , sized]) => sized)
+			.flatMap(([where, value]) =>
+				[...new Set(fontSizes(value))]
+					.filter((size) => !isFontSize(size))
+					.map(
+						(size) =>
+							`${where}: font size ${JSON.stringify(size)} is not a whole number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}`,
+					),
+			),
 	};
 };
 

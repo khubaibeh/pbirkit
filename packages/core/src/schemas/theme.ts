@@ -1,4 +1,14 @@
-import { Array, Record, String, Struct, Union, decodeUnknownSync, optionalKey } from "effect/Schema";
+import {
+	Array,
+	Record,
+	String,
+	Struct,
+	StructWithRest,
+	Union,
+	Unknown,
+	decodeUnknownSync,
+	optionalKey,
+} from "effect/Schema";
 
 import { FontFace, FontSize } from "#core/font.ts";
 
@@ -89,3 +99,9 @@ export const defineTheme = (theme: Theme): Theme => theme;
 
 export const decodeTheme = (json: unknown): Theme =>
 	decodeUnknownSync(Theme)(json, { onExcessProperty: "error" });
+
+export const DesktopTheme = StructWithRest(Struct({ name: String }), [Record(String, Unknown)]);
+
+export type DesktopTheme = typeof DesktopTheme.Type;
+
+export const decodeDesktopTheme = (json: unknown): DesktopTheme => decodeUnknownSync(DesktopTheme)(json);
