@@ -11,7 +11,7 @@ import { requireDesktopClosed, requireInside } from "./discard.ts";
 import { ConflictError, DiscardError } from "./errors.ts";
 import { requireGitRepo } from "./git.ts";
 import { changedUnder, changesBetween, discardTrees, mergeTrees, pendingPorts } from "./merge.ts";
-import { summary } from "./messages.ts";
+import { desktopWarnings, summary } from "./messages.ts";
 import { buildTree } from "./outputs.ts";
 import { DEFAULT_OUT, checkOut, fromCwd, projectPaths, snapshotFolder } from "./paths.ts";
 import {
@@ -151,22 +151,24 @@ const runBuild = Effect.fnUntraced(function* ({
 			changedUnder(folder, found.tree, next),
 		);
 
-	return yield* Console.log(
-		summary({
-			out: fromCwd(path, paths.out),
-			recorded: paths.recorded,
-			changes,
-			total: HashMap.size(result),
-			merged,
-			cache: cacheOutcome,
-			modelChanged,
-			pending: pendingPorts(next, result, owned, scope),
-			losses: modelLosses(next, result, owned),
-			discarded,
-			desktopChecked: checked,
-			snapshot: shown(id),
-		}),
-	);
+	const outcome = {
+		out: fromCwd(path, paths.out),
+		recorded: paths.recorded,
+		changes,
+		total: HashMap.size(result),
+		merged,
+		cache: cacheOutcome,
+		modelChanged,
+		pending: pendingPorts(next, result, owned, scope),
+		losses: modelLosses(next, result, owned),
+		discarded,
+		desktopChecked: checked,
+		snapshot: shown(id),
+	};
+	yield* Console.log(summary(outcome));
+	const warnings = desktopWarnings(outcome);
+
+	return yield* warnings.length > 0 ? Console.error(warnings.join("\n")) : Effect.void;
 });
 
 export const build = Command.make("build", flags, (input) =>

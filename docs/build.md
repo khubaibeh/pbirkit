@@ -27,13 +27,13 @@ The build keeps a snapshot of its last output. For each file it compares three v
 
 `--prefer src` or `--prefer desktop` settles a conflict. It does not touch the Desktop changes that merge cleanly. A Desktop deletion counts as a change.
 
-The list of Desktop changes puts the real changes first. A file that Desktop only reformatted gets one line with a count: its JSON keys moved, or its whitespace or line endings changed. Such a file needs no port.
+The build prints the list of Desktop changes to stderr, under a `[WARN] build:` line. The file paths follow on their own lines without the prefix. When you filter or capture the build output, keep stderr and the lines after the warning, for example `pbirkit build 2>&1 | tee build.log`. A file that Desktop only reformatted gets one line with a count on stdout: its JSON keys moved, or its whitespace or line endings changed. Such a file needs no port.
 
 The first build over a `dist/` that pbirkit did not write has no snapshot to compare with. Each file that differs from the new build then counts as a conflict, and the build asks for `--prefer`.
 
 ## Lost model parts
 
-A Desktop save can drop part of the model, such as the ordinals and the partition of a calculation group, and Desktop shows no error. The merge keeps such a change like any other. The build then prints a `[WARN] build:` list of the model parts that src has and `dist/` lacks.
+A Desktop save can drop part of the model, such as the ordinals and the partition of a calculation group, and Desktop shows no error. The merge keeps such a change like any other. The build then prints to stderr a `[WARN] build:` list of the model parts that src has and `dist/` lacks.
 
 - The check reads the object lines of each TMDL file (`table`, `column`, `measure`, `partition`, `calculationItem`, `ref` and others) and the `ordinal` property.
 - A part that moved to another file does not count as lost.

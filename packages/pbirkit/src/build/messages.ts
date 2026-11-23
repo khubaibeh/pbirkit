@@ -121,15 +121,13 @@ const reformattedNote = (count: number): ReadonlyArray<string> =>
 
 const pendingBlock = ({ out, pending, snapshot }: Summary): ReadonlyArray<string> => {
 	const changed = pending.filter(({ kind }) => kind !== "reformatted");
-	const reformatted = pending.length - changed.length;
 
 	return changed.length === 0
-		? reformattedNote(reformatted)
+		? []
 		: [
-				`Desktop changes not in src yet (${fileCount(changed.length)}). Port them to src, then build again:`,
+				`[WARN] build: Desktop changes not in src yet (${fileCount(changed.length)}). The build kept them. Port them to src, then build again:`,
 				...changed.map(({ path, kind }) => `  ${PENDING[kind]}: ${path}`),
 				...(changed.some(({ kind }) => kind === "added") ? [ADDED_NOTE] : []),
-				...reformattedNote(reformatted),
 				"To see the changed values, run pbirkit diff. To see the raw files, run:",
 				diffCommand(snapshot, out),
 				IGNORED_NOTE,
@@ -142,5 +140,10 @@ export const summary = (input: Summary): string =>
 		headline(input),
 		...(input.modelChanged ? ["The model changed since the last build. Refresh the data in Desktop."] : []),
 		...discardBlock(input),
-		...(input.recorded ? [...lossBlock(input), ...pendingBlock(input)] : []),
+		...(input.recorded
+			? reformattedNote(input.pending.filter(({ kind }) => kind === "reformatted").length)
+			: []),
 	].join("\n");
+
+export const desktopWarnings = (input: Summary): ReadonlyArray<string> =>
+	input.recorded ? [...lossBlock(input), ...pendingBlock(input)] : [];
