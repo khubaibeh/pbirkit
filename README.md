@@ -1,103 +1,157 @@
 # pbirkit
 
-pbirkit lets you write Power BI reports in TypeScript. The build writes the PBIR files byte for byte as Power BI Desktop writes them. The model (TMDL) stays as plain files.
+Write Power BI reports in TypeScript.
 
-pbirkit puts agents first. An agent writes and changes the report in TS, and a person checks the result in Power BI Desktop.
+[![npm](https://img.shields.io/npm/v/pbirkit)](https://www.npmjs.com/package/pbirkit) [![license](https://img.shields.io/npm/l/pbirkit)](LICENSE) ![status](https://img.shields.io/badge/status-experimental-orange)
 
-> Status: experimental. APIs can change without notice.
+pbirkit turns typed TypeScript modules into a Power BI project (PBIP).
+The build writes each report file as Power BI Desktop writes it: the same JSON, and in most cases the same bytes.
+The semantic model stays as plain TMDL files.
 
-## Agents: start here
+pbirkit is built first for coding agents. An agent writes and changes the report in TS, and the person checks the result in Power BI Desktop. People can use it by hand too, but the docs, checks and messages are written for agents.
 
-1. Read [docs/README.md](docs/README.md). It maps each task to the page that covers it. In an installed project, the same docs live at `node_modules/pbirkit/docs/README.md`.
-2. For a step-by-step recipe, read [docs/playbook.md](docs/playbook.md).
-3. Run `npx pbirkit <command> --help` for the exact flags. The help text is the source of truth.
+> [!WARNING]
+> pbirkit is experimental. APIs can change in any release before 1.0.
 
 ## Install
 
 ```sh
 npm i -D pbirkit typescript
-npx pbirkit --help
+npx pbirkit --version
 ```
 
-One package holds the `pbirkit` command and every module that a report imports, such as `pbirkit/config` and `pbirkit/schemas/visual/2.11.0`. See [docs/setup.md](docs/setup.md) for the details.
+With pnpm:
+
+```sh
+pnpm add -D pbirkit typescript
+pnpm exec pbirkit --version
+```
+
+To run a command before an install, such as the import below, use `npx pbirkit` or `pnpm dlx pbirkit`. If pnpm blocks a new release because of its minimum release age, add `pbirkit` to `minimumReleaseAgeExclude`.
+
+One package holds the `pbirkit` command and every module that a report imports.
+
+## Requirements
+
+| Tool                                                                       | Version     | Why                                              |
+| -------------------------------------------------------------------------- | ----------- | ------------------------------------------------ |
+| Node                                                                       | 24 or later | runs the CLI and loads the TS config             |
+| TypeScript                                                                 | 7           | typechecks the report                            |
+| Git                                                                        | any         | the build runs only inside a git repo            |
+| Power BI Desktop                                                           | on Windows  | opens the report and runs the `desktop` commands |
+| [Power BI modeling MCP](https://github.com/microsoft/powerbi-modeling-mcp) | optional    | live model work: DAX queries, measures, refresh  |
 
 ## What it does
 
-- **Author:** you write pages, visuals, bookmarks, themes and resources as typed TS modules. Each module uses the schema of the exact Microsoft version it targets.
-- **Check:** `checkConfig` catches bad names, broken links, unknown fonts, bad colors and model setup errors before Desktop sees them.
-- **Build:** `pbirkit build` writes the PBIP project. It keeps edits that someone made in Desktop and lists them for a port back to TS.
-- **Import:** `pbirkit import` turns an existing PBIP project into a TS project that rebuilds the same bytes.
+- **Author:** write pages, visuals, bookmarks, themes and resources as typed modules. Each module follows the exact Microsoft schema version it targets.
+- **Check:** catch bad names, broken links, unknown fonts, bad colors and model setup errors before Desktop opens the report.
+- **Build:** `pbirkit build` writes the PBIP project. It keeps the edits that someone saved in Desktop and lists them for a port back to TS.
+- **Import:** `pbirkit import` turns an existing PBIP project into a TS project that rebuilds the same JSON.
 - **Inspect:** `pbirkit tree` prints the pages, visuals and bookmarks of a config or a PBIP folder.
 - **Compare:** `pbirkit diff` compares the TS build with a PBIP folder, by JSON meaning or by exact bytes.
-- **Drive Desktop (Windows):** `pbirkit desktop` opens, reloads and screenshots the report through Microsoft's Desktop bridge.
+- **Look up:** `pbirkit visual` lists the roles, objects and properties of each built-in visual.
+- **Drive Desktop (Windows):** `pbirkit desktop` opens, reloads and screenshots the report.
 
-## The loop
+## Quick start
 
+Most projects start from a report that already exists. Save it in Desktop as PBIP with the PBIR format, then:
+
+```sh
+npx pbirkit import path/to/Sales.pbip -o sales --idiomatic --cache
+cd sales
+git init
+npm i -D typescript
+npx pbirkit build
 ```
-TS source ──pbirkit build──▶ dist/ (PBIP) ──open──▶ Power BI Desktop
-    ▲                            │                        │
-    └──── agent ports edits ◀── build lists edits ◀── user saves
-```
 
-1. The agent edits the TS source.
-2. `pbirkit build` writes `dist/`.
-3. A person opens `dist/` in Desktop, looks, edits and saves.
-4. The next `pbirkit build` keeps the Desktop edits and lists them.
-5. The agent ports each listed edit into TS.
+1. Read `IMPORT.md` in the new project. It lists the work that the import left for you.
+2. Open the `.pbip` file in `dist/` with Desktop. `--cache` brings the data, so the report shows it at once. Without `--cache`, refresh the data in Desktop.
+3. Change a visual in `src/`, then run `npx pbirkit build` again.
+4. If you saved edits in Desktop, the build keeps them and lists them. Port each one into `src/`. To drop them, close Desktop without saving and run `npx pbirkit build --discard-desktop`.
 
-## Quick example
+## What the code looks like
+
+`pbirkit.config.ts` describes the project:
 
 ```ts
-// pbirkit.config.ts
 import { defineConfig } from "pbirkit/config";
+import { themeRef } from "pbirkit/resource";
 import { SchemaUrl } from "pbirkit/schemas/schema-url";
 
-import pages from "#/pages/index.ts";
+import overview from "./src/pages/overview.ts";
+import theme from "./src/theme.ts";
 
 export default defineConfig({
 	name: "Sales",
-	pbip: { version: "1.0", settings: { enableAutoRecovery: true } },
+	pbip: { version: "1.0" },
 	report: {
+		logicalId: "21e73ab2-3245-4c3c-b660-2938a3372863",
 		platform: { $schema: SchemaUrl.platform["2.0.0"], version: "2.0" },
 		pbir: { version: "4.0" },
-		definition: new URL("./src/report.json", import.meta.url),
+		definition: {
+			$schema: SchemaUrl.report["3.3.0"],
+			themeCollection: { customTheme: themeRef(theme, { visual: "2.13.0", report: "3.3.0", page: "2.1.0" }) },
+		},
 		version: { $schema: SchemaUrl.version["1.0.0"], version: "2.0.0" },
-		pagesMetadata: { $schema: SchemaUrl.pages["1.0.0"] },
-		pages,
+		pagesMetadata: { $schema: SchemaUrl.pages["1.0.0"], activePageName: overview.name },
+		pages: [overview],
+		resources: [theme],
 	},
 	model: {
+		name: "Sales",
 		path: "Sales.SemanticModel",
+		logicalId: "23a4994e-a4e6-4870-b629-6a67a548fe0c",
 		platform: { $schema: SchemaUrl.platform["2.0.0"], version: "2.0" },
-		pbism: { version: "4.2", settings: {} },
-		definition: new URL("./model/definition/", import.meta.url),
+		pbism: { version: "4.2" },
+		definition: new URL("./model/", import.meta.url),
 	},
 });
 ```
 
-Most projects start from `pbirkit import` and not from a blank file. See [docs/import.md](docs/import.md).
+`src/pages/overview.ts` holds a page with one visual:
 
-## Modules
+```ts
+import { measure, project, role } from "pbirkit/expr";
+import { definePage } from "pbirkit/schemas/page/2.1.0";
+import { defineVisual } from "pbirkit/schemas/visual/2.13.0";
 
-| Import from                                                 | What it holds                                                   |
-| ----------------------------------------------------------- | --------------------------------------------------------------- |
-| `pbirkit/config`                                            | `defineConfig` and the config schema                            |
-| `pbirkit/schemas/<kind>/<v>`                                | `define*` helpers for each schema version                       |
-| `pbirkit/expr`                                              | expression helpers: `col`, `measure`, `solid`, `filterState`... |
-| `pbirkit/resource`, `pbirkit/custom-visual`, `pbirkit/font` | images, custom visuals and fonts                                |
-| `pbirkit/schemas/theme`                                     | `defineTheme` and the theme schema                              |
-| `pbirkit/schemas/schema-url`                                | every `$schema` URL                                             |
-| `pbirkit/register`                                          | `Register`, for project-wide custom visuals and fonts           |
-| `pbirkit/check`, `pbirkit/build`, `pbirkit/tree`            | `checkConfig`, the in-memory build, the report tree             |
+const revenue = defineVisual({
+	name: "revenue-card",
+	position: { x: 20, y: 20, z: 0, width: 240, height: 120 },
+	visual: {
+		visualType: "card",
+		query: { queryState: { Values: role(project(measure("Sales", "Revenue"))) } },
+	},
+});
 
-## Requirements
+export default definePage({
+	name: "overview",
+	displayName: "Overview",
+	displayOption: "FitToPage",
+	visuals: [revenue],
+});
+```
 
-- Node 24 or later
-- Git: the build needs the project inside a git repo
-- Windows with Power BI Desktop, for the `desktop` commands and for a look at the report
+`tsc` catches what Desktop would skip without a word: keys and values that the imported schema version does not allow, and typos in visual types, roles, objects and properties.
 
-See [docs/setup.md](docs/setup.md).
+## Data Modelling
 
-## Credits
+pbirkit builds the report and keeps the model as plain TMDL files. It does not type the model.
+For live model work, add Microsoft's [Power BI modeling MCP server](https://github.com/microsoft/powerbi-modeling-mcp)
+to your agent. The agent can then run DAX, edit measures and tables, and refresh data in the open Desktop.
+
+Without the server, the agent edits the TMDL files by hand. See [docs/model.md](docs/model.md) for the full setup.
+
+## Example project
+
+[`examples/`](examples) holds a full Northwind Traders report with 15 pages. It shows shared builders for charts, cards and slicers, a layout grid, a custom theme and a typed field list from the model.
+
+## Docs
+
+Start at [docs/README.md](docs/README.md). An installed project has the same docs at `node_modules/pbirkit/docs/README.md`.
+
+## Credits and license
 
 - The schemas follow Microsoft's [Power BI JSON schemas](https://github.com/microsoft/json-schemas), under the MIT license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - pbirkit has no tie to Microsoft, and Microsoft does not endorse it. Power BI is a trademark of Microsoft.
+- pbirkit uses the [MIT license](LICENSE).
