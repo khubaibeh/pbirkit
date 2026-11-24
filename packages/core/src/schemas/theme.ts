@@ -1,14 +1,18 @@
 import {
 	Array,
+	Finite,
 	Record,
 	String,
 	Struct,
 	StructWithRest,
+	TemplateLiteral,
 	Union,
 	Unknown,
 	decodeUnknownSync,
+	is,
 	optionalKey,
 } from "effect/Schema";
+import type { Constraint } from "effect/Schema";
 
 import { FontFace, FontSize } from "#core/font.ts";
 
@@ -48,6 +52,44 @@ export const ThemeIcon = Struct({ url: String, description: optionalKey(String) 
 
 export type ThemeIcon = typeof ThemeIcon.Type;
 
+const colorSlots = <C extends Constraint>(Color: C) => ({
+	foreground: optionalKey(Color),
+	firstLevelElements: optionalKey(Color),
+	secondLevelElements: optionalKey(Color),
+	thirdLevelElements: optionalKey(Color),
+	fourthLevelElements: optionalKey(Color),
+	background: optionalKey(Color),
+	secondaryBackground: optionalKey(Color),
+	good: optionalKey(Color),
+	neutral: optionalKey(Color),
+	bad: optionalKey(Color),
+	maximum: optionalKey(Color),
+	center: optionalKey(Color),
+	minimum: optionalKey(Color),
+	null: optionalKey(Color),
+	accent: optionalKey(Color),
+	tableAccent: optionalKey(Color),
+	foregroundLight: optionalKey(Color),
+	foregroundDark: optionalKey(Color),
+	foregroundNeutralLight: optionalKey(Color),
+	foregroundNeutralDark: optionalKey(Color),
+	foregroundNeutralSecondary: optionalKey(Color),
+	foregroundNeutralSecondaryAlt: optionalKey(Color),
+	foregroundNeutralSecondaryAlt2: optionalKey(Color),
+	foregroundNeutralTertiary: optionalKey(Color),
+	foregroundNeutralTertiaryAlt: optionalKey(Color),
+	foregroundSelected: optionalKey(Color),
+	foregroundButton: optionalKey(Color),
+	backgroundLight: optionalKey(Color),
+	backgroundNeutral: optionalKey(Color),
+	backgroundDark: optionalKey(Color),
+	hyperlink: optionalKey(Color),
+	visitedHyperlink: optionalKey(Color),
+	shapeStroke: optionalKey(Color),
+	disabledText: optionalKey(Color),
+	mapPushpin: optionalKey(Color),
+});
+
 export const Theme = Struct({
 	$schema: optionalKey(String),
 	name: String,
@@ -56,41 +98,7 @@ export const Theme = Struct({
 	dataColors: optionalKey(Array(ThemeColor)),
 	icons: optionalKey(Union([Record(String, ThemeIcon), Array(ThemeIcon)])),
 	textClasses: optionalKey(TextClasses),
-	foreground: optionalKey(ThemeColor),
-	firstLevelElements: optionalKey(ThemeColor),
-	secondLevelElements: optionalKey(ThemeColor),
-	thirdLevelElements: optionalKey(ThemeColor),
-	fourthLevelElements: optionalKey(ThemeColor),
-	background: optionalKey(ThemeColor),
-	secondaryBackground: optionalKey(ThemeColor),
-	good: optionalKey(ThemeColor),
-	neutral: optionalKey(ThemeColor),
-	bad: optionalKey(ThemeColor),
-	maximum: optionalKey(ThemeColor),
-	center: optionalKey(ThemeColor),
-	minimum: optionalKey(ThemeColor),
-	null: optionalKey(ThemeColor),
-	accent: optionalKey(ThemeColor),
-	tableAccent: optionalKey(ThemeColor),
-	foregroundLight: optionalKey(ThemeColor),
-	foregroundDark: optionalKey(ThemeColor),
-	foregroundNeutralLight: optionalKey(ThemeColor),
-	foregroundNeutralDark: optionalKey(ThemeColor),
-	foregroundNeutralSecondary: optionalKey(ThemeColor),
-	foregroundNeutralSecondaryAlt: optionalKey(ThemeColor),
-	foregroundNeutralSecondaryAlt2: optionalKey(ThemeColor),
-	foregroundNeutralTertiary: optionalKey(ThemeColor),
-	foregroundNeutralTertiaryAlt: optionalKey(ThemeColor),
-	foregroundSelected: optionalKey(ThemeColor),
-	foregroundButton: optionalKey(ThemeColor),
-	backgroundLight: optionalKey(ThemeColor),
-	backgroundNeutral: optionalKey(ThemeColor),
-	backgroundDark: optionalKey(ThemeColor),
-	hyperlink: optionalKey(ThemeColor),
-	visitedHyperlink: optionalKey(ThemeColor),
-	shapeStroke: optionalKey(ThemeColor),
-	disabledText: optionalKey(ThemeColor),
-	mapPushpin: optionalKey(ThemeColor),
+	...colorSlots(ThemeColor),
 });
 
 export type Theme = typeof Theme.Type;
@@ -100,8 +108,39 @@ export const defineTheme = (theme: Theme): Theme => theme;
 export const decodeTheme = (json: unknown): Theme =>
 	decodeUnknownSync(Theme)(json, { onExcessProperty: "error" });
 
-export const DesktopTheme = StructWithRest(Struct({ name: String }), [Record(String, Unknown)]);
+const Open = Record(String, Unknown);
+
+const DesktopColor = TemplateLiteral(["#", String]);
+
+export const DesktopTextClass = StructWithRest(
+	Struct({
+		fontFace: optionalKey(String),
+		fontSize: optionalKey(Finite),
+		fontWeight: optionalKey(String),
+		color: optionalKey(DesktopColor),
+	}),
+	[Open],
+);
+
+export type DesktopTextClass = typeof DesktopTextClass.Type;
+
+export const DesktopTheme = StructWithRest(
+	Struct({
+		$schema: optionalKey(String),
+		name: String,
+		visualStyles: optionalKey(Record(String, Record(String, Record(String, Array(Open))))),
+		dataColors: optionalKey(Array(DesktopColor)),
+		textClasses: optionalKey(Record(String, DesktopTextClass)),
+		...colorSlots(DesktopColor),
+	}),
+	[Open],
+);
 
 export type DesktopTheme = typeof DesktopTheme.Type;
 
-export const decodeDesktopTheme = (json: unknown): DesktopTheme => decodeUnknownSync(DesktopTheme)(json);
+export const defineDesktopTheme = <const T extends DesktopTheme>(theme: T): T => theme;
+
+export const decodeDesktopTheme = (json: unknown): DesktopTheme => {
+	const theme = decodeUnknownSync(DesktopTheme)(json);
+	return is(DesktopTheme)(json) ? json : theme;
+};

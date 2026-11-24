@@ -66,6 +66,7 @@ const DEFINERS: ReadonlyMap<string, string> = new Map([
 	["bookmark", "defineBookmark"],
 ]);
 const CONFIG_DEFINER = { name: "defineConfig", from: `${CORE_PACKAGE}/config` };
+const DESKTOP_THEME_DEFINER = { name: "defineDesktopTheme", from: `${CORE_PACKAGE}/schemas/theme` };
 const encoder = new TextEncoder();
 
 type Report = Config["report"];
@@ -83,6 +84,7 @@ interface Module {
 	readonly value: unknown;
 	readonly swaps: boolean;
 	readonly links: boolean;
+	readonly definer: Definer | undefined;
 }
 
 export type Located = ReadonlyMap<unknown, string>;
@@ -204,7 +206,13 @@ export const renderModule = (
 		header = "",
 		idiomatic = false,
 		swaps = NO_SWAPS,
-	}: { readonly header?: string; readonly idiomatic?: boolean; readonly swaps?: ModuleSwaps } = {},
+		definer,
+	}: {
+		readonly header?: string;
+		readonly idiomatic?: boolean;
+		readonly swaps?: ModuleSwaps;
+		readonly definer?: Definer;
+	} = {},
 ): string => {
 	const imports = new Map<string, string>();
 	const names = new Set<string>();
@@ -265,7 +273,12 @@ export const renderModule = (
 				),
 		});
 
-	const defined = file === Layout.config ? { definer: CONFIG_DEFINER, value } : definerOf(value);
+	const defined =
+		file === Layout.config
+			? { definer: CONFIG_DEFINER, value }
+			: definer === undefined
+				? definerOf(value)
+				: { definer, value };
 	const tree = toNode(defined?.value ?? value, idiomatic, { ...swaps, nameOf: importName });
 	const used = [...new Set(helperNames(tree))].toSorted();
 	const body = render(tree, 0);
@@ -455,8 +468,8 @@ const projectModules = (
 	const pageFiles = new Map<string, string>();
 	const themeName = nameScope();
 	const imageName = nameScope();
-	const add = (file: string, value: unknown, swaps = true, links = false) => {
-		modules.push({ file, value, swaps, links });
+	const add = (file: string, value: unknown, swaps = true, links = false, definer?: Definer) => {
+		modules.push({ file, value, swaps, links, definer });
 		located.set(value, file);
 		return new ModuleReference(file);
 	};
@@ -532,7 +545,8 @@ const projectModules = (
 	const resourceModule = (resource: Resource): unknown => {
 		if ("theme" in resource) {
 			const file = Layout.theme(themeName(wordsOf(posix.basename(resource.name, ".json"))).file);
-			return { ...resource, theme: add(file, resource.theme, false) };
+			const definer = resource.kind === "customTheme" ? undefined : DESKTOP_THEME_DEFINER;
+			return { ...resource, theme: add(file, resource.theme, false, false, definer) };
 		}
 		if (resource.kind !== "image") return resource;
 
@@ -697,7 +711,10 @@ export const importFiles = (
 
 	const rendered = [
 		...modules.map((module) =>
-			render(module.file, module.value, module.swaps ? { swaps: module.links ? linkSwaps : swaps } : {}),
+			render(module.file, module.value, {
+				...(module.swaps ? { swaps: module.links ? linkSwaps : swaps } : {}),
+				...(module.definer === undefined ? {} : { definer: module.definer }),
+			}),
 		),
 		render(Layout.config, root, { header: registerBlock(config), swaps }),
 	];

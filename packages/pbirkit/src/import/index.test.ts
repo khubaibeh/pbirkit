@@ -363,6 +363,27 @@ it("types a Desktop custom theme registered as Image and escapes generated modul
 	expect(contents).not.toContain("resourcePackages:");
 });
 
+it("types a Desktop base theme with fractional font sizes", () => {
+	const theme = {
+		name: "Base",
+		dataColors: ["#118DFF"],
+		textClasses: { label: { fontSize: 10.5 } },
+		visualStyles: { "*": { "*": { categoryAxis: [{ fontSize: 10.5, titleFontSize: 10.5 }] } } },
+		futureProperty: true,
+	};
+	writeFileSync(
+		join(project, "Example.Report", "StaticResources", "SharedResources", "BaseThemes", "Base.json"),
+		toJson(theme),
+	);
+	importProject();
+	const base = readFileSync(join(out, "src", "themes", "base.ts"), "utf8");
+	expect(base).toContain('import { defineDesktopTheme } from "@pbirkit/core/schemas/theme";');
+	expect(base).toContain("export default defineDesktopTheme({");
+	expect(readFileSync(join(out, "src", "themes", "brand.ts"), "utf8")).toContain("export default {");
+	const typecheck = spawnSync(tsgo, ["-p", out], { encoding: "utf8" });
+	expect(typecheck.status, typecheck.stdout).toBe(0);
+});
+
 it("uses --force to replace only the files an earlier import wrote", () => {
 	importProject();
 	writeFileSync(join(out, "src", "pages", "custom.ts"), "");
