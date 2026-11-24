@@ -307,6 +307,14 @@ const mergeObjects = (
 		]),
 	);
 
+const desktopThemeObjects: Readonly<Record<string, Readonly<Record<string, ObjectDescriptor>>>> = {
+	cardVisual: {
+		overflow: { properties: { type: {} } },
+		referenceLabelValue: { properties: { fontColor: {} } },
+	},
+	scatterChart: { fillPoint: { properties: { show: {} } } },
+};
+
 export const themeCatalogIssues = (visualStyles: unknown): ReadonlyArray<string> =>
 	Object.entries(record(visualStyles)).flatMap(([type, styles]) =>
 		visualTypes.has(type)
@@ -316,7 +324,10 @@ export const themeCatalogIssues = (visualStyles: unknown): ReadonlyArray<string>
 							type,
 							key: `visualStyles.${type}.${style}`,
 							owner: `a ${type} object or a visual container object`,
-							objects: mergeObjects(containerObjects(), visualObjects(type)),
+							objects: mergeObjects(
+								mergeObjects(containerObjects(), visualObjects(type)),
+								own(desktopThemeObjects, type) ?? {},
+							),
 							themed: true,
 						},
 						value,
