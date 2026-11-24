@@ -19,3 +19,7 @@ export const PlatformItem = Union([
 ]);
 
 export type PlatformItem = typeof PlatformItem.Type;
+
+export type WithPlatformIds<T extends { readonly platform: unknown }, K extends keyof T> =
+	| (T & { readonly platform: URL })
+	| (T & { readonly [P in K]-?: NonNullable<T[P]> });

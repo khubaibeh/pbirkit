@@ -1,4 +1,6 @@
-import { Console, Effect, HashMap, Option, Path } from "effect";
+import { pathToFileURL } from "node:url";
+
+import { Console, Effect, FileSystem, HashMap, Option, Path } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
 import { loadConfig } from "../build/config.ts";
@@ -15,9 +17,12 @@ import { findProject } from "../pbip/project.ts";
 import type { Project } from "../pbip/project.ts";
 import { indexTree } from "../pbip/tree.ts";
 import { settleConfig } from "./draft.ts";
+import type { Draft } from "./draft.ts";
 import { diffCommand, verifiedMessage, writtenMessage } from "./messages.ts";
 import { importFiles, supportFiles } from "./modules.ts";
 import { checkOutput, writeImport } from "./output.ts";
+
+const MODEL_CACHE = ".pbi/cache.abf";
 
 const flags = {
 	source: Argument.String("source").pipe(
@@ -41,6 +46,12 @@ const flags = {
 		Flag.withDefault(false),
 		Flag.withDescription(
 			"Write one module per visual, with groups as folders, instead of one module per page",
+		),
+	),
+	cache: Flag.Boolean("cache").pipe(
+		Flag.withDefault(false),
+		Flag.withDescription(
+			`Copy the model's data cache to ${Layout.modelFile(MODEL_CACHE)} and set model.cache, so the first build has data`,
 		),
 	),
 };
@@ -71,26 +82,64 @@ const requireFiles = Effect.fnUntraced(function* (project: Project) {
 	return yield* Effect.void;
 });
 
+const entryOf = Effect.fnUntraced(function* (folder: string, name: string) {
+	const fs = yield* FileSystem.FileSystem;
+
+	const entries = yield* fs.readDirectory(folder).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+	return Option.fromNullishOr(entries.find((entry) => fileKey(entry) === fileKey(name)));
+});
+
+const withCache = Effect.fnUntraced(function* (project: Project, { config, fallbacks }: Draft) {
+	const path = yield* Path.Path;
+
+	const note = (reason: string): Draft => ({
+		config,
+		fallbacks: [...fallbacks, { label: "Data cache", reason }],
+	});
+	if (project.model === undefined || config.model === undefined)
+		return note("The project has no semantic model, so the import copied no data cache");
+
+	const folder = path.join(project.root, project.model);
+	const parts: Array<string> = [];
+	for (const part of MODEL_CACHE.split("/")) {
+		const entry = yield* entryOf(path.join(folder, ...parts), part);
+		if (Option.isNone(entry))
+			return note(
+				`The model has no ${MODEL_CACHE}, so the first build has no data until a refresh in Desktop`,
+			);
+		parts.push(entry.value);
+	}
+
+	const file = path.join(folder, ...parts);
+	const found = parts.join("/");
+	return {
+		...note(`Copied ${found} to ${Layout.modelFile(found)}`),
+		config: { ...config, model: { ...config.model, cache: pathToFileURL(file) } },
+	};
+});
+
 const runImport = Effect.fnUntraced(function* ({
 	source,
 	out: outFlag,
 	force,
 	idiomatic,
 	grouped,
+	cache,
 }: Command.Command.Config.Infer<typeof flags>) {
 	const path = yield* Path.Path;
 
 	const project = yield* findProject(source);
 	yield* requireFiles(project);
 	const index = indexTree(project.name, project.report, project.tree);
-	const { config, fallbacks } = yield* Effect.try({
+	const draft = yield* Effect.try({
 		try: () => settleConfig(project, index),
 		catch: (cause) => new ConfigBuildError({ detail: String(cause) }),
 	});
+	const { config, fallbacks } = cache ? yield* withCache(project, draft) : draft;
 	const out = path.resolve(Option.getOrElse(outFlag, () => `${project.name}.pbirkit`));
 	const files = importFiles(project, index, config, fallbacks, idiomatic, grouped);
 	yield* checkOutput(out, project, files, force);
-	yield* writeImport(out, files, supportFiles());
+	yield* writeImport(out, files, supportFiles(files));
 
 	const configFile = path.join(out, Layout.config);
 	yield* Console.log(

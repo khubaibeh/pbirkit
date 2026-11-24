@@ -15,6 +15,7 @@ const STATIC_ALIAS = "#static/";
 export const Layout = {
 	config: "pbirkit.config.ts",
 	report: "IMPORT.md",
+	agents: "AGENTS.md",
 	manifest: ".pbirkit-import.json",
 	packageJson: "package.json",
 	tsconfig: "tsconfig.json",

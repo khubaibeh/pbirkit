@@ -102,6 +102,8 @@ const writeCoreTypes = Effect.fnUntraced(function* (folder: string) {
 		new CoreTypesError({ file: target, detail: error.message });
 	const compilerOptions = {
 		...(hasNodeTypes(folder) ? { types: ["node"] } : {}),
+		erasableSyntaxOnly: true,
+		verbatimModuleSyntax: true,
 		paths: yield* coreTypePaths(),
 	};
 	const text = `${JSON.stringify({ compilerOptions }, null, "\t")}\n`;

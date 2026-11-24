@@ -1,7 +1,7 @@
 import { expect, it } from "vite-plus/test";
 
 import { long, measure, project, props, role } from "../expr/index.ts";
-import { catalogNames, visualCatalogIssues } from "./index.ts";
+import { catalogNames, themeCatalogIssues, visualCatalogIssues } from "./index.ts";
 import objects from "./objects.json" with { type: "json" };
 
 const net = measure("Sales", "Net Sales");
@@ -65,4 +65,19 @@ it("names what the catalog does not list", () => {
 			query: { queryState: { Gradient: role(project(net)) } },
 		}),
 	).toEqual([]);
+});
+
+it("takes the theme names that Desktop's own base theme writes", () => {
+	expect(
+		themeCatalogIssues({
+			cardVisual: {
+				"*": {
+					overflow: [{ type: 0 }],
+					referenceLabelValue: [{ fontColor: { solid: { color: "#252423" } } }],
+					overFlow: [{ nope: 1 }],
+				},
+			},
+			scatterChart: { "*": { fillPoint: [{ show: true }] } },
+		}),
+	).toEqual(['visualStyles.cardVisual.*.overFlow[0]: "nope" is not a property of overFlow']);
 });

@@ -4,6 +4,7 @@ import { EditorSettings } from "#schemas/editor-settings/1.0.0.ts";
 import { ModelReference } from "#schemas/model-reference/2.0.0.ts";
 import { Pbism } from "#schemas/pbism/1.0.0.ts";
 import { PlatformItem } from "#schemas/platform";
+import type { WithPlatformIds } from "#schemas/platform";
 
 export const Model = Struct({
 	name: optionalKey(String),
@@ -25,4 +26,6 @@ export const Model = Struct({
 
 export type Model = typeof Model.Type;
 
-export const defineModel = (model: Model): Model => model;
+export type ModelInput = WithPlatformIds<Model, "name" | "logicalId">;
+
+export const defineModel = (model: ModelInput): ModelInput => model;
