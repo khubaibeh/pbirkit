@@ -3,11 +3,13 @@ import { omit } from "effect/Struct";
 
 import { BookmarksItem, RawBookmarks } from "#schemas/bookmarks-metadata";
 import { Model } from "#schemas/model";
+import type { ModelInput } from "#schemas/model";
 import { AnyPage, RawPage } from "#schemas/page";
 import { PagesMetadataItem } from "#schemas/pages";
 import { Pbip } from "#schemas/pbip/1.0.0.ts";
 import { PbirItem } from "#schemas/pbir";
 import { PlatformItem } from "#schemas/platform";
+import type { WithPlatformIds } from "#schemas/platform";
 import { AnyReport } from "#schemas/report";
 import { ReportExtension } from "#schemas/report-extension/1.0.0.ts";
 import { VersionMetadata } from "#schemas/version/1.0.0.ts";
@@ -51,4 +53,9 @@ export const Config = Struct({
 
 export type Config = typeof Config.Type;
 
-export const defineConfig = (config: Config): Config => config;
+export type ConfigInput = Omit<Config, "report" | "model"> & {
+	readonly report: WithPlatformIds<ReportItem, "logicalId">;
+	readonly model?: ModelInput;
+};
+
+export const defineConfig = (config: ConfigInput): ConfigInput => config;

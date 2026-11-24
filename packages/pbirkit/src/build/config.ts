@@ -23,6 +23,16 @@ const isCore = (specifier: string): boolean =>
 export const resolveCoreFromCli: ResolveHookSync = (specifier, context, nextResolve) =>
 	nextResolve(specifier, isCore(specifier) ? { ...context, parentURL: import.meta.url } : context);
 
+const STRIP_ERROR = "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX";
+
+const loadDetail = (cause: unknown): string => {
+	if (!(cause instanceof Error) || !Predicate.hasProperty(cause, "code") || cause.code !== STRIP_ERROR)
+		return String(cause);
+	const first = cause.stack?.split("\n", 1)[0] ?? "";
+	const location = first === "" || first.includes(STRIP_ERROR) ? "" : `${first}: `;
+	return `${location}${cause.message}. Node strips the TS types and does not transform them, so enum, namespace and parameter properties fail. Rewrite them as plain code; tsc lists each one.`;
+};
+
 const importDefault = Effect.fnUntraced(function* (file: string) {
 	const path = yield* Path.Path;
 
@@ -31,7 +41,7 @@ const importDefault = Effect.fnUntraced(function* (file: string) {
 		.pipe(Effect.mapError((error) => new ConfigLoadError({ file, detail: causeDetail(error) })));
 	const module: unknown = yield* Effect.tryPromise({
 		try: () => import(url.href),
-		catch: (cause) => new ConfigLoadError({ file, detail: String(cause) }),
+		catch: (cause) => new ConfigLoadError({ file, detail: loadDetail(cause) }),
 	});
 
 	if (!Predicate.hasProperty(module, "default")) {
