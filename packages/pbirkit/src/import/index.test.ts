@@ -13,7 +13,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { NodeServices } from "@effect/platform-node";
@@ -409,6 +409,38 @@ it("uses --force to replace only the files an earlier import wrote", () => {
 	expect(refused.status).not.toBe(0);
 	expect(refused.stderr).toContain("an earlier import did not write this file");
 	expect(readFileSync(join(out, "IMPORT.md"), "utf8")).toBe("mine\n");
+});
+
+it("copies the model data cache with --cache so the first build has data", () => {
+	const bytes = Buffer.from([0, 1, 2, 255, 13, 10, 0]);
+	const source = join(project, "Example.SemanticModel", ".pbi", "cache.abf");
+	const cache = join(out, "model", ".pbi", "cache.abf");
+	const manifest = (): unknown => JSON.parse(readFileSync(join(out, ".pbirkit-import.json"), "utf8"));
+	expect(importProject("--cache")).toContain("Data cache: The model has no .pbi/cache.abf");
+	expect(readFileSync(config, "utf8")).not.toContain("cache:");
+	mkdirSync(dirname(source), { recursive: true });
+	writeFileSync(source, bytes);
+	const ignores = ".pbirkit/\nnode_modules/\nmodel/.pbi/cache.abf\n!model/.pbi/cache.abf";
+	writeFileSync(join(out, ".gitignore"), ignores);
+	expect(importProject("--force", "--cache")).toContain(
+		"Data cache: Copied .pbi/cache.abf to model/.pbi/cache.abf",
+	);
+	expect(readFileSync(cache)).toEqual(bytes);
+	expect(readFileSync(config, "utf8")).toContain(
+		'cache: new URL("./model/.pbi/cache.abf", import.meta.url),',
+	);
+	expect(readFileSync(join(out, ".gitignore"), "utf8")).toBe(`${ignores}\nmodel/.pbi/cache.abf\n`);
+	expect(manifest()).toContain("model/.pbi/cache.abf");
+	mkdirSync(join(out, "node_modules", "@pbirkit"), { recursive: true });
+	symlinkSync(core, join(out, "node_modules", "@pbirkit", "core"), "junction");
+	expect(spawnSync("git", ["init", "-q", out]).status).toBe(0);
+	const build = run(out, ["build"]);
+	expect(build.status, build.stderr).toBe(0);
+	expect(readFileSync(join(out, "dist", "Example.SemanticModel", ".pbi", "cache.abf"))).toEqual(bytes);
+	importProject("--force");
+	expect(existsSync(cache)).toBe(false);
+	expect(readFileSync(config, "utf8")).not.toContain("cache:");
+	expect(manifest()).not.toContain("model/.pbi/cache.abf");
 });
 
 it("rejects ambiguous input and protects a non-empty output without --force", () => {

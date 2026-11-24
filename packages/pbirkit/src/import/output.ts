@@ -49,6 +49,24 @@ const addAliases = Effect.fnUntraced(function* (out: string) {
 	yield* fs.writeFileString(file, `${JSON.stringify(next, null, "\t")}\n`).pipe(onFileSystem("write", file));
 });
 
+const addIgnores = Effect.fnUntraced(function* (out: string, lines: ReadonlyArray<string>) {
+	const fs = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+
+	const file = path.join(out, Layout.gitignore);
+	const text = yield* fs.readFileString(file).pipe(onFileSystem("read", file));
+	const rules = text.split(/\r?\n/u).map((line) => line.trimEnd());
+	const ignored = (line: string) => {
+		const last = rules.findLast((rule) => [line, `/${line}`, `!${line}`, `!/${line}`].includes(rule));
+		return last !== undefined && !last.startsWith("!");
+	};
+	const missing = lines.filter((line) => !ignored(line));
+	if (missing.length === 0) return yield* Effect.void;
+
+	const next = `${text}${text === "" || text.endsWith("\n") ? "" : "\n"}${missing.map((line) => `${line}\n`).join("")}`;
+	yield* fs.writeFileString(file, next).pipe(onFileSystem("write", file));
+});
+
 const removeFile = Effect.fnUntraced(function* (out: string, relative: string) {
 	const fs = yield* FileSystem.FileSystem;
 	const path = yield* Path.Path;
@@ -79,9 +97,8 @@ export const checkOutput = Effect.fnUntraced(function* (
 		path.join(project.root, folder),
 	);
 	const pbip = path.join(project.root, project.filename);
-	const targets = [...files.files.map((file) => file.path), ...files.folders, Layout.manifest].map((file) =>
-		path.join(out, file),
-	);
+	const written = [...files.files, ...files.copies].map((file) => file.path);
+	const targets = [...written, ...files.folders, Layout.manifest].map((file) => path.join(out, file));
 	if (
 		targets.some((target) => target === pbip || sources.some((source) => containedBy(path, source, target)))
 	)
@@ -101,10 +118,9 @@ export const checkOutput = Effect.fnUntraced(function* (
 		});
 
 	const owned = new Set((yield* readManifest(out)).map((file) => fileKey(file)));
-	for (const file of files.files) {
-		const target = path.join(out, file.path);
-		if (owned.has(fileKey(file.path)) || !(yield* fs.exists(target).pipe(onFileSystem("check", target))))
-			continue;
+	for (const file of written) {
+		const target = path.join(out, file);
+		if (owned.has(fileKey(file)) || !(yield* fs.exists(target).pipe(onFileSystem("check", target)))) continue;
 
 		return yield* new ImportOutputError({
 			path: target,
@@ -131,14 +147,24 @@ export const writeImport = Effect.fnUntraced(function* (
 		if (!(yield* fs.exists(target).pipe(onFileSystem("check", target)))) missing.push(file);
 	}
 	yield* writeTree(out, treeOf([...files.files, ...missing]));
+	for (const copy of files.copies) {
+		const target = path.join(out, copy.path);
+		yield* fs.makeDirectory(path.dirname(target), { recursive: true }).pipe(onFileSystem("create", target));
+		yield* fs.copyFile(copy.source, target).pipe(onFileSystem("copy", copy.source));
+	}
 	if (!missing.some((file) => file.path === Layout.packageJson)) yield* addAliases(out);
+	if (!missing.some((file) => file.path === Layout.gitignore))
+		yield* addIgnores(
+			out,
+			files.copies.map((copy) => copy.path),
+		);
 	for (const folder of files.folders) {
 		const target = path.join(out, folder);
 		yield* fs.makeDirectory(target, { recursive: true }).pipe(onFileSystem("create", target));
 	}
 
 	const manifest = path.join(out, Layout.manifest);
-	const listed = files.files.map((file) => file.path).toSorted();
+	const listed = [...files.files, ...files.copies].map((file) => file.path).toSorted();
 	yield* fs
 		.writeFileString(manifest, `${JSON.stringify(listed, null, "\t")}\n`)
 		.pipe(onFileSystem("write", manifest));

@@ -74,9 +74,15 @@ type Page = Report["pages"][number];
 type Resource = NonNullable<Report["resources"]>[number];
 type Visual = Page["visuals"][number];
 
+export interface ImportCopy {
+	readonly path: string;
+	readonly source: string;
+}
+
 export interface ImportFiles {
 	readonly files: ReadonlyArray<TreeFile>;
 	readonly folders: ReadonlyArray<string>;
+	readonly copies: ReadonlyArray<ImportCopy>;
 }
 
 interface Module {
@@ -679,8 +685,11 @@ const SUPPORT_FILES = {
 	},
 };
 
-export const supportFiles = (): ReadonlyArray<TreeFile> => [
-	treeFile(Layout.gitignore, encoder.encode(`${Layout.localFolder}/\n`)),
+export const supportFiles = ({ copies }: ImportFiles): ReadonlyArray<TreeFile> => [
+	treeFile(
+		Layout.gitignore,
+		encoder.encode([`${Layout.localFolder}/`, ...copies.map((copy) => copy.path)].join("\n").concat("\n")),
+	),
 	...Object.entries(SUPPORT_FILES).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
 	),
@@ -738,8 +747,14 @@ export const importFiles = (
 		}));
 	});
 
+	const copies = Option.toArray(Option.fromNullishOr(config.model?.cache)).map((url) => ({
+		path: assetOf(url),
+		source: fileURLToPath(url),
+	}));
+
 	return {
 		files: [...rendered, ...shared, ...assets],
 		folders: urls.filter((url) => isFolder(url)).map((url) => assetPath(project, projectPath(project, url))),
+		copies,
 	};
 };
