@@ -685,11 +685,21 @@ const SUPPORT_FILES = {
 	},
 };
 
+const AGENTS_NOTE = [
+	"# Agents",
+	"",
+	"This project builds a Power BI report with pbirkit.",
+	"",
+	`Read \`node_modules/${CORE_PACKAGE}/docs/README.md\` before you change this report. It lists the rules, and the page to read for each task.`,
+	"",
+].join("\n");
+
 export const supportFiles = ({ copies }: ImportFiles): ReadonlyArray<TreeFile> => [
 	treeFile(
 		Layout.gitignore,
 		encoder.encode([`${Layout.localFolder}/`, ...copies.map((copy) => copy.path)].join("\n").concat("\n")),
 	),
+	treeFile(Layout.agents, encoder.encode(AGENTS_NOTE)),
 	...Object.entries(SUPPORT_FILES).map(([path, value]) =>
 		treeFile(path, encoder.encode(`${JSON.stringify(value, null, "\t")}\n`)),
 	),
