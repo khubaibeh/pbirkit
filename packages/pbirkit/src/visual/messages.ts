@@ -34,6 +34,20 @@ const columns = (rows: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<stri
 	);
 };
 
+const noteOf = (description: string | undefined, displayName?: string): string | undefined => {
+	const note = description?.replaceAll(/\s+/gu, " ").trim();
+	return note === undefined || note === "" || note === displayName ? undefined : note;
+};
+
+const withNotes = (
+	rows: ReadonlyArray<ReadonlyArray<string>>,
+	notes: ReadonlyArray<string | undefined>,
+): ReadonlyArray<string> =>
+	columns(rows).flatMap((line, index) => {
+		const note = notes[index];
+		return note === undefined ? [line] : [line, `      ${note}`];
+	});
+
 const objectsOf = (type: string): Readonly<Record<string, ObjectDescriptor>> =>
 	type === CONTAINER ? containerObjects() : visualObjects(type);
 
@@ -65,23 +79,28 @@ export const visualMessage = (type: string): Result.Result<string, string> => {
 				: [
 						"",
 						"roles",
-						...columns(
+						...withNotes(
 							names.map((name) => {
 								const role = roles.find((known) => known.name === name);
 								return role === undefined
 									? [name, "-", "-"]
 									: [name, ROLE_KINDS[role.kind] ?? role.kind, role.displayName ?? "-"];
 							}),
+							names.map((name) => {
+								const role = roles.find((known) => known.name === name);
+								return noteOf(role?.description, role?.displayName);
+							}),
 						),
 					]),
 			"",
 			`objects (${objects.length})`,
-			...columns(
+			...withNotes(
 				objects.map(([name, object]) => [
 					name,
 					`${Object.keys(object.properties).length} properties`,
 					statesNote(states[name]),
 				]),
+				objects.map(([, object]) => noteOf(object.description, object.displayName)),
 			),
 		].join("\n"),
 	);
@@ -94,17 +113,21 @@ export const objectMessage = (type: string, name: string): Result.Result<string,
 	if (object === undefined)
 		return Result.fail(`"${name}" is not a ${type} object. Run pbirkit visual ${type} to list its objects`);
 	const states = own(objectStates(type), name);
+	const note = noteOf(object.description, object.displayName);
+	const properties = Object.entries(object.properties);
 	return Result.succeed(
 		[
 			`${type}.${name}${object.displayName === undefined ? "" : ` (${object.displayName})`}`,
+			...(note === undefined ? [] : [note]),
 			...(states === undefined ? [] : [statesNote(states)]),
 			"",
-			...columns(
-				Object.entries(object.properties).map(([property, descriptor]) => [
+			...withNotes(
+				properties.map(([property, descriptor]) => [
 					property,
 					descriptor.displayName ?? "-",
 					kindOf(descriptor.type),
 				]),
+				properties.map(([, descriptor]) => noteOf(descriptor.description, descriptor.displayName)),
 			),
 		].join("\n"),
 	);

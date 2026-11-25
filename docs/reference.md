@@ -112,6 +112,7 @@ Looks up the built-in visuals in Microsoft's visual catalog.
 - With no argument, it lists the visual types.
 - With a type, it lists the query roles, the objects and the states of each object.
 - With an object, it lists each property, its Format pane name and its kind. An enum lists its values.
+- An indented line below a role, an object or a property gives its description, when the catalog has one.
 - `container` stands for the objects that every visual frame shares (`visualContainerObjects`).
 - `--json` prints the catalog entry as it is.
 

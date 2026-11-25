@@ -14,6 +14,7 @@ const HELP = [
 	`  pbirkit visual ${CONTAINER} [object]   the objects every visual frame shares`,
 	"",
 	"Each property line has its name, its name in the Format pane and its kind.",
+	"An indented line below a role, object or property gives its description, when the catalog has one.",
 	"A kind of enum lists the values that the property takes.",
 	'"states" lists the selector ids that the object takes, for example default and hover.',
 	"",
