@@ -10,6 +10,7 @@ import { VisualLinkFields, visualConfiguration } from "./shared.ts";
 export * from "./shared.ts";
 export { Border, RoleFieldParameterSortFields, VisualHeader };
 
+/** The `visualLink` container object: the action that a click on the visual runs. */
 export const VisualLink = Struct({
 	...VisualLinkFields,
 	dataFunction: optionalKey(Unknown),

@@ -18,6 +18,7 @@ import { BookmarkFields, bookmarkDefinitions, filterMetadata } from "./shared.ts
 export * from "./shared.ts";
 export { ParameterSortFields };
 
+/** The filter metadata schemas of 2.1.0. See `filterMetadata`. */
 export const { FilterLabelIdPair, FilterExpressionMetadata } = filterMetadata({
 	QueryExpressionContainer,
 	DataRepetitionSelector,
@@ -26,6 +27,7 @@ export const { FilterLabelIdPair, FilterExpressionMetadata } = filterMetadata({
 export type FilterLabelIdPair = typeof FilterLabelIdPair.Type;
 export type FilterExpressionMetadata = typeof FilterExpressionMetadata.Type;
 
+/** The bookmark state schemas of 2.1.0. See `bookmarkDefinitions` for each one. */
 export const {
 	FilterContainerState,
 	FiltersState,
@@ -52,6 +54,11 @@ export const {
 	},
 );
 
+/**
+ * The `<name>.bookmark.json` file of one bookmark.
+ *
+ * - `explorationState`: The captured report state that the bookmark applies.
+ */
 export const Bookmark = Struct({
 	$schema: Literal(SchemaUrl.bookmark["2.1.0"]),
 	...BookmarkFields,
@@ -78,6 +85,7 @@ export type SectionState = typeof SectionState.Type;
 
 export type ExplorationState = typeof ExplorationState.Type;
 
+/** Builds a 2.1.0 bookmark and fills `$schema`. */
 export const defineBookmark = (bookmark: Omit<Bookmark, "$schema">): Bookmark => ({
 	$schema: Bookmark.fields.$schema.literal,
 	...bookmark,

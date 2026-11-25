@@ -16,6 +16,7 @@ import type { QueryDefinitions, QueryExpressionKindsOf, QuerySparklineDataFields
 export * from "./shared.ts";
 export { QueryVisualTopNExpression };
 
+/** The data type of a visual calculation. */
 export const QueryNativeVisualCalcDataType = Literals([
 	"Binary",
 	"Boolean",
@@ -36,6 +37,7 @@ export const QueryNativeVisualCalcDataType = Literals([
 
 export type QueryNativeVisualCalcDataType = typeof QueryNativeVisualCalcDataType.Type;
 
+/** A visual calculation: DAX that runs on the visual data, not on the model. */
 export const QueryNativeVisualCalc = Struct({
 	...QueryNativeVisualCalcFields,
 	DataType: optionalKey(QueryNativeVisualCalcDataType),

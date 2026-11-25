@@ -14,6 +14,7 @@ import { VisualContainerFields, visualGroupConfig } from "./shared.ts";
 export * from "./shared.ts";
 export { FilterConfig, HowCreated, VisualConfiguration, VisualContainerPosition };
 
+/** A visual group. It holds visuals whose `parentGroupName` is the group `name`. */
 export const VisualGroupConfig = visualGroupConfig(Selector);
 
 export type VisualGroupConfig = typeof VisualGroupConfig.Type;

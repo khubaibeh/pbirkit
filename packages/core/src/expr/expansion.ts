@@ -1,10 +1,12 @@
 import type { LiteralExpression } from "./literal.ts";
 
+/** One node of an expansion state: its value and the nodes under it. `branch` builds it. */
 export interface ExpansionBranch<V extends LiteralExpression, C extends ReadonlyArray<unknown>> {
 	readonly identityValues: readonly [V];
 	readonly children?: C;
 }
 
+/** An expanded node of an expansion state. `toggled` builds it. */
 export interface ToggledBranch<
 	V extends LiteralExpression,
 	C extends ReadonlyArray<unknown>,
@@ -12,12 +14,17 @@ export interface ToggledBranch<
 	readonly isToggled: true;
 }
 
+/**
+ * Builds a node of an expansion state, such as `branch(text("North"), toggled(text("Q1")))`.
+ * The value must be a literal. The rest are the nodes under it.
+ */
 export const branch = <const V extends LiteralExpression, const C extends ReadonlyArray<ChainNode>>(
 	value: V,
 	...children: C
 ): ExpansionBranch<V, C> =>
 	children.length === 0 ? { identityValues: [value] } : { identityValues: [value], children };
 
+/** Builds an expanded node of an expansion state. It is `branch` with `isToggled: true`. */
 export const toggled = <const V extends LiteralExpression, const C extends ReadonlyArray<ChainNode>>(
 	value: V,
 	...children: C
@@ -28,6 +35,7 @@ export const toggled = <const V extends LiteralExpression, const C extends Reado
 
 type ChainNode = ExpansionBranch<LiteralExpression, ReadonlyArray<unknown>>;
 
+/** The type that `nest` builds: each node becomes the only child of the node before it. */
 export type Nest<T extends ReadonlyArray<ChainNode>> = T extends readonly [
 	infer H extends ChainNode,
 	...infer R extends ReadonlyArray<ChainNode>,

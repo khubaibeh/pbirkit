@@ -13,6 +13,7 @@ import { Spacing as SpacingV1_5, VisualTooltip as VisualTooltipV1_5, visualConfi
 export * from "./shared.ts";
 export { Border, RoleFieldParameterSortFields, VisualHeader, VisualLink };
 
+/** The `spacing` container object, with the extra space settings from 2.6.0. */
 export const Spacing = Struct({
 	...SpacingV1_5.fields,
 	...formattingProperties("spaceAbovePlotArea", "spaceAboveDivider", "spaceAboveSubtitle"),
@@ -20,6 +21,7 @@ export const Spacing = Struct({
 
 export type Spacing = typeof Spacing.Type;
 
+/** The `visualTooltip` container object, with the sentence and value settings from 2.6.0. */
 export const VisualTooltip = Struct({
 	...VisualTooltipV1_5.fields,
 	...formattingProperties(
@@ -33,6 +35,7 @@ export const VisualTooltip = Struct({
 
 export type VisualTooltip = typeof VisualTooltip.Type;
 
+/** The `visual` schemas of 2.6.0 and later. See `visualConfiguration` for each one. */
 export const {
 	RoleFieldParameter,
 	ProjectionState,

@@ -18,10 +18,12 @@ import {
 
 import { FontFace, FontSize } from "#core/font.ts";
 
+/** A theme color as `#RRGGBB`. */
 export const ThemeColor = TemplateLiteral(["#", String]).check(isPattern(/^#[0-9a-fA-F]{6}$/u));
 
 export type ThemeColor = typeof ThemeColor.Type;
 
+/** The names of the theme color slots. */
 export const ThemeColorName = Literals([
 	"foreground",
 	"firstLevelElements",
@@ -62,6 +64,7 @@ export const ThemeColorName = Literals([
 
 export type ThemeColorName = typeof ThemeColorName.Type;
 
+/** A fill color: `#RRGGBB`, `#RRGGBBAA`, or a theme color slot name. */
 export const FillColor = Union([
 	TemplateLiteral(["#", String]).check(isPattern(/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u)),
 	ThemeColorName,
@@ -69,12 +72,18 @@ export const FillColor = Union([
 
 export type FillColor = typeof FillColor.Type;
 
+/** A solid fill, as theme files write it: `{ solid: { color } }`. */
 export const ThemeFill = Struct({ solid: Struct({ color: FillColor }) });
 
 export type ThemeFill = typeof ThemeFill.Type;
 
 const Transparency = Finite.check(isBetween({ minimum: 0, maximum: 100 }));
 
+/**
+ * The properties of one style object in a theme.
+ * Any key that ends in `FontFamily` takes a font stack, and any key that ends in `FontSize` or `TextSize` takes a size.
+ * Other keys take any value.
+ */
 export const VisualStyleProperties = StructWithRest(
 	Struct({
 		fontFamily: optionalKey(FontFace),
@@ -91,6 +100,13 @@ export const VisualStyleProperties = StructWithRest(
 
 export type VisualStyleProperties = typeof VisualStyleProperties.Type;
 
+/**
+ * The `background` style object of a visual frame.
+ *
+ * - `color`: The fill.
+ * - `show`: When true, the background shows.
+ * - `transparency`: The transparency, from 0 to 100.
+ */
 export const VisualBackground = Struct({
 	color: optionalKey(ThemeFill),
 	show: optionalKey(Boolean),
@@ -99,6 +115,14 @@ export const VisualBackground = Struct({
 
 export type VisualBackground = typeof VisualBackground.Type;
 
+/**
+ * The `border` style object of a visual frame.
+ *
+ * - `color`: The line color.
+ * - `radius`: The corner radius in pixels.
+ * - `show`: When true, the border shows.
+ * - `width`: The line width in pixels.
+ */
 export const VisualBorder = Struct({
 	color: optionalKey(ThemeFill),
 	radius: optionalKey(Finite),
@@ -108,6 +132,10 @@ export const VisualBorder = Struct({
 
 export type VisualBorder = typeof VisualBorder.Type;
 
+/**
+ * The `visualHeader` style object of a visual frame.
+ * `background`, `border` and `foreground` set the colors. Each `show*` key shows or hides one header button.
+ */
 export const VisualHeader = Struct({
 	background: optionalKey(ThemeFill),
 	border: optionalKey(ThemeFill),
@@ -139,6 +167,7 @@ export const VisualHeader = Struct({
 
 export type VisualHeader = typeof VisualHeader.Type;
 
+/** The tooltip fields that `VisualTooltip` and `VisualHeaderTooltip` share. */
 const tooltipText = {
 	background: optionalKey(ThemeFill),
 	themedBackground: optionalKey(ThemeFill),
@@ -154,6 +183,14 @@ const tooltipText = {
 	type: optionalKey(String),
 };
 
+/**
+ * The `visualTooltip` style object of a visual frame.
+ *
+ * - `type`: The tooltip kind, such as `Default` or `Canvas`.
+ * - `section`: The `name` of the tooltip page.
+ * - `show`: When true, tooltips show.
+ * - The `*Color` keys and font keys set the look.
+ */
 export const VisualTooltip = Struct({
 	...tooltipText,
 	valueFontColor: optionalKey(ThemeFill),
@@ -170,6 +207,11 @@ export const VisualTooltip = Struct({
 
 export type VisualTooltip = typeof VisualTooltip.Type;
 
+/**
+ * The `visualHeaderTooltip` style object: the help tooltip in the visual header.
+ *
+ * - `text`: The help text.
+ */
 export const VisualHeaderTooltip = Struct({
 	...tooltipText,
 	text: optionalKey(String),
@@ -177,6 +219,12 @@ export const VisualHeaderTooltip = Struct({
 
 export type VisualHeaderTooltip = typeof VisualHeaderTooltip.Type;
 
+/**
+ * The `outspacePane` style object: the look of the filter pane.
+ *
+ * - `width`: The pane width in pixels.
+ * - `transparency`: The transparency, from 0 to 100.
+ */
 export const FilterPane = Struct({
 	backgroundColor: optionalKey(ThemeFill),
 	foregroundColor: optionalKey(ThemeFill),
@@ -194,6 +242,11 @@ export const FilterPane = Struct({
 
 export type FilterPane = typeof FilterPane.Type;
 
+/**
+ * The `filterCard` style object: the look of filter cards.
+ *
+ * - `$id`: `Applied` styles cards with a value. `Available` styles the rest.
+ */
 export const FilterCard = Struct({
 	$id: Literals(["Applied", "Available"]),
 	backgroundColor: optionalKey(ThemeFill),
@@ -208,6 +261,13 @@ export const FilterCard = Struct({
 
 export type FilterCard = typeof FilterCard.Type;
 
+/**
+ * The `background` and `outspace` style objects of a page.
+ *
+ * - `color`: The fill.
+ * - `image`: The background image.
+ * - `transparency`: The transparency, from 0 to 100.
+ */
 export const PageArea = Struct({
 	color: optionalKey(ThemeFill),
 	image: optionalKey(Unknown),
@@ -223,6 +283,10 @@ const paneObjects = {
 	filterCard: optionalKey(Array(FilterCard)),
 };
 
+/**
+ * The style objects that apply to all visuals, under `visualStyles["*"]["*"]`.
+ * It types the frame objects and allows any other object name.
+ */
 export const AllVisualStyles = StructWithRest(
 	Struct({
 		background: optionalKey(Array(VisualBackground)),
@@ -237,6 +301,7 @@ export const AllVisualStyles = StructWithRest(
 
 export type AllVisualStyles = typeof AllVisualStyles.Type;
 
+/** The style objects of pages, under `visualStyles.page["*"]`. */
 export const PageStyles = StructWithRest(
 	Struct({
 		background: optionalKey(Array(PageArea)),
@@ -248,6 +313,10 @@ export const PageStyles = StructWithRest(
 
 export type PageStyles = typeof PageStyles.Type;
 
+/**
+ * The `visualStyles` of a theme: visual type, then style name, then object name, then a list of property sets.
+ * Use `"*"` for all visual types or all styles. `page` styles the page itself.
+ */
 export const VisualStyles = StructWithRest(
 	Struct({
 		"*": optionalKey(

@@ -6,6 +6,7 @@ import { SelectorFields, dataRepetitionSelector, dataViewObjectDefinitions } fro
 
 export * from "./shared.ts";
 
+/** How a selector matches values in a hierarchy. `0` matches only leaf levels. `1` matches all levels. */
 export const HierarchyMatching = Literals([0, 1]);
 
 export type HierarchyMatching = typeof HierarchyMatching.Type;

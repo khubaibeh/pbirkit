@@ -2,10 +2,12 @@ import { Effect, SchemaIssue, SchemaParser } from "effect";
 import { Struct, declareConstructor } from "effect/Schema";
 import type { Codec, Top } from "effect/Schema";
 
+/** A union where each member has the `Base` fields plus exactly one key of `Kinds`. */
 export type OneKey<Base, Kinds> = {
 	readonly [K in keyof Kinds]: Base & { readonly [P in K]: Kinds[K] };
 }[keyof Kinds];
 
+/** Maps each kind schema to its decoded type. */
 export type KindTypes<Kinds extends Struct.Fields> = { readonly [K in keyof Kinds]: Kinds[K]["Type"] };
 
 const kindMessage = (input: object, keys: ReadonlyArray<string>, base: ReadonlyArray<string>) => {
@@ -16,6 +18,10 @@ const kindMessage = (input: object, keys: ReadonlyArray<string>, base: ReadonlyA
 	return "Missing kind";
 };
 
+/**
+ * Builds a schema for an object with the `base` fields and exactly one key of `kinds`.
+ * It fails with a clear message on zero keys, several keys, or an unknown key.
+ */
 export function oneKeyOf<const B extends Struct.Fields, const K extends Struct.Fields>(
 	base: B,
 	kinds: K,

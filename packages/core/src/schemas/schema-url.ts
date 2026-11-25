@@ -1,3 +1,7 @@
+/**
+ * The `$schema` URL of each file kind and version, as Microsoft publishes them.
+ * Use it to set `$schema` in config input, such as `SchemaUrl.platform["2.0.0"]`.
+ */
 export const SchemaUrl = {
 	pbip: {
 		"1.0.0": "https://developer.microsoft.com/json-schemas/fabric/pbip/pbipProperties/1.0.0/schema.json",
@@ -180,6 +184,7 @@ export const SchemaUrl = {
 	},
 } as const;
 
+/** Any one `$schema` URL in `SchemaUrl`. */
 export type SchemaUrl = {
 	[K in keyof typeof SchemaUrl]: (typeof SchemaUrl)[K][keyof (typeof SchemaUrl)[K]];
 }[keyof typeof SchemaUrl];

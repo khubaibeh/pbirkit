@@ -13,6 +13,7 @@ export * from "./shared.ts";
 
 export { FilterConfig };
 
+/** The report `objects`: `outspacePane` and `section` formatting, each a list of selector and property pairs. */
 export const ReportFormattingObjects = formattingObjects(Selector, ReportFormattingProperties);
 
 export type ReportFormattingObjects = typeof ReportFormattingObjects.Type;

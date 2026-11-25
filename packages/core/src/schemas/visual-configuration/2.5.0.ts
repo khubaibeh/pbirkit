@@ -12,6 +12,7 @@ import { visualConfiguration } from "./shared.ts";
 export * from "./shared.ts";
 export { Border, RoleFieldParameterSortFields, VisualLink };
 
+/** The `visualHeader` container object: the header icons and their look. */
 export const VisualHeader = Struct({
 	...VisualHeaderV1_5.fields,
 	...formattingProperties("showCopilotSummaryButton"),

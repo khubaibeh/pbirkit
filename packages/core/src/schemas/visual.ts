@@ -24,6 +24,7 @@ import { Visual as VisualV2_11 } from "./visual/2.11.0.ts";
 import { Visual as VisualV2_12 } from "./visual/2.12.0.ts";
 import { Visual as VisualV2_13 } from "./visual/2.13.0.ts";
 
+/** A `visual.json` of any supported version. `$schema` picks the version. */
 export const AnyVisual = Union([
 	VisualV1_0,
 	VisualV1_1,

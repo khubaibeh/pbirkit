@@ -9,6 +9,11 @@ import { SortDirection, visualConfiguration } from "./shared.ts";
 export * from "./shared.ts";
 export { Border, VisualHeader, VisualLink };
 
+/**
+ * Sort fields for a field parameter in a role, from 1.8.0 on.
+ *
+ * - `sortDirection`: When set, the visual sorts by the parameter fields in this direction.
+ */
 export const RoleFieldParameterSortFields = {
 	sortDirection: optionalKey(SortDirection),
 };

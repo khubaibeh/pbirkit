@@ -15,6 +15,7 @@ import type { QueryDefinitions, QueryExpressionKindsOf, QuerySparklineDataFields
 export * from "./shared.ts";
 export { QueryNativeVisualCalc };
 
+/** A filter that keeps the first `ItemCount` data points of a visual. */
 export const QueryVisualTopNExpression = Struct({ ItemCount: Finite });
 
 export type QueryVisualTopNExpression = typeof QueryVisualTopNExpression.Type;

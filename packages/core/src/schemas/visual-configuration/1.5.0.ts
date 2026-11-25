@@ -7,6 +7,7 @@ import { BorderFields, VisualHeaderFields, VisualLinkFields, visualConfiguration
 
 export * from "./shared.ts";
 
+/** The `border` container object: the line around the visual. */
 export const Border = Struct({
 	...BorderFields,
 	width: optionalKey(Unknown),
@@ -22,6 +23,7 @@ export const VisualHeader = Struct({
 
 export type VisualHeader = typeof VisualHeader.Type;
 
+/** The `visualLink` container object: the action that a click on the visual runs. */
 export const VisualLink = Struct(VisualLinkFields);
 
 export type VisualLink = typeof VisualLink.Type;

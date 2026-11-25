@@ -5,6 +5,7 @@ import { FilterType, filterConfiguration } from "./shared.ts";
 
 export * from "./shared.ts";
 
+/** The filter schemas of 1.3.0. See `filterConfiguration` for each one. */
 export const { FilterContainerFormattingObjects, FilterContainer, FilterConfig } = filterConfiguration({
 	QueryExpressionContainer,
 	FilterDefinition,

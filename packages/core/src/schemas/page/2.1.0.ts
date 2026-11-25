@@ -19,10 +19,16 @@ import {
 export * from "./shared.ts";
 export { FilterConfig, PageType };
 
+/** The page `objects`: each formatting object maps to a list of selector and property pairs. */
 export const PageFormattingObjects = formattingObjects(Selector, PageFormattingProperties);
 
 export type PageFormattingObjects = typeof PageFormattingObjects.Type;
 
+/**
+ * A field that a drillthrough or tooltip page takes as a filter.
+ *
+ * - `boundFilter`: The `name` of the page filter that the parameter sets.
+ */
 export const BindingParameter = Struct({
 	...bindingParameterFields(QueryExpressionContainer),
 	boundFilter: optionalKey(String),
@@ -30,6 +36,11 @@ export const BindingParameter = Struct({
 
 export type BindingParameter = typeof BindingParameter.Type;
 
+/**
+ * Makes the page a drillthrough or tooltip target.
+ *
+ * - `parameters`: The fields that the page takes from the source visual.
+ */
 export const PageBinding = Struct({
 	...PageBindingFields,
 	parameters: optionalKey(Array(BindingParameter)),
@@ -37,10 +48,20 @@ export const PageBinding = Struct({
 
 export type PageBinding = typeof PageBinding.Type;
 
+/** The settings that made the page automatically, such as through Auto create. */
 export const AutoPageGenerationConfig = autoPageGenerationConfig(QueryExpressionContainer);
 
 export type AutoPageGenerationConfig = typeof AutoPageGenerationConfig.Type;
 
+/**
+ * The `page.json` file of one page.
+ *
+ * - `filterConfig`: Filters on every visual of the page, on top of the report filters.
+ * - `pageBinding`: The drillthrough or tooltip binding of the page.
+ * - `objects`: Page formatting, such as `background`, `pageSize` and `outspacePane`.
+ * - `type`: `Drillthrough` or `Tooltip` for a page with a special use.
+ * - `autoPageGenerationConfig`: The settings that made the page automatically. Desktop writes it.
+ */
 export const Page = Struct({
 	$schema: Literal(SchemaUrl.page["2.1.0"]),
 	...PageFields,
@@ -53,10 +74,12 @@ export const Page = Struct({
 
 export type Page = typeof Page.Type;
 
+/** One page in config input: the `page.json` fields plus the page visuals. */
 export const PageDefinition = Struct({ ...Page.fields, visuals: PageVisuals });
 
 export type PageDefinition = typeof PageDefinition.Type;
 
+/** Builds a 2.1.0 page and fills `$schema`. Export it as the default of `src/pages/<page>/index.ts`. */
 export const definePage = (page: Omit<PageDefinition, "$schema">): PageDefinition => ({
 	$schema: Page.fields.$schema.literal,
 	...page,

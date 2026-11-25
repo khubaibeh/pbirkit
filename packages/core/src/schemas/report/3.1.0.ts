@@ -9,6 +9,12 @@ import { ExplorationSettingsFields, ReportFields } from "./shared.ts";
 export * from "./shared.ts";
 export { FilterConfig, ReportFormattingObjects, ThemeCollection, ThemeMetadata, ThemeVersion };
 
+/**
+ * Report-wide settings for field parameters.
+ *
+ * - `skipHierarchyLevelPersistence`: When true, a field parameter switch drops the hierarchy level and expand
+ *   state of a visual.
+ */
 export const FieldParameterReportSettings = Struct({
 	skipHierarchyLevelPersistence: optionalKey(Boolean),
 });

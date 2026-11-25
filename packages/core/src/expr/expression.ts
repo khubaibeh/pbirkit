@@ -15,12 +15,14 @@ import type {
 	QuerySparklineDataFieldsOf,
 } from "#schemas/semantic-query/shared.ts";
 
+/** The name of any expression kind, such as `Column`, `Literal` or `Comparison`. */
 export type ExpressionKind =
 	| QueryExpressionKindName
 	| "SparklineData"
 	| "NativeVisualCalculation"
 	| "VisualTopN";
 
+/** A loose expression type: any object with one kind key. The helpers take and return it. */
 export type Expression = { readonly [K in ExpressionKind]: { readonly [P in K]: unknown } }[ExpressionKind];
 
 interface FieldRecursion {
@@ -36,6 +38,7 @@ type FieldKinds = QueryExpressionKindsOf<FieldRecursion, typeof SortDirection> &
 	readonly NativeVisualCalculation: QueryNativeVisualCalc;
 };
 
+/** A strict expression type: the base fields plus exactly one kind key, with typed contents. */
 export type Field = OneKey<FieldBase, FieldKinds>;
 
 const kinds: ReadonlySet<string> = new Set([
@@ -45,6 +48,7 @@ const kinds: ReadonlySet<string> = new Set([
 	"VisualTopN",
 ]);
 
+/** True when the value is an object with at least one expression kind key. */
 export const isExpression = (value: unknown): value is Expression =>
 	typeof value === "object" &&
 	value !== null &&

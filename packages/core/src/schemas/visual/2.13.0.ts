@@ -22,6 +22,16 @@ const fields = {
 	howCreated: optionalKey(HowCreated),
 };
 
+/**
+ * The `visual.json` file of one visual or group.
+ * Set `visual` for a chart, or `visualGroup` for a group, never both.
+ *
+ * - `position`: Where the visual sits and how big it is.
+ * - `filterConfig`: Filters on this visual, on top of the page and report filters.
+ * - `howCreated`: How the visual came to be. Desktop writes it.
+ * - `visual`: The chart: its type, query, formatting and more.
+ * - `visualGroup`: The group settings, for a group.
+ */
 export const Visual = Union([
 	Struct({ ...fields, visual: VisualConfiguration }),
 	Struct({ ...fields, visualGroup: VisualGroupConfig }),
@@ -29,6 +39,11 @@ export const Visual = Union([
 
 export type Visual = typeof Visual.Type;
 
+/**
+ * Builds a 2.13.0 visual and fills `$schema`.
+ * It checks `visualType`, object names, property names and role names against the visual catalog.
+ * Pass no type parameters. TS infers them from the call. See `docs/authoring.md`.
+ */
 export const defineVisual = <Type extends string, const Objects, QueryState>(
 	visual: CheckedVisual<WithoutSchema<Visual>, Type, Objects, QueryState>,
 ): Visual => ({

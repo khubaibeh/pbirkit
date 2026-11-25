@@ -11,6 +11,7 @@ import { Report as ReportV3_1 } from "./report/3.1.0.ts";
 import { Report as ReportV3_2 } from "./report/3.2.0.ts";
 import { Report as ReportV3_3 } from "./report/3.3.0.ts";
 
+/** A `report.json` of any supported version. `$schema` picks the version. */
 export const AnyReport = Union([
 	ReportV1_0,
 	ReportV1_1,

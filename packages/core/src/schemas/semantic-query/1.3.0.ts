@@ -16,10 +16,12 @@ import type { QueryDefinitions, QueryExpressionKindsOf, QuerySparklineDataFields
 export * from "./shared.ts";
 export { QueryNativeVisualCalc, QueryNativeVisualCalcDataType, QueryVisualTopNExpression };
 
+/** A query sort direction. `1` ascending, `2` descending. */
 export const SortDirection = Literals([1, 2]);
 
 export type SortDirection = typeof SortDirection.Type;
 
+/** Where a calculation group applies in a sparkline: `Sparkline` for the whole line, `Point` for each point. */
 export const ApplyCalculationGroupTo = Literals(["Sparkline", "Point"]);
 
 export type ApplyCalculationGroupTo = typeof ApplyCalculationGroupTo.Type;

@@ -4,6 +4,10 @@ import { omit } from "effect/Struct";
 import { ByConnection as ByConnectionV1_0, Pbir as PbirV1_0 } from "./pbir/1.0.0.ts";
 import { ByConnection as ByConnectionV2_0, Pbir as PbirV2_0 } from "./pbir/2.0.0.ts";
 
+/**
+ * The `report.pbir` config input, for any `.pbir` version.
+ * The build writes `byPath` from `model`, so input sets only `byConnection`, and only for a live connection.
+ */
 export const PbirItem = Union([
 	Struct({
 		...PbirV1_0.mapFields(omit(["datasetReference"])).fields,

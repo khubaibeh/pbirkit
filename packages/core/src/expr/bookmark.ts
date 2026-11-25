@@ -1,7 +1,9 @@
 import type { Expression } from "./expression.ts";
 
+/** How a bookmark filter came to be, as the number that bookmark state writes. */
 export type HowCreated = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+/** One filter in bookmark state. */
 export interface FilterState<N extends string, T extends string, E extends Expression, F> {
 	readonly name: N;
 	readonly type: T;
@@ -10,6 +12,7 @@ export interface FilterState<N extends string, T extends string, E extends Expre
 	readonly howCreated: HowCreated;
 }
 
+/** Builds one filter in bookmark state: its name, type, field, how it came to be, and its filter query. */
 export const filterState = <
 	const N extends string,
 	const T extends string,

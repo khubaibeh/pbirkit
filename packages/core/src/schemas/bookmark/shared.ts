@@ -16,17 +16,33 @@ import type { Codec, Constraint } from "effect/Schema";
 
 import { VisualType } from "#core/visual-type.ts";
 
+/** A tree of group-on key columns in a filter. */
 export interface DecomposedTree<E> {
 	readonly left?: DecomposedTree<E>;
 	readonly right?: DecomposedTree<E>;
 	readonly value?: E;
 }
 
+/**
+ * The state of a visual group in a bookmark.
+ *
+ * - `isHidden`: True when the bookmark hides the group.
+ * - `children`: The state of child groups, by group name.
+ */
 export interface VisualContainerGroupState {
 	readonly isHidden?: boolean;
 	readonly children?: { readonly [name: string]: VisualContainerGroupState };
 }
 
+/**
+ * What a bookmark applies.
+ *
+ * - `applyOnlyToTargetVisuals`: When true, the bookmark applies only to `targetVisualNames`.
+ * - `targetVisualNames`: The `name` of each visual that the bookmark applies to.
+ * - `suppressActiveSection`: When true, the bookmark does not change the current page.
+ * - `suppressData`: When true, the bookmark does not change filters, slicers or sorts.
+ * - `suppressDisplay`: When true, the bookmark does not change visibility or spotlight.
+ */
 export const BookmarkOptions = Struct({
 	applyOnlyToTargetVisuals: optionalKey(Boolean),
 	targetVisualNames: optionalKey(Array(String)),
@@ -37,14 +53,25 @@ export const BookmarkOptions = Struct({
 
 export type BookmarkOptions = typeof BookmarkOptions.Type;
 
+/** How a filter came to be, as a number in bookmark state. */
 export const FilterContainerHowCreated = Literals([0, 1, 2, 3, 4, 5, 6, 7]);
 
 export type FilterContainerHowCreated = typeof FilterContainerHowCreated.Type;
 
+/**
+ * How a bookmark shows a visual.
+ * `maximize` shows it in focus mode. `spotlight` dims the other visuals. `elevation` raises it. `hidden` hides it.
+ */
 export const VisualContainerDisplayMode = Literals(["maximize", "spotlight", "elevation", "hidden"]);
 
 export type VisualContainerDisplayMode = typeof VisualContainerDisplayMode.Type;
 
+/**
+ * How a bookmark shows a visual.
+ *
+ * - `mode`: The display mode.
+ * - `maximizedOptions`: For `maximize`, the kind of data table to show: `accessible` or `normal`.
+ */
 export const VisualContainerDisplayState = Struct({
 	mode: VisualContainerDisplayMode,
 	maximizedOptions: optionalKey(Struct({ dataTable: optionalKey(Literals(["accessible", "normal"])) })),
@@ -52,6 +79,7 @@ export const VisualContainerDisplayState = Struct({
 
 export type VisualContainerDisplayState = typeof VisualContainerDisplayState.Type;
 
+/** The state of a visual group in a bookmark. */
 export const VisualContainerGroupState: Codec<VisualContainerGroupState> = Struct({
 	isHidden: optionalKey(Boolean),
 	children: optionalKey(
@@ -62,25 +90,41 @@ export const VisualContainerGroupState: Codec<VisualContainerGroupState> = Struc
 	),
 });
 
+/** Maps an index in decomposed identities to a `queryRef`. */
 export const IndexValueMap = Record(String, String);
 
 export type IndexValueMap = typeof IndexValueMap.Type;
 
+/** A JSON filter. `filterType` holds its type. */
 export const JsonFilter = Struct({ filterType: Unknown });
 
 export type JsonFilter = typeof JsonFilter.Type;
 
+/** Loose filter metadata fields for bookmark versions without typed forms. */
 export const UntypedFilterMetadata = {
 	FilterLabelIdPair: Unknown,
 	FilterExpressionMetadata: Unknown,
 };
 
+/**
+ * The bookmark fields that all versions share.
+ *
+ * - `displayName`: The bookmark name that the bookmarks pane shows.
+ * - `name`: The bookmark id. It must be unique in the report, and it names the `<name>.bookmark.json` file.
+ * - `options`: What the bookmark applies.
+ */
 export const BookmarkFields = {
 	displayName: String,
 	name: String,
 	options: optionalKey(BookmarkOptions),
 };
 
+/**
+ * Builds the schema of decomposed identities: the group-on key columns of a filter, and the values on them.
+ *
+ * - `values`: The filter values on each column.
+ * - `columns`: The group-on key columns.
+ */
 export const decomposedIdentities = <E>(Expression: Codec<E>) => {
 	const DecomposedTree: Codec<DecomposedTree<E>> = Struct({
 		left: optionalKey(suspend((): Codec<DecomposedTree<E>> => DecomposedTree)),
@@ -94,6 +138,13 @@ export const decomposedIdentities = <E>(Expression: Codec<E>) => {
 	});
 };
 
+/**
+ * Builds the filter metadata schemas of one version.
+ *
+ * - `FilterLabelIdPair`: A display name for one data point, by selector `id`.
+ * - `FilterExpressionMetadata`: The fields of a filter and the values it holds on their group-on keys.
+ *   One form lists `expressions` and `cachedValueItems`. The other lists `decomposedIdentities` and `valueMap`.
+ */
 export const filterMetadata = <E, R extends Constraint>(refs: {
 	readonly QueryExpressionContainer: Codec<E>;
 	readonly DataRepetitionSelector: R;
@@ -122,6 +173,25 @@ export const filterMetadata = <E, R extends Constraint>(refs: {
 	return { FilterLabelIdPair, FilterExpressionMetadata };
 };
 
+/**
+ * Builds the bookmark state schemas of one version. Desktop captures this state, so copy it from a saved report.
+ *
+ * - `ExplorationState`: The whole state of a bookmark.
+ * - `ExplorationState.version`: The bookmark state version.
+ * - `ExplorationState.activeSection`: The `name` of the page that was open.
+ * - `ExplorationState.filters`: The report filters.
+ * - `ExplorationState.sections`: The state of each page, by page `name`.
+ * - `ExplorationState.objects`: Report formatting changes.
+ * - `SectionState`: One page: its filters, and the state of each visual and group, by `name`.
+ * - `VisualContainerState`: One visual: its filters, its config state and its highlights.
+ * - `SingleVisualConfigState`: Changes to a visual: type, formatting, sort, fields, field parameters and display.
+ *   `targetType` changes the visual type, for personalize this visual.
+ * - `HighlightState`: The data points of a cross-highlight.
+ * - `FiltersState`: Filter cards, keyed `byName`, or listed `byExpr`, `byType` and `byTransientState`.
+ * - `FilterContainerState`: One filter card. Its fields mean the same as in `filterConfig`.
+ * - `DataViewObjectDefinitionUpdates`: Formatting to `merge`, and properties to `remove`.
+ * - `ParameterState`: A field parameter in a query: its field, start index and field count.
+ */
 export const bookmarkDefinitions = <
 	E,
 	F extends Constraint,

@@ -13,10 +13,16 @@ import { PositionFields, VisualContainerFields, visualGroupConfig } from "./shar
 export * from "./shared.ts";
 export { FilterConfig, HowCreated, VisualConfiguration };
 
+/** A visual group. It holds visuals whose `parentGroupName` is the group `name`. */
 export const VisualGroupConfig = visualGroupConfig(Selector);
 
 export type VisualGroupConfig = typeof VisualGroupConfig.Type;
 
+/**
+ * Where the visual sits on the page and how big it is, in page pixels.
+ *
+ * - `angle`: The rotation angle.
+ */
 export const VisualContainerPosition = Struct({
 	...PositionFields,
 	angle: optionalKey(Finite),

@@ -8,6 +8,7 @@ import { Bookmark as BookmarkV1_4 } from "./bookmark/1.4.0.ts";
 import { Bookmark as BookmarkV2_0 } from "./bookmark/2.0.0.ts";
 import { Bookmark as BookmarkV2_1 } from "./bookmark/2.1.0.ts";
 
+/** A bookmark of any supported version. `$schema` picks the version. */
 export const AnyBookmark = Union([
 	BookmarkV1_0,
 	BookmarkV1_1,

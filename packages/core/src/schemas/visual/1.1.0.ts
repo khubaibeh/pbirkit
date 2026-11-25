@@ -15,6 +15,7 @@ import { HowCreatedValues, VisualContainerFields, visualGroupConfig } from "./sh
 export * from "./shared.ts";
 export { VisualContainerPosition };
 
+/** How a visual came to be. Desktop writes it, and it does not change how the visual works. */
 export const HowCreated = Literals([...HowCreatedValues, "SummarizeVisualContainer"]);
 
 export type HowCreated = typeof HowCreated.Type;

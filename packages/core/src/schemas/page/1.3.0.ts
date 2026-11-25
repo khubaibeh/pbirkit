@@ -9,6 +9,7 @@ import { PageFields, PageVisuals } from "./shared.ts";
 export * from "./shared.ts";
 export { AutoPageGenerationConfig, BindingParameter, FilterConfig, PageBinding, PageFormattingObjects };
 
+/** A special use of a page: a drillthrough target or a tooltip. */
 export const PageType = Literals(["Drillthrough", "Tooltip"]);
 
 export type PageType = typeof PageType.Type;

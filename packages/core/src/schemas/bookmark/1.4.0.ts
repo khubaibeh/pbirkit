@@ -16,6 +16,11 @@ import { BookmarkFields, bookmarkDefinitions, filterMetadata } from "./shared.ts
 
 export * from "./shared.ts";
 
+/**
+ * Sort fields for a field parameter in bookmark state.
+ *
+ * - `sortDirection`: `1` ascending, `2` descending.
+ */
 export const ParameterSortFields = { sortDirection: optionalKey(Literals([1, 2])) };
 
 export const { FilterLabelIdPair, FilterExpressionMetadata } = filterMetadata({
