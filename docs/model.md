@@ -61,8 +61,18 @@ Some harnesses read the MCP config from a `.mcp.json` file at the project root:
 
 The server changes the model in Desktop's memory, not in your files. The files change only when the person saves in Desktop. The save writes the model into `dist/`.
 
+Keep the changes in one of two ways. A reload or a reopen before that loses them.
+
+**Save in Desktop.** Use this way by default.
+
 1. Ask the person to save in Desktop.
 2. Run `pbirkit build`. It keeps the model changes and lists them.
 3. Port each changed model file, as [workflow.md](workflow.md#port-desktop-edits) shows.
 
-A reload or a reopen before the save loses the change.
+**Export through the server.** Use this way when you want to keep the changes without a save.
+
+1. Ask the server to export the model as TMDL into a scratch folder.
+2. Compare the export with the TMDL in your source, and copy only the changed files.
+3. Run `pbirkit build`, then check the diff in git.
+
+The export can write files that you did not change in a new form, such as a new property order. Do not copy those files.

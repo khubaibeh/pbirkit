@@ -143,6 +143,11 @@ A selector picks the part of the visual that an entry formats.
 | `wildcard(field, 0)`                    | every instance and the totals.                                 |
 | `perField("key", [[f1, v1], [f2, v2]])` | one entry per field, each with its own value of one key        |
 
+Pick the selector by what the setting applies to:
+
+- For a fixed setting on one field, such as the format of one card tile, use `forField`.
+- For a rule that runs on each value of a field, such as a color by sign, use `wildcard`.
+
 Add a state with a spread: `{ ...wildcard(field, 0), id: "default" }`. Run `pbirkit visual TYPE OBJECT` to list the state ids that an object takes.
 
 ## Conditions
